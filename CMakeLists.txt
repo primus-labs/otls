@@ -9,8 +9,8 @@ find_package(emp-ot REQUIRED)
 include_directories(${EMP-OT_INCLUDE_DIRS})
 
 # Installation
-install(FILES cmake/emp-sh2pc-config.cmake DESTINATION cmake/)
-install(DIRECTORY emp-sh2pc DESTINATION include/)
+# install(FILES cmake/emp-sh2pc-config.cmake DESTINATION cmake/)
+# install(DIRECTORY emp-sh2pc DESTINATION include/)
 
 
 #aux_source_directory(prf PRF_SRC)
@@ -24,3 +24,5 @@ install(DIRECTORY emp-sh2pc DESTINATION include/)
 
 ENABLE_TESTING()
 ADD_SUBDIRECTORY(test)
+
+add_subdirectory(mpc_tls)
