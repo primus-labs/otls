@@ -14,6 +14,15 @@ void run_pado() {
 	printf("begin mul tls\n");
 	EC_POINT_mul_tls(z_pub_key, s_pub_key);
 	printf("end mul tls\n");
+    
+	printf("begin get pms\n");
+	BIGNUM* x = BN_new();
+	get_pms_tls(x, z_pub_key);
+	printf("end get pms\n");
+
+    printf("begin get client key\n");
+	get_client_pub_key_tls(NULL);
+	printf("end get client key\n");
 }
 
 int main(int argc, char* argv[]) {
