@@ -12,7 +12,7 @@ echo ${LD_LIBRARY_PATH}
 ll ${MPC_TLS_PATH}
 g++ -ggdb3 server.cpp  -lotls -lssl -lcrypto -o server
 g++ -L${OPENSSL_PATH} -ggdb3 client.cpp   -lotls -lssl -lcrypto -o client
-g++ -ggdb3 pado.cpp  -lotls -lssl -lotls -o pado
+g++ -ggdb3 pado.cpp  -lotls -lssl -lcrypto -o pado
 
 
 #g++ -ggdb3 client.cpp   -lmpc_tls -lssl -lcrypto -o client && echo "AAAAAAAAAAaa"

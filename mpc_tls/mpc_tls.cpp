@@ -40,23 +40,42 @@ int init_mpc(int party) {
     return 1;
 }
 
+EC_POINT* EC_POINT_new_mpc() {
+   return EC_POINT_new(g_group);
+}
+
+void EC_POINT_free_mpc(EC_POINT* p) {
+	return EC_POINT_free(p);
+}
+
 static int send_point(EC_POINT* pub_key) {
         unsigned char buf[65];
         int size = EC_POINT_point2oct(g_group, pub_key, POINT_CONVERSION_UNCOMPRESSED, buf, 65, g_ctx);
+		printf("begin send point:%d\n", size);
         g_io->send_data(buf, size);
+		g_io->flush();
+		printf("end send point\n");
 		return 1;
 }
 
 static int recv_point(EC_POINT* pub_key) {
         unsigned char buf[65];
+		printf("begin recv point:%d\n", 65);
         g_io->recv_data(buf, 65);
+		printf("end recv point\n");
 
         if (!EC_POINT_oct2point(g_group, pub_key, buf, 65, g_ctx))
             printf("error in converting oct to TA\n");
 		return 1;
 }
 
+int set_priv_key_mpc(BIGNUM* priv_key) {
+	BN_copy(g_priv_key, priv_key);
+	EC_POINT_mul(g_group, g_pub_key, g_priv_key, NULL, NULL, g_ctx);
 
+	return 1;
+}
+	
 int EC_POINT_mul_mpc(EC_POINT* out, EC_POINT* pub_key) {
     if (g_party == ALICE) {
 		recv_point(pub_key);
