@@ -6,7 +6,7 @@
 #include<openssl/mpc_tls_meth.h>
 
 void run_pado() {
-    OPENSSL_init_MPC_METH(set_priv_key_mpc, EC_POINT_mul_mpc, get_client_pub_key_mpc, get_pms_mpc, tls1_prf_P_hash_mpc);
+    OPENSSL_init_MPC_METH(set_priv_key_mpc, EC_POINT_mul_mpc, get_client_pub_key_mpc, get_pms_mpc, tls1_prf_P_hash_mpc, transfer_hash_mpc);
 	init_mpc(1);
     
 	EC_POINT* s_pub_key = EC_POINT_new_mpc();
@@ -23,6 +23,11 @@ void run_pado() {
     printf("begin get client key\n");
 	get_client_pub_key_tls(NULL);
 	printf("end get client key\n");
+
+	printf("begin transfer hash\n");
+	unsigned char hash[32];
+	transfer_hash_tls(hash);
+	printf("end transfer hash\n");
 }
 
 int main(int argc, char* argv[]) {

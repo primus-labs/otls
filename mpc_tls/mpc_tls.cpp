@@ -86,6 +86,7 @@ int EC_POINT_mul_mpc(EC_POINT* out, EC_POINT* pub_key) {
 
     EC_POINT_mul(g_group, out, NULL, pub_key, g_priv_key, g_ctx);
     
+	printf("finish ec point mul mpc\n");
     return 1;
 }
 
@@ -99,6 +100,7 @@ int get_client_pub_key_mpc(EC_POINT* out) {
         EC_POINT_add(g_group, out, tmp, g_pub_key, g_ctx);
         EC_POINT_free(tmp);
     }
+	printf("finish get client pub key mpc\n");
 
     return 1;
 }
@@ -107,6 +109,7 @@ int get_pms_mpc(BIGNUM *pms, EC_POINT* Z) {
     g_hs->compute_pms_offline(g_party);
 
     g_hs->compute_pms_online(pms, Z, g_party);
+	printf("finish get pms mpc\n");
     return 1;
 }
     
@@ -135,6 +138,19 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
         prf.init(hmac, pmsbits);
         prf.opt_phash(hmac, ms, olen * 8, pmsbits, seed, seed_len, true, true);
 
+		printf("finsih tls1 prf P hash mpc\n");
+
         delete []buf;
         return 1;
+}
+
+int transfer_hash_mpc(unsigned char* hash) {
+	if (g_party == ALICE) {
+		g_io->recv_data(hash, 32);
+	}
+	else {
+		g_io->send_data(hash, 32);
+		g_io->flush();
+	}
+	return 1;
 }

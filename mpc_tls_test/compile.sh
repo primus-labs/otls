@@ -9,7 +9,6 @@ OPENSSL_PATH=${OPENSSL_PATH}/lib/
 MPC_TLS_PATH=${OTLS_PATH}/build/mpc_tls/
 
 echo ${LD_LIBRARY_PATH}
-ll ${MPC_TLS_PATH}
 g++ -ggdb3 server.cpp  -lotls -lssl -lcrypto -o server
 g++ -L${OPENSSL_PATH} -ggdb3 client.cpp   -lotls -lssl -lcrypto -o client
 g++ -ggdb3 pado.cpp  -lotls -lssl -lcrypto -o pado
