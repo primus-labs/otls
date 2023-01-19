@@ -87,7 +87,7 @@ int EC_POINT_mul_mpc(EC_POINT* out, EC_POINT* pub_key) {
 
     EC_POINT_mul(g_group, out, NULL, pub_key, g_priv_key, g_ctx);
     
-	printf("finish ec point mul mpc\n");
+    printf("finish ec point mul mpc\n");
     return 1;
 }
 
@@ -101,7 +101,7 @@ int get_client_pub_key_mpc(EC_POINT* out) {
         EC_POINT_add(g_group, out, tmp, g_pub_key, g_ctx);
         EC_POINT_free(tmp);
     }
-	printf("finish get client pub key mpc\n");
+    printf("finish get client pub key mpc\n");
 
     return 1;
 }
@@ -110,7 +110,7 @@ int get_pms_mpc(BIGNUM *pms, EC_POINT* Z) {
     g_hs->compute_pms_offline(g_party);
 
     g_hs->compute_pms_online(pms, Z, g_party);
-	printf("finish get pms mpc\n");
+    printf("finish get pms mpc\n");
     return 1;
 }
     
@@ -118,7 +118,7 @@ static Integer* g_block_key = NULL;
 static Integer* g_ms = NULL;
 int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
         Integer *pmsbits;
-		if (sec_len == 32) {
+        if (sec_len == 32) {
             char* buf = new char[sec_len];
             for (int i = 0; i < sec_len; i++) {
                 buf[i] = sec[sec_len - 1 - i];
@@ -133,78 +133,79 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
                 pmsb = Integer(sec_len * 8, buf, BOB);
             }
             
-    		pmsbits = new Integer();
+            pmsbits = new Integer();
             addmod(*pmsbits, pmsa, pmsb, g_q);
             delete []buf;
-		}
-		else {
-			pmsbits = g_ms;
-		}
+        }
+        else {
+            pmsbits = g_ms;
+        }
 
-		unsigned char* pms_oct = new unsigned char[1024];
+        unsigned char* pms_oct = new unsigned char[1024];
         pmsbits->reveal<unsigned char>((unsigned char*)pms_oct, PUBLIC);
-		printf("reveal pms:");
-		for (int i = 0; i < sec_len; i++) {
-			printf("%2x ", pms_oct[i]);
-		}
-		printf("\n");
+        printf("reveal pms[%d]:", sec_len);
+        for (int i = 0; i < sec_len; i++) {
+            printf("%2x ", pms_oct[sec_len - 1 - i]);
+        }
+        printf("\n");
 
-		printf("reveal seed:");
-		for (int i = 0; i < seed_len; i++) {
-			printf("%2x ", seed[i]);
-		}
-		printf("\n");
+        printf("reveal seed[%d]:", seed_len);
+        for (int i = 0; i < seed_len; i++) {
+            printf("%2x ", seed[i]);
+        }
+        printf("\n");
 
         PRF prf;
         HMAC_SHA256 hmac;
+        printf("hmac diglen:%d wordlen:%d\n", hmac.DIGLEN, hmac.WORDLEN);
         Integer *ms = new Integer();
         prf.init(hmac, pmsbits);
         prf.opt_phash(hmac, *ms, olen * 8, *pmsbits, seed, seed_len, true, true);
 
-		if (sec_len == 32)
-			g_ms = ms;
-		else
-			g_block_key = ms;
+        if (sec_len == 32)
+            g_ms = ms;
+        else
+            g_block_key = ms;
 
-		unsigned char* out_oct = new unsigned char[1024];
+        unsigned char* out_oct = new unsigned char[1024];
         ms->reveal<unsigned char>((unsigned char*)out_oct, PUBLIC);
-		printf("reveal out:");
-		for (int i = 0; i < olen; i++) {
-			printf("%2x ", out_oct[i]);
-		}
-		printf("\n");
+        printf("reveal out[%d]:", olen);
+        for (int i = 0; i < olen; i++) {
+            printf("%2x ", out_oct[olen - 1 - i]);
+        }
+        printf("\n");
 
-		printf("finsih tls1 prf P hash mpc\n");
+        printf("finsih tls1 prf P hash mpc\n");
 
         return 1;
 }
 
 int transfer_hash_mpc(unsigned char* hash) {
-	if (g_party == ALICE) {
-		g_io->recv_data(hash, 32);
-	}
-	else {
-		g_io->send_data(hash, 32);
-		g_io->flush();
-	}
-	return 1;
+    if (g_party == ALICE) {
+        g_io->recv_data(hash, 32);
+    }
+    else {
+        g_io->send_data(hash, 32);
+        g_io->flush();
+    }
+    return 1;
 }
 
 
 int tls1_prf_master_secret_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
     char buf[256]; // 22 + 32
     strcpy(buf, "extended master secret");
-	memcpy(buf + 22, seed, 32);
+    memcpy(buf + 22, seed, 32);
 
-	tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 54, out, olen);
-	return 1;
+    tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 54, out, olen);
+    return 1;
 }
 
 int tls1_prf_block_key_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
     char buf[256]; // 13 + 32 + 32
     strcpy(buf, "key expansion");
-	memcpy(buf + 13, seed, 64);
+    memcpy(buf + 13, seed, 64);
 
-	tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 77, out, olen);
-	return 1;
+    tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 77, out, olen);
+    return 1;
 }
