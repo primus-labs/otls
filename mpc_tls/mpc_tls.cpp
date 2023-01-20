@@ -116,6 +116,7 @@ int get_pms_mpc(BIGNUM *pms, EC_POINT* Z) {
     
 static Integer* g_block_key = NULL;
 static Integer* g_ms = NULL;
+static Integer* g_finish_mac = NULL;
 int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
         Integer *pmsbits;
         if (sec_len == 32) {
@@ -159,13 +160,15 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
         HMAC_SHA256 hmac;
         printf("hmac diglen:%d wordlen:%d\n", hmac.DIGLEN, hmac.WORDLEN);
         Integer *ms = new Integer();
-        prf.init(hmac, pmsbits);
+        prf.init(hmac, *pmsbits);
         prf.opt_phash(hmac, *ms, olen * 8, *pmsbits, seed, seed_len, true, true);
 
         if (sec_len == 32)
             g_ms = ms;
-        else
+        else if (olen == 56)
             g_block_key = ms;
+		else
+			g_finish_mac = ms;
 
         unsigned char* out_oct = new unsigned char[1024];
         ms->reveal<unsigned char>((unsigned char*)out_oct, PUBLIC);
@@ -207,5 +210,14 @@ int tls1_prf_block_key_mpc(const unsigned char* sec, size_t sec_len, const unsig
     memcpy(buf + 13, seed, 64);
 
     tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 77, out, olen);
+    return 1;
+}
+
+int tls1_prf_finish_mac_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
+    char buf[256]; // 15 + 32
+    strcpy(buf, "client finished");
+    memcpy(buf + 15, seed, 32);
+
+    tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 47, out, olen);
     return 1;
 }

@@ -15,7 +15,7 @@ void print_random(char* title, unsigned char* r, int rlen) {
 }
 
 void run_pado() {
-    OPENSSL_init_MPC_METH(set_priv_key_mpc, EC_POINT_mul_mpc, get_client_pub_key_mpc, get_pms_mpc, tls1_prf_P_hash_mpc, tls1_prf_master_secret_mpc, tls1_prf_block_key_mpc, transfer_hash_mpc);
+    OPENSSL_init_MPC_METH(set_priv_key_mpc, EC_POINT_mul_mpc, get_client_pub_key_mpc, get_pms_mpc, tls1_prf_P_hash_mpc, tls1_prf_master_secret_mpc, tls1_prf_block_key_mpc, tls1_prf_finish_mac_mpc, transfer_hash_mpc);
     init_mpc(1);
     
     printf("begin tranfer client random\n");
@@ -54,8 +54,7 @@ void run_pado() {
     printf("end transfer hash\n");
 
     printf("begin generate master secret\n");
-    unsigned char** master_secret = new unsigned char*;
-    tls1_prf_master_secret_tls(pmsbuf, 32, hash, 32, (unsigned char*)master_secret, 48);
+    tls1_prf_master_secret_tls(pmsbuf, 32, hash, 32, NULL, 48);
     printf("end generate master secret\n");
 
     printf("begin generate block key\n");
@@ -65,6 +64,15 @@ void run_pado() {
     memcpy(random + 32, client_random, 32);
     tls1_prf_key_block_tls(pmsbuf, 48, (unsigned char*)random, 64, (unsigned char*)block_key, 56);
     printf("end generate block key\n");
+
+    printf("begin transfer finish hash\n");
+    unsigned char finish_hash[32];
+    transfer_hash_tls(finish_hash);
+    printf("end transfer finish hash\n");
+
+    printf("begin generate finish mac\n");
+    tls1_prf_finish_mac_tls(pmsbuf, 48, finish_hash, 32, NULL, 12);
+    printf("end generate finish mac\n");
 }
 
 int main(int argc, char* argv[]) {
