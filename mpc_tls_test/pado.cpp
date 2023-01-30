@@ -15,7 +15,7 @@ void print_random(char* title, unsigned char* r, int rlen) {
 }
 
 void run_pado() {
-    OPENSSL_init_MPC_METH(set_priv_key_mpc, EC_POINT_mul_mpc, get_client_pub_key_mpc, get_pms_mpc, tls1_prf_P_hash_mpc, tls1_prf_master_secret_mpc, tls1_prf_block_key_mpc, tls1_prf_finish_mac_mpc, transfer_hash_mpc);
+    OPENSSL_init_MPC_METH(set_priv_key_mpc, EC_POINT_mul_mpc, get_client_pub_key_mpc, get_pms_mpc, tls1_prf_P_hash_mpc, tls1_prf_master_secret_mpc, tls1_prf_block_key_mpc, tls1_prf_finish_mac_mpc, enc_aesgcm_mpc, dec_aesgcm_mpc, transfer_hash_mpc);
     init_mpc(1);
     
     printf("begin tranfer client random\n");

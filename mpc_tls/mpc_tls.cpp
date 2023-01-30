@@ -114,6 +114,10 @@ int get_pms_mpc(BIGNUM *pms, EC_POINT* Z) {
     return 1;
 }
     
+static Integer g_iv, g_key_c, g_key_s;
+static unsigned char g_iv_oct[24];
+static AESGCM<NetIO> *g_aesgcm_c = NULL;
+static AESGCM<NetIO> *g_aesgcm_s = NULL;
 static Integer* g_block_key = NULL;
 static Integer* g_ms = NULL;
 static Integer* g_finish_mac = NULL;
@@ -165,10 +169,19 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
 
         if (sec_len == 32)
             g_ms = ms;
-        else if (olen == 56)
+        else if (olen == 56) {
             g_block_key = ms;
-		else
-			g_finish_mac = ms;
+            g_iv.bits.insert(g_iv.bits.begin(), ms->bits.begin(), ms->bits.begin() + 96 * 2);
+            g_key_s.bits.insert(g_key_s.bits.begin(), ms->bits.begin() + 2 * 96,
+                                ms->bits.begin() + 2 * 96 + 128);
+            g_key_c.bits.insert(g_key_c.bits.begin(), ms->bits.begin() + 2 * 96 + 128,
+                                ms->bits.begin() + 2 * (96 + 128));
+            g_iv.reveal<unsigned char>((unsigned char*)g_iv_oct, PUBLIC);
+            g_aesgcm_c = new AESGCM<NetIO>(g_key_c, g_iv_oct + 12, 12);
+            g_aesgcm_s = new AESGCM<NetIO>(g_key_s, g_iv_oct, 12);
+        }
+        else
+            g_finish_mac = ms;
 
         unsigned char* out_oct = new unsigned char[1024];
         ms->reveal<unsigned char>((unsigned char*)out_oct, PUBLIC);
@@ -219,5 +232,16 @@ int tls1_prf_finish_mac_mpc(const unsigned char* sec, size_t sec_len, const unsi
     memcpy(buf + 15, seed, 32);
 
     tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 47, out, olen);
+    return 1;
+}
+
+int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char* msg, size_t msg_len, const unsigned char* aad, size_t aad_len) {
+    g_hs->encrypt_client_finished_msg(*g_aesgcm_c, ctxt, tag, msg, aad, aad_len, g_party);
+    return 1;
+}
+
+int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_len, const unsigned char* tag, const unsigned char* aad, size_t aad_len) {
+    bool res = g_hs->decrypt_and_check_server_finished_msg(*g_aesgcm_s, msg, ctxt, tag, aad,
+                                                         aad_len, g_party);
     return 1;
 }
