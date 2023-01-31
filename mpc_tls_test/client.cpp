@@ -97,6 +97,7 @@ void run_client() {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
+    printf("SSL connect success\n");
     // ==========================
     printf("ssl cipher %s\n", SSL_get_cipher(ssl));
 

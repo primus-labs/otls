@@ -42,6 +42,13 @@ class AESGCM {
         Integer ONE = Integer(32, 1, PUBLIC);
         concat(nonce, &ONE, 1);
 
+        unsigned char nonce_oct[16];
+        nonce.reveal<unsigned char>(nonce_oct, PUBLIC);
+        printf("J00[%d]", 16);
+        for (int i = 0; i < 16; i++)
+            printf("%2x ", nonce_oct[16 - 1 - i]);
+        printf("\n");
+
         computeH();
     }
     ~AESGCM() {

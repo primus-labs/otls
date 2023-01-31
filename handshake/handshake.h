@@ -176,29 +176,31 @@ class HandShake {
                                             unsigned char* ctxt,
                                             unsigned char* tag,
                                             const unsigned char* ufinc,
+                                            size_t finished_msg_bit_length0,
                                             const unsigned char* aad,
                                             size_t aad_len,
                                             int party) {
-        aesgcm_c.enc_finished_msg(io, ctxt, tag, ufinc, finished_msg_bit_length / 8, aad,
+        aesgcm_c.enc_finished_msg(io, ctxt, tag, ufinc, finished_msg_bit_length0 / 8, aad,
                                   aad_len, party);
     }
 
     // The ufins string is computed by pado and client, need to check the equality with the decrypted string
     inline bool decrypt_and_check_server_finished_msg(AESGCM<IO>& aesgcm_s,
-                                                      const unsigned char* ufins,
+                                                      unsigned char* ufins,
                                                       const unsigned char* ctxt,
+                                                      size_t finished_msg_bit_length0,
                                                       const unsigned char* tag,
                                                       const unsigned char* aad,
                                                       size_t aad_len,
                                                       int party) {
-        unsigned char* msg = new unsigned char[finished_msg_bit_length / 8];
-        bool res1 = aesgcm_s.dec_finished_msg(io, msg, ctxt, finished_msg_bit_length / 8, tag,
+        unsigned char* msg = new unsigned char[finished_msg_bit_length0 / 8];
+        bool res1 = aesgcm_s.dec_finished_msg(io, msg, ctxt, finished_msg_bit_length0 / 8, tag,
                                               aad, aad_len, party);
 
-        bool res2 = (memcmp(msg, ufins, finished_msg_bit_length / 8) == 0);
+        memcpy(ufins, msg, finished_msg_bit_length0 / 8);
         delete[] msg;
 
-        return res1 & res2;
+        return res1;
     }
 };
 

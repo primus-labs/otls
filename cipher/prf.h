@@ -14,6 +14,15 @@ class PRF {
     size_t hmac_calls_num = 0;
 
     inline void init(HMAC_SHA256& hmac, const Integer secret) {
+        int sec_len = 32;
+        unsigned char* pms_oct = new unsigned char[1024];
+        secret.reveal<unsigned char>((unsigned char*)pms_oct, PUBLIC);
+        printf("reveal prf[%d]:", sec_len);
+        for (int i = 0; i < sec_len; i++) {
+            printf("%2x ", pms_oct[sec_len - 1 - i]);
+        }
+        printf("\n");
+
         hmac.init(secret);
     }
 

@@ -70,9 +70,77 @@ void run_pado() {
     transfer_hash_tls(finish_hash);
     printf("end transfer finish hash\n");
 
-    printf("begin generate finish mac\n");
-    tls1_prf_finish_mac_tls(pmsbuf, 48, finish_hash, 32, NULL, 12);
-    printf("end generate finish mac\n");
+    printf("begin generate client finish mac\n");
+    unsigned char finish_md[12];
+    tls1_prf_finish_mac_tls(pmsbuf, 48, finish_hash, 32, finish_md, 12, 1);
+    printf("end generate client finish mac\n");
+
+    // ==================encrypt aesgcm=============
+    printf("begin transfer aad\n");
+    unsigned char aad[32]; // 13
+    size_t aad_len = 13;
+    transfer_hash_tls(aad);
+    printf("end transfer aad\n");
+
+    printf("begin transfer msg\n");
+    unsigned char msg[32]; // 16
+    size_t msg_len = 16;
+    transfer_hash_tls(msg);
+    printf("end transfer msg\n");
+
+    printf("begin transfer iv\n");
+    unsigned char iv[32]; // 8
+    size_t iv_len = 8;
+    transfer_hash_tls(iv);
+    printf("end transfer iv\n");
+
+    unsigned char ctxt[32]; // 16
+    unsigned char tag[32]; // 16
+    printf("begin enc aesgcm\n");
+    enc_aesgcm_tls(ctxt, tag, msg, msg_len, aad, aad_len, iv, iv_len);
+    printf("end enc aesgcm\n");
+    
+    // ==================decrypt aesgcm=============
+    {
+    printf("begin transfer aad\n");
+    unsigned char aad[32]; // 13
+    size_t aad_len = 13;
+    transfer_hash_tls(aad);
+    printf("end transfer aad\n");
+
+    printf("begin transfer msg\n");
+    unsigned char ctxt[32]; // 16
+    size_t ctxt_len = 16;
+    transfer_hash_tls(ctxt);
+    printf("end transfer msg\n");
+
+    printf("begin transfer iv\n");
+    unsigned char iv[32]; // 8
+    size_t iv_len = 8;
+    transfer_hash_tls(iv);
+    printf("end transfer iv\n");
+
+    printf("begin transfer tag\n");
+    unsigned char tag[32]; // 16
+    transfer_hash_tls(tag);
+    printf("end transfer tag\n");
+
+    unsigned char msg[32]; // 16
+    printf("begin dec aesgcm\n");
+    dec_aesgcm_tls(msg, ctxt, ctxt_len, tag, aad, aad_len, iv, iv_len);
+    printf("end dec aesgcm\n");
+    }
+
+    printf("begin transfer server finish hash\n");
+    unsigned char server_finish_hash[32];
+    transfer_hash_tls(server_finish_hash);
+    printf("end transfer server finish hash\n");
+
+    printf("begin generate server finish mac\n");
+    unsigned char server_finish_md[12];
+    tls1_prf_finish_mac_tls(pmsbuf, 48, server_finish_hash, 32, server_finish_md, 12, 0);
+    printf("end generate server finish mac\n");
+
 }
 
 int main(int argc, char* argv[]) {

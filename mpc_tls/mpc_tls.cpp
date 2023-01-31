@@ -115,7 +115,9 @@ int get_pms_mpc(BIGNUM *pms, EC_POINT* Z) {
 }
     
 static Integer g_iv, g_key_c, g_key_s;
-static unsigned char g_iv_oct[24];
+static unsigned char g_iv_oct[8];
+static unsigned char g_fixed_iv_c[4];
+static unsigned char g_fixed_iv_s[4];
 static AESGCM<NetIO> *g_aesgcm_c = NULL;
 static AESGCM<NetIO> *g_aesgcm_s = NULL;
 static Integer* g_block_key = NULL;
@@ -162,7 +164,7 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
 
         PRF prf;
         HMAC_SHA256 hmac;
-        printf("hmac diglen:%d wordlen:%d\n", hmac.DIGLEN, hmac.WORDLEN);
+        printf("hmac diglen:%d wordlen:%d olen:%d\n", hmac.DIGLEN, hmac.WORDLEN, olen);
         Integer *ms = new Integer();
         prf.init(hmac, *pmsbits);
         prf.opt_phash(hmac, *ms, olen * 8, *pmsbits, seed, seed_len, true, true);
@@ -171,14 +173,43 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
             g_ms = ms;
         else if (olen == 56) {
             g_block_key = ms;
-            g_iv.bits.insert(g_iv.bits.begin(), ms->bits.begin(), ms->bits.begin() + 96 * 2);
-            g_key_s.bits.insert(g_key_s.bits.begin(), ms->bits.begin() + 2 * 96,
-                                ms->bits.begin() + 2 * 96 + 128);
-            g_key_c.bits.insert(g_key_c.bits.begin(), ms->bits.begin() + 2 * 96 + 128,
-                                ms->bits.begin() + 2 * (96 + 128));
+            g_iv.bits.insert(g_iv.bits.begin(), ms->bits.begin() + 128, ms->bits.begin() + 128 + 32 * 2);
+            g_key_s.bits.insert(g_key_s.bits.begin(), ms->bits.begin() + 128 + 2 * 32,
+                                ms->bits.begin() + 128 + 2 * 32 + 128);
+            g_key_c.bits.insert(g_key_c.bits.begin(), ms->bits.begin() + 128 + 2 * 32 + 128,
+                                ms->bits.begin() + 128 + 2 * (32 + 128));
             g_iv.reveal<unsigned char>((unsigned char*)g_iv_oct, PUBLIC);
-            g_aesgcm_c = new AESGCM<NetIO>(g_key_c, g_iv_oct + 12, 12);
-            g_aesgcm_s = new AESGCM<NetIO>(g_key_s, g_iv_oct, 12);
+
+            for (int i = 0; i < 4; i++)
+                g_fixed_iv_c[i] = g_iv_oct[4 + 4 - 1 - i];
+
+            for (int i = 0; i < 4; i++)
+                g_fixed_iv_s[i] = g_iv_oct[4 - 1 - i];
+
+            printf("iv_c[%d]", 4);
+            for (int i = 0; i < 4; i++)
+                printf("%2x ", g_iv_oct[4 + 4 - 1 - i]);
+            printf("\n");
+
+            printf("iv_s[%d]", 4);
+            for (int i = 0; i < 4; i++)
+                printf("%2x ", g_iv_oct[4 - 1 - i]);
+            printf("\n");
+
+            unsigned char key_oct[16];
+            g_key_c.reveal<unsigned char>(key_oct, PUBLIC);
+            printf("key_c[%d]", 16);
+            for (int i = 0; i < 16; i++)
+                printf("%2x ", key_oct[16 - 1 - i]);
+            printf("\n");
+
+            g_key_s.reveal<unsigned char>(key_oct, PUBLIC);
+            printf("key_s[%d]", 16);
+            for (int i = 0; i < 16; i++)
+                printf("%2x ", key_oct[16 - 1 - i]);
+            printf("\n");
+            // g_aesgcm_c = new AESGCM<NetIO>(g_key_c, g_iv_oct + 12, 12);
+            // g_aesgcm_s = new AESGCM<NetIO>(g_key_s, g_iv_oct, 12);
         }
         else
             g_finish_mac = ms;
@@ -190,6 +221,10 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
             printf("%2x ", out_oct[olen - 1 - i]);
         }
         printf("\n");
+        if (olen == 12) {
+            memcpy(out, out_oct, olen);
+            reverse(out, out + olen);
+        }
 
         printf("finsih tls1 prf P hash mpc\n");
 
@@ -204,6 +239,10 @@ int transfer_hash_mpc(unsigned char* hash) {
         g_io->send_data(hash, 32);
         g_io->flush();
     }
+    printf("transfer hash[%d] ", 32);
+    for (int i = 0; i < 32; i++)
+        printf("%2x ", hash[i]);
+    printf("\n");
     return 1;
 }
 
@@ -226,22 +265,71 @@ int tls1_prf_block_key_mpc(const unsigned char* sec, size_t sec_len, const unsig
     return 1;
 }
 
-int tls1_prf_finish_mac_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
+int tls1_prf_finish_mac_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen, int client) {
     char buf[256]; // 15 + 32
-    strcpy(buf, "client finished");
+    strcpy(buf, client ? "client finished":"server finished");
     memcpy(buf + 15, seed, 32);
 
     tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 47, out, olen);
     return 1;
 }
 
-int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char* msg, size_t msg_len, const unsigned char* aad, size_t aad_len) {
-    g_hs->encrypt_client_finished_msg(*g_aesgcm_c, ctxt, tag, msg, aad, aad_len, g_party);
+int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char* msg, size_t msg_len, const unsigned char* aad, size_t aad_len, const unsigned char* iv, size_t iv_len) {
+    unsigned char buf[12];
+    memcpy(buf, g_fixed_iv_c, 4);
+    memcpy(buf + 4, iv, 8);
+    // reverse(buf, buf + 12);
+    g_aesgcm_c = new AESGCM<NetIO>(g_key_c, buf, 12);
+    printf("msg[%d]", msg_len);
+    for (int i = 0; i < msg_len; i++)
+        printf("%2x ", msg[i]);
+    printf("\n");
+
+    printf("aad[%d]", aad_len);
+    for (int i = 0; i < aad_len; i++)
+        printf("%2x ", aad[i]);
+    printf("\n");
+    g_hs->encrypt_client_finished_msg(*g_aesgcm_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
+    printf("ctxt[%d]", 16);
+    for (int i = 0; i < 16; i++)
+        printf("%2x ", ctxt[i]);
+    printf("\n");
+
+    printf("tag[%d]", 16);
+    for (int i = 0; i < 16; i++)
+        printf("%2x ", tag[i]);
+    printf("\n");
     return 1;
 }
 
-int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_len, const unsigned char* tag, const unsigned char* aad, size_t aad_len) {
-    bool res = g_hs->decrypt_and_check_server_finished_msg(*g_aesgcm_s, msg, ctxt, tag, aad,
+int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_len, const unsigned char* tag, const unsigned char* aad, size_t aad_len, const unsigned char* iv, size_t iv_len) {
+    unsigned char buf[12];
+    memcpy(buf, g_fixed_iv_s, 4);
+    memcpy(buf + 4, iv, 8);
+    // reverse(buf, buf + 12);
+    g_aesgcm_s = new AESGCM<NetIO>(g_key_s, buf, 12);
+    printf("ctxt[%d]", ctxt_len);
+    for (int i = 0; i < ctxt_len; i++)
+        printf("%2x ", ctxt[i]);
+    printf("\n");
+
+    printf("aad[%d]", aad_len);
+    for (int i = 0; i < aad_len; i++)
+        printf("%2x ", aad[i]);
+    printf("\n");
+    
+    printf("tag[%d]", 16);
+    for (int i = 0; i < 16; i++)
+        printf("%2x ", tag[i]);
+    printf("\n");
+    bool res = g_hs->decrypt_and_check_server_finished_msg(*g_aesgcm_s, msg, ctxt, ctxt_len * 8, tag, aad,
                                                          aad_len, g_party);
+    printf("msg[%d]", ctxt_len);
+    for (int i = 0; i < ctxt_len; i++)
+        printf("%2x ", msg[i]);
+    printf("\n");
+
+    if (!res)
+        printf("bad mac\n");
     return 1;
 }

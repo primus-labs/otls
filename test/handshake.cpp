@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
     unsigned char* ctxt = new unsigned char[finished_msg_bit_length / 8];
     unsigned char* tag = new unsigned char[16];
 
-    hs->encrypt_client_finished_msg(aesgcm_c, ctxt, tag, ufinc, aad, aad_len, party);
+    hs->encrypt_client_finished_msg(aesgcm_c, ctxt, tag, ufinc, finished_msg_bit_length * 8, aad, aad_len, party);
 
     cout << "tag: ";
     for (int i = 0; i < 16; i++) {
@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
                              tau_s, 32);
 
     // ctxt and tag are received from Server. res should be false
-    bool res = hs->decrypt_and_check_server_finished_msg(aesgcm_s, ufins, ctxt, tag, aad,
+    bool res = hs->decrypt_and_check_server_finished_msg(aesgcm_s, ufins, ctxt, finished_msg_bit_length * 8, tag, aad,
                                                          aad_len, party);
     cout << res << endl;
     cout << "time " << emp::time_from(start) << " us" << endl;
