@@ -41,7 +41,7 @@ int init_mpc(int party) {
 }
 
 EC_POINT* EC_POINT_new_mpc() {
-   return EC_POINT_new(g_group);
+    return EC_POINT_new(g_group);
 }
 
 void EC_POINT_free_mpc(EC_POINT* p) {
@@ -49,24 +49,24 @@ void EC_POINT_free_mpc(EC_POINT* p) {
 }
 
 static int send_point(EC_POINT* pub_key) {
-        unsigned char buf[65];
-        int size = EC_POINT_point2oct(g_group, pub_key, POINT_CONVERSION_UNCOMPRESSED, buf, 65, g_ctx);
-        printf("begin send point:%d\n", size);
-        g_io->send_data(buf, size);
-        g_io->flush();
-        printf("end send point\n");
-        return 1;
+    unsigned char buf[65];
+    int size = EC_POINT_point2oct(g_group, pub_key, POINT_CONVERSION_UNCOMPRESSED, buf, 65, g_ctx);
+    printf("begin send point:%d\n", size);
+    g_io->send_data(buf, size);
+    g_io->flush();
+    printf("end send point\n");
+    return 1;
 }
 
 static int recv_point(EC_POINT* pub_key) {
-        unsigned char buf[65];
-        printf("begin recv point:%d\n", 65);
-        g_io->recv_data(buf, 65);
-        printf("end recv point\n");
+    unsigned char buf[65];
+    printf("begin recv point:%d\n", 65);
+    g_io->recv_data(buf, 65);
+    printf("end recv point\n");
 
-        if (!EC_POINT_oct2point(g_group, pub_key, buf, 65, g_ctx))
-            printf("error in converting oct to TA\n");
-        return 1;
+    if (!EC_POINT_oct2point(g_group, pub_key, buf, 65, g_ctx))
+        printf("error in converting oct to TA\n");
+    return 1;
 }
 
 int set_priv_key_mpc(BIGNUM* priv_key) {
@@ -126,107 +126,107 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
         if (sec_len == 32) {
             char* buf = new char[sec_len];
             for (int i = 0; i < sec_len; i++) {
-                buf[i] = sec[sec_len - 1 - i];
-            }
-            Integer pmsa, pmsb;
-    
-            if (g_party == ALICE) {
-                pmsa = Integer(sec_len * 8, buf, ALICE);
-                pmsb = Integer(sec_len * 8, 0, BOB);
-            } else {
-                pmsa = Integer(sec_len * 8, 0, ALICE);
-                pmsb = Integer(sec_len * 8, buf, BOB);
-            }
-            
-            pmsbits = new Integer();
-            addmod(*pmsbits, pmsa, pmsb, g_q);
-            delete []buf;
+            buf[i] = sec[sec_len - 1 - i];
         }
-        else {
-            pmsbits = g_ms;
-        }
+        Integer pmsa, pmsb;
 
-        unsigned char* pms_oct = new unsigned char[1024];
-        pmsbits->reveal<unsigned char>((unsigned char*)pms_oct, PUBLIC);
-        printf("reveal pms[%d]:", sec_len);
-        for (int i = 0; i < sec_len; i++) {
-            printf("%2x ", pms_oct[sec_len - 1 - i]);
+        if (g_party == ALICE) {
+            pmsa = Integer(sec_len * 8, buf, ALICE);
+            pmsb = Integer(sec_len * 8, 0, BOB);
+        } else {
+            pmsa = Integer(sec_len * 8, 0, ALICE);
+            pmsb = Integer(sec_len * 8, buf, BOB);
         }
+        
+        pmsbits = new Integer();
+        addmod(*pmsbits, pmsa, pmsb, g_q);
+        delete []buf;
+    }
+    else {
+        pmsbits = g_ms;
+    }
+
+    unsigned char* pms_oct = new unsigned char[1024];
+    pmsbits->reveal<unsigned char>((unsigned char*)pms_oct, PUBLIC);
+    printf("reveal pms[%d]:", sec_len);
+    for (int i = 0; i < sec_len; i++) {
+        printf("%2x ", pms_oct[sec_len - 1 - i]);
+    }
+    printf("\n");
+
+    printf("reveal seed[%d]:", seed_len);
+    for (int i = 0; i < seed_len; i++) {
+        printf("%2x ", seed[i]);
+    }
+    printf("\n");
+
+    PRF prf;
+    HMAC_SHA256 hmac;
+    printf("hmac diglen:%d wordlen:%d olen:%d\n", hmac.DIGLEN, hmac.WORDLEN, olen);
+    Integer *ms = new Integer();
+    prf.init(hmac, *pmsbits);
+    prf.opt_phash(hmac, *ms, olen * 8, *pmsbits, seed, seed_len, true, true);
+
+    if (sec_len == 32)
+        g_ms = ms;
+    else if (olen == 56) {
+        g_block_key = ms;
+        g_iv.bits.insert(g_iv.bits.begin(), ms->bits.begin() + 128, ms->bits.begin() + 128 + 32 * 2);
+        g_key_s.bits.insert(g_key_s.bits.begin(), ms->bits.begin() + 128 + 2 * 32,
+                            ms->bits.begin() + 128 + 2 * 32 + 128);
+        g_key_c.bits.insert(g_key_c.bits.begin(), ms->bits.begin() + 128 + 2 * 32 + 128,
+                            ms->bits.begin() + 128 + 2 * (32 + 128));
+        g_iv.reveal<unsigned char>((unsigned char*)g_iv_oct, PUBLIC);
+
+        for (int i = 0; i < 4; i++)
+            g_fixed_iv_c[i] = g_iv_oct[4 + 4 - 1 - i];
+
+        for (int i = 0; i < 4; i++)
+            g_fixed_iv_s[i] = g_iv_oct[4 - 1 - i];
+
+        printf("iv_c[%d]", 4);
+        for (int i = 0; i < 4; i++)
+            printf("%2x ", g_iv_oct[4 + 4 - 1 - i]);
         printf("\n");
 
-        printf("reveal seed[%d]:", seed_len);
-        for (int i = 0; i < seed_len; i++) {
-            printf("%2x ", seed[i]);
-        }
+        printf("iv_s[%d]", 4);
+        for (int i = 0; i < 4; i++)
+            printf("%2x ", g_iv_oct[4 - 1 - i]);
         printf("\n");
 
-        PRF prf;
-        HMAC_SHA256 hmac;
-        printf("hmac diglen:%d wordlen:%d olen:%d\n", hmac.DIGLEN, hmac.WORDLEN, olen);
-        Integer *ms = new Integer();
-        prf.init(hmac, *pmsbits);
-        prf.opt_phash(hmac, *ms, olen * 8, *pmsbits, seed, seed_len, true, true);
-
-        if (sec_len == 32)
-            g_ms = ms;
-        else if (olen == 56) {
-            g_block_key = ms;
-            g_iv.bits.insert(g_iv.bits.begin(), ms->bits.begin() + 128, ms->bits.begin() + 128 + 32 * 2);
-            g_key_s.bits.insert(g_key_s.bits.begin(), ms->bits.begin() + 128 + 2 * 32,
-                                ms->bits.begin() + 128 + 2 * 32 + 128);
-            g_key_c.bits.insert(g_key_c.bits.begin(), ms->bits.begin() + 128 + 2 * 32 + 128,
-                                ms->bits.begin() + 128 + 2 * (32 + 128));
-            g_iv.reveal<unsigned char>((unsigned char*)g_iv_oct, PUBLIC);
-
-            for (int i = 0; i < 4; i++)
-                g_fixed_iv_c[i] = g_iv_oct[4 + 4 - 1 - i];
-
-            for (int i = 0; i < 4; i++)
-                g_fixed_iv_s[i] = g_iv_oct[4 - 1 - i];
-
-            printf("iv_c[%d]", 4);
-            for (int i = 0; i < 4; i++)
-                printf("%2x ", g_iv_oct[4 + 4 - 1 - i]);
-            printf("\n");
-
-            printf("iv_s[%d]", 4);
-            for (int i = 0; i < 4; i++)
-                printf("%2x ", g_iv_oct[4 - 1 - i]);
-            printf("\n");
-
-            unsigned char key_oct[16];
-            g_key_c.reveal<unsigned char>(key_oct, PUBLIC);
-            printf("key_c[%d]", 16);
-            for (int i = 0; i < 16; i++)
-                printf("%2x ", key_oct[16 - 1 - i]);
-            printf("\n");
-
-            g_key_s.reveal<unsigned char>(key_oct, PUBLIC);
-            printf("key_s[%d]", 16);
-            for (int i = 0; i < 16; i++)
-                printf("%2x ", key_oct[16 - 1 - i]);
-            printf("\n");
-            // g_aesgcm_c = new AESGCM<NetIO>(g_key_c, g_iv_oct + 12, 12);
-            // g_aesgcm_s = new AESGCM<NetIO>(g_key_s, g_iv_oct, 12);
-        }
-        else
-            g_finish_mac = ms;
-
-        unsigned char* out_oct = new unsigned char[1024];
-        ms->reveal<unsigned char>((unsigned char*)out_oct, PUBLIC);
-        printf("reveal out[%d]:", olen);
-        for (int i = 0; i < olen; i++) {
-            printf("%2x ", out_oct[olen - 1 - i]);
-        }
+        unsigned char key_oct[16];
+        g_key_c.reveal<unsigned char>(key_oct, PUBLIC);
+        printf("key_c[%d]", 16);
+        for (int i = 0; i < 16; i++)
+            printf("%2x ", key_oct[16 - 1 - i]);
         printf("\n");
-        if (olen == 12) {
-            memcpy(out, out_oct, olen);
-            reverse(out, out + olen);
-        }
 
-        printf("finsih tls1 prf P hash mpc\n");
+        g_key_s.reveal<unsigned char>(key_oct, PUBLIC);
+        printf("key_s[%d]", 16);
+        for (int i = 0; i < 16; i++)
+            printf("%2x ", key_oct[16 - 1 - i]);
+        printf("\n");
+        // g_aesgcm_c = new AESGCM<NetIO>(g_key_c, g_iv_oct + 12, 12);
+        // g_aesgcm_s = new AESGCM<NetIO>(g_key_s, g_iv_oct, 12);
+    }
+    else
+        g_finish_mac = ms;
 
-        return 1;
+    unsigned char* out_oct = new unsigned char[1024];
+    ms->reveal<unsigned char>((unsigned char*)out_oct, PUBLIC);
+    printf("reveal out[%d]:", olen);
+    for (int i = 0; i < olen; i++) {
+        printf("%2x ", out_oct[olen - 1 - i]);
+    }
+    printf("\n");
+    if (olen == 12) {
+        memcpy(out, out_oct, olen);
+        reverse(out, out + olen);
+    }
+
+    printf("finsih tls1 prf P hash mpc\n");
+
+    return 1;
 }
 
 int transfer_hash_mpc(unsigned char* hash, size_t n) {
@@ -320,8 +320,7 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
     for (int i = 0; i < 16; i++)
         printf("%2x ", tag[i]);
     printf("\n");
-    bool res = g_hs->decrypt_and_check_server_finished_msg(*g_aesgcm_s, msg, ctxt, ctxt_len * 8, tag, aad,
-                                                         aad_len, g_party);
+    bool res = g_hs->decrypt_and_check_server_finished_msg(*g_aesgcm_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
     printf("msg[%d]", ctxt_len);
     for (int i = 0; i < ctxt_len; i++)
         printf("%2x ", msg[i]);
