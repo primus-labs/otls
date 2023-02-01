@@ -26,3 +26,4 @@ ENABLE_TESTING()
 ADD_SUBDIRECTORY(test)
 
 add_subdirectory(mpc_tls)
+add_subdirectory(mpc_tls_test)
