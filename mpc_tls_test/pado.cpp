@@ -7,11 +7,89 @@
 #include<openssl/mpc_tls_meth.h>
 #include<openssl/bn.h>
 
-void print_random(char* title, unsigned char* r, int rlen) {
+void print_random(const char* title, unsigned char* r, int rlen) {
     printf("%s:", title);
     for (int i = 0; i < rlen; i++)
         printf("%2x ", r[i]);
     printf("\n");
+}
+
+void transfer_data(unsigned char* &data, size_t *size) {
+    size_t n;
+    transfer_hash_tls((unsigned char*)&n, sizeof(size_t));
+    data = new unsigned char[n];
+    transfer_hash_tls(data, n);
+    *size = n;
+}
+
+void enc_msg() {
+    printf("begin transfer aad\n");
+    unsigned char *aad; // 13
+    size_t aad_len;
+    transfer_data(aad, &aad_len);
+    printf("end transfer aad\n");
+
+    printf("begin transfer msg\n");
+    unsigned char *msg; // 16
+    size_t msg_len;
+    transfer_data(msg, &msg_len);
+    printf("end transfer msg\n");
+
+    printf("begin transfer iv\n");
+    unsigned char *iv; // 8
+    size_t iv_len;
+    transfer_data(iv, &iv_len);
+    printf("end transfer iv\n");
+
+    unsigned char *ctxt = new unsigned char[msg_len]; // 16
+    unsigned char tag[32]; // 16
+    printf("begin enc aesgcm\n");
+    enc_aesgcm_tls(ctxt, tag, msg, msg_len, aad, aad_len, iv, iv_len);
+    printf("end enc aesgcm\n");
+
+    delete []aad;
+    delete []msg;
+    delete []iv;
+
+    delete []ctxt;
+}
+
+void dec_msg() {
+    printf("begin transfer aad\n");
+    unsigned char *aad; // 13
+    size_t aad_len = 13;
+    transfer_data(aad, &aad_len);
+    printf("end transfer aad\n");
+
+    printf("begin transfer msg\n");
+    unsigned char *ctxt; // 16
+    size_t ctxt_len = 16;
+    transfer_data(ctxt, &ctxt_len);
+    printf("end transfer msg\n");
+
+    printf("begin transfer iv\n");
+    unsigned char *iv; // 8
+    size_t iv_len = 8;
+    transfer_data(iv, &iv_len);
+    printf("end transfer iv\n");
+
+    printf("begin transfer tag\n");
+    unsigned char *tag; // 16
+    size_t tag_len;
+    transfer_data(tag, &tag_len);
+    printf("end transfer tag\n");
+
+    unsigned char *msg = new unsigned char[ctxt_len]; // 16
+    printf("begin dec aesgcm\n");
+    dec_aesgcm_tls(msg, ctxt, ctxt_len, tag, aad, aad_len, iv, iv_len);
+    printf("end dec aesgcm\n");
+
+    delete []aad;
+    delete []ctxt;
+    delete []iv;
+    delete []tag;
+
+    delete []msg;
 }
 
 void run_pado() {
@@ -20,13 +98,13 @@ void run_pado() {
     
     printf("begin tranfer client random\n");
     unsigned char client_random[32];
-    transfer_hash_tls(client_random);
+    transfer_hash_tls(client_random, 32);
     print_random("client random", client_random, 32);
     printf("end transfer client random\n");
 
     printf("begin tranfer server random\n");
     unsigned char server_random[32];
-    transfer_hash_tls(server_random);
+    transfer_hash_tls(server_random, 32);
     print_random("server random", server_random, 32);
     printf("end transfer server random\n");
 
@@ -50,7 +128,7 @@ void run_pado() {
 
     printf("begin transfer hash\n");
     unsigned char hash[32];
-    transfer_hash_tls(hash);
+    transfer_hash_tls(hash, 32);
     printf("end transfer hash\n");
 
     printf("begin generate master secret\n");
@@ -67,7 +145,7 @@ void run_pado() {
 
     printf("begin transfer finish hash\n");
     unsigned char finish_hash[32];
-    transfer_hash_tls(finish_hash);
+    transfer_hash_tls(finish_hash, 32);
     printf("end transfer finish hash\n");
 
     printf("begin generate client finish mac\n");
@@ -76,70 +154,26 @@ void run_pado() {
     printf("end generate client finish mac\n");
 
     // ==================encrypt aesgcm=============
-    printf("begin transfer aad\n");
-    unsigned char aad[32]; // 13
-    size_t aad_len = 13;
-    transfer_hash_tls(aad);
-    printf("end transfer aad\n");
-
-    printf("begin transfer msg\n");
-    unsigned char msg[32]; // 16
-    size_t msg_len = 16;
-    transfer_hash_tls(msg);
-    printf("end transfer msg\n");
-
-    printf("begin transfer iv\n");
-    unsigned char iv[32]; // 8
-    size_t iv_len = 8;
-    transfer_hash_tls(iv);
-    printf("end transfer iv\n");
-
-    unsigned char ctxt[32]; // 16
-    unsigned char tag[32]; // 16
-    printf("begin enc aesgcm\n");
-    enc_aesgcm_tls(ctxt, tag, msg, msg_len, aad, aad_len, iv, iv_len);
-    printf("end enc aesgcm\n");
+    enc_msg();
     
     // ==================decrypt aesgcm=============
-    {
-    printf("begin transfer aad\n");
-    unsigned char aad[32]; // 13
-    size_t aad_len = 13;
-    transfer_hash_tls(aad);
-    printf("end transfer aad\n");
-
-    printf("begin transfer msg\n");
-    unsigned char ctxt[32]; // 16
-    size_t ctxt_len = 16;
-    transfer_hash_tls(ctxt);
-    printf("end transfer msg\n");
-
-    printf("begin transfer iv\n");
-    unsigned char iv[32]; // 8
-    size_t iv_len = 8;
-    transfer_hash_tls(iv);
-    printf("end transfer iv\n");
-
-    printf("begin transfer tag\n");
-    unsigned char tag[32]; // 16
-    transfer_hash_tls(tag);
-    printf("end transfer tag\n");
-
-    unsigned char msg[32]; // 16
-    printf("begin dec aesgcm\n");
-    dec_aesgcm_tls(msg, ctxt, ctxt_len, tag, aad, aad_len, iv, iv_len);
-    printf("end dec aesgcm\n");
-    }
+    dec_msg();
 
     printf("begin transfer server finish hash\n");
     unsigned char server_finish_hash[32];
-    transfer_hash_tls(server_finish_hash);
+    transfer_hash_tls(server_finish_hash, 32);
     printf("end transfer server finish hash\n");
 
     printf("begin generate server finish mac\n");
     unsigned char server_finish_md[12];
     tls1_prf_finish_mac_tls(pmsbuf, 48, server_finish_hash, 32, server_finish_md, 12, 0);
     printf("end generate server finish mac\n");
+
+
+    while (1) {
+        enc_msg();
+        dec_msg();
+    }
 
 }
 

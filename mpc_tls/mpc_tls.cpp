@@ -1,7 +1,5 @@
-// #include <openssl/mpc_tls.h>
-// #include <openssl/mpc_tls_meth.h>
-#include "mpc_tls.h"
-#include "mpc_tls_meth.h"
+#include <openssl/mpc_tls.h>
+#include <openssl/mpc_tls_meth.h>
 #include "handshake/handshake.h"
 #include "backend/backend.h"
 #include <iostream>
@@ -231,16 +229,16 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
         return 1;
 }
 
-int transfer_hash_mpc(unsigned char* hash) {
+int transfer_hash_mpc(unsigned char* hash, size_t n) {
     if (g_party == ALICE) {
-        g_io->recv_data(hash, 32);
+        g_io->recv_data(hash, n);
     }
     else {
-        g_io->send_data(hash, 32);
+        g_io->send_data(hash, n);
         g_io->flush();
     }
-    printf("transfer hash[%d] ", 32);
-    for (int i = 0; i < 32; i++)
+    printf("transfer hash[%d] ", n);
+    for (int i = 0; i < n; i++)
         printf("%2x ", hash[i]);
     printf("\n");
     return 1;
