@@ -11,6 +11,7 @@ target_link_libraries(otls PUBLIC ${EMP-OT_LIBRARIES})
 message("source dir:" ${CMAKE_CURRENT_SOURCE_DIR})
 
 install(TARGETS otls DESTINATION lib)
+install(FILES mpc_tls.h DESTINATION include/otls)
 
 # list(APPEND EXTRA_LIBS crypto)
 # target_link_libraries(mpc_tls PUBLIC ${EXTRA_LIBS})
