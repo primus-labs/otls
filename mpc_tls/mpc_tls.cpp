@@ -117,8 +117,8 @@ static Integer g_iv, g_key_c, g_key_s;
 static unsigned char g_iv_oct[8];
 static unsigned char g_fixed_iv_c[4];
 static unsigned char g_fixed_iv_s[4];
-static AEAD<NetIO> *g_aead_c = NULL;
-static AEAD<NetIO> *g_aead_s = NULL;
+static AESGCM<NetIO> *g_aead_c = NULL;
+static AESGCM<NetIO> *g_aead_s = NULL;
 static Integer* g_block_key = NULL;
 static Integer* g_ms = NULL;
 static Integer* g_finish_mac = NULL;
@@ -207,8 +207,8 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
         for (int i = 0; i < 16; i++)
             printf("%2x ", key_oct[16 - 1 - i]);
         printf("\n");
-        // g_aead_c = new AEAD<NetIO>(g_key_c, g_iv_oct + 12, 12);
-        // g_aead_s = new AEAD<NetIO>(g_key_s, g_iv_oct, 12);
+        // g_aead_c = new AESGCM<NetIO>(g_key_c, g_iv_oct + 12, 12);
+        // g_aead_s = new AESGCM<NetIO>(g_key_s, g_iv_oct, 12);
     }
     else
         g_finish_mac = ms;
@@ -278,7 +278,8 @@ int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char*
     memcpy(buf, g_fixed_iv_c, 4);
     memcpy(buf + 4, iv, 8);
     // reverse(buf, buf + 12);
-    g_aead_c = new AEAD<NetIO>(g_io, g_cot, g_key_c, buf, 12);
+    // g_aead_c = new AESGCM<NetIO>(g_io, g_cot, g_key_c, buf, 12);
+    g_aead_c = new AESGCM<NetIO>(g_key_c, buf, 12);
     printf("msg[%d]", msg_len);
     for (int i = 0; i < msg_len; i++)
         printf("%2x ", msg[i]);
@@ -306,7 +307,8 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
     memcpy(buf, g_fixed_iv_s, 4);
     memcpy(buf + 4, iv, 8);
     // reverse(buf, buf + 12);
-    g_aead_s = new AEAD<NetIO>(g_io, g_cot, g_key_s, buf, 12);
+    // g_aead_s = new AESGCM<NetIO>(g_io, g_cot, g_key_s, buf, 12);
+    g_aead_s = new AESGCM<NetIO>(g_key_s, buf, 12);
     printf("ctxt[%d]", ctxt_len);
     for (int i = 0; i < ctxt_len; i++)
         printf("%2x ", ctxt[i]);
