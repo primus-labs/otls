@@ -1,6 +1,6 @@
 #include "mpc_tls.h"
 #include <openssl/mpc_tls_meth.h>
-#include "handshake/handshake.h"
+#include "protocol/handshake.h"
 #include "backend/backend.h"
 #include <iostream>
 #include "cipher/prf.h"
@@ -13,6 +13,7 @@ static EC_GROUP* g_group = nullptr;
 static int g_party = -1;
 static HandShake<NetIO>* g_hs = nullptr;
 static NetIO* g_io = nullptr;
+static IKNP<NetIO>* g_cot = nullptr;
 static BN_CTX* g_ctx = nullptr;
 static BIGNUM* g_q = nullptr;
 static BIGNUM* g_priv_key = nullptr;
@@ -22,13 +23,13 @@ int init_mpc(int party) {
     g_io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", 8081);
     setup_backend(g_io, party);
     auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
-    IKNP<NetIO>* cot = prot->ot;
+    g_cot = prot->ot;
 
     g_party = party;
 
     g_group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
 
-    g_hs = new HandShake<NetIO>(g_io, cot, g_group);
+    g_hs = new HandShake<NetIO>(g_io, g_cot, g_group);
     g_ctx = g_hs->ctx;
     g_q = g_hs->q;
 
@@ -116,8 +117,8 @@ static Integer g_iv, g_key_c, g_key_s;
 static unsigned char g_iv_oct[8];
 static unsigned char g_fixed_iv_c[4];
 static unsigned char g_fixed_iv_s[4];
-static AESGCM<NetIO> *g_aesgcm_c = NULL;
-static AESGCM<NetIO> *g_aesgcm_s = NULL;
+static AEAD<NetIO> *g_aead_c = NULL;
+static AEAD<NetIO> *g_aead_s = NULL;
 static Integer* g_block_key = NULL;
 static Integer* g_ms = NULL;
 static Integer* g_finish_mac = NULL;
@@ -206,8 +207,8 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
         for (int i = 0; i < 16; i++)
             printf("%2x ", key_oct[16 - 1 - i]);
         printf("\n");
-        // g_aesgcm_c = new AESGCM<NetIO>(g_key_c, g_iv_oct + 12, 12);
-        // g_aesgcm_s = new AESGCM<NetIO>(g_key_s, g_iv_oct, 12);
+        // g_aead_c = new AEAD<NetIO>(g_key_c, g_iv_oct + 12, 12);
+        // g_aead_s = new AEAD<NetIO>(g_key_s, g_iv_oct, 12);
     }
     else
         g_finish_mac = ms;
@@ -277,7 +278,7 @@ int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char*
     memcpy(buf, g_fixed_iv_c, 4);
     memcpy(buf + 4, iv, 8);
     // reverse(buf, buf + 12);
-    g_aesgcm_c = new AESGCM<NetIO>(g_key_c, buf, 12);
+    g_aead_c = new AEAD<NetIO>(g_io, g_cot, g_key_c, buf, 12);
     printf("msg[%d]", msg_len);
     for (int i = 0; i < msg_len; i++)
         printf("%2x ", msg[i]);
@@ -287,7 +288,7 @@ int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char*
     for (int i = 0; i < aad_len; i++)
         printf("%2x ", aad[i]);
     printf("\n");
-    g_hs->encrypt_client_finished_msg(*g_aesgcm_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
+    g_hs->encrypt_client_finished_msg(*g_aead_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
     printf("ctxt[%d]", 16);
     for (int i = 0; i < 16; i++)
         printf("%2x ", ctxt[i]);
@@ -305,7 +306,7 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
     memcpy(buf, g_fixed_iv_s, 4);
     memcpy(buf + 4, iv, 8);
     // reverse(buf, buf + 12);
-    g_aesgcm_s = new AESGCM<NetIO>(g_key_s, buf, 12);
+    g_aead_s = new AEAD<NetIO>(g_io, g_cot, g_key_s, buf, 12);
     printf("ctxt[%d]", ctxt_len);
     for (int i = 0; i < ctxt_len; i++)
         printf("%2x ", ctxt[i]);
@@ -320,7 +321,7 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
     for (int i = 0; i < 16; i++)
         printf("%2x ", tag[i]);
     printf("\n");
-    bool res = g_hs->decrypt_and_check_server_finished_msg(*g_aesgcm_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
+    bool res = g_hs->decrypt_and_check_server_finished_msg(*g_aead_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
     printf("msg[%d]", ctxt_len);
     for (int i = 0; i < ctxt_len; i++)
         printf("%2x ", msg[i]);

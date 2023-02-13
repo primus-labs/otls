@@ -11,6 +11,16 @@ using namespace emp;
 using std::string;
 using std::vector;
 
+static string circuit_file_location =
+  macro_xstr(EMP_CIRCUIT_PATH) + string("bristol_fashion/");
+static BristolFashion aes = BristolFashion((circuit_file_location + "aes_128.txt").c_str());
+
+static string aes_ks_file = "cipher/circuit_files/aes128_ks.txt";
+static BristolFormat aes_ks = BristolFormat(aes_ks_file.c_str());
+
+static string aes_enc_file = "cipher/circuit_files/aes128_with_ks.txt";
+static BristolFormat aes_enc_ks = BristolFormat(aes_enc_file.c_str());
+
 inline Integer rrot(const Integer& rhs, int sht) {
     return (rhs >> sht) ^ (rhs << (rhs.size() - sht));
 }
@@ -192,5 +202,121 @@ inline block powBlock(block a, size_t len) {
     }
 
     return res;
+}
+
+inline block invBlock(block a) {
+    block h = a;
+    block res = a;
+    for (int i = 1; i < 127; i++) {
+        h = mulBlock(h, h);
+        res = mulBlock(h, res);
+    }
+
+    res = mulBlock(res, res);
+    return res;
+}
+
+inline block ghash(block h, block* x, size_t m) {
+    block y = zero_block;
+    for (int i = 0; i < m; i++) {
+        y = mulBlock((y ^ x[i]), h);
+    }
+    return y;
+}
+
+inline Integer computeAES(const Integer& key, const Integer& msg) {
+    Integer o = Integer(128, 0, PUBLIC);
+    Integer in(msg);
+    concat(in, &key, 1);
+    aes.compute(o.bits.data(), in.bits.data());
+    return o;
+}
+
+inline Integer computeKS(Integer& key) {
+    Integer o(1408, 0, PUBLIC);
+    aes_ks.compute(o.bits.data(), key.bits.data(), nullptr);
+    return o;
+}
+
+inline Integer computeAES_KS(Integer& key, Integer& msg) {
+    Integer o(128, 0, PUBLIC);
+    aes_enc_ks.compute(o.bits.data(), key.bits.data(), msg.bits.data());
+    reverse(o.bits.begin(), o.bits.end());
+    return o;
+}
+
+// Transfer gc share into xor share.
+inline block integer_to_block(Integer& in) {
+    if (in.size() != 128)
+        error("the length of input should be 128!\n");
+
+    block b = zero_block;
+    size_t one = 1;
+    for (int i = 0; i < 64; i++) {
+        if (getLSB(in[i].bit))
+            b = b ^ makeBlock(0, one << i);
+
+        if (getLSB(in[i + 64].bit))
+            b = b ^ makeBlock(one << i, 0);
+    }
+    return b;
+}
+
+// Transfer gc share into xor share.
+inline void integer_to_block(block* out, Integer* in, size_t len) {
+    for (int i = 0; i < len; i++)
+        out[i] = integer_to_block(in[i]);
+}
+
+inline void integer_to_block(block* out, Integer& in) {
+    if (in.size() % 128 != 0)
+        error("the length of input should be multiples of 128!\n");
+    Integer* ins = new Integer[in.size() / 128];
+    Integer tmp;
+    for (int i = 0; i < in.size() / 128; i++) {
+        ins[i].bits.insert(ins[i].bits.end(), in.bits.end() - 128 * (i + 1),
+                           in.bits.end() - 128 * i);
+    }
+    integer_to_block(out, ins, in.size() / 128);
+}
+
+inline void integer_to_chars(unsigned char* out, Integer& in) {
+    Integer ins(in);
+    reverse(ins.bits.begin(), ins.bits.end());
+    for (int i = 0; i < in.size(); i += 8) {
+        size_t tmp = 0;
+        for (int j = 0; j < 8; j++) {
+            if (getLSB(ins.bits[i + j].bit)) {
+                tmp ^= (1 << (7 - j));
+            }
+        }
+        out[i / 8] = tmp;
+    }
+}
+
+inline void block_to_hex(unsigned char* out, const block* in, size_t len) {
+    block* ins = new block[len];
+    memcpy(ins, in, len * 16);
+
+    reverse(ins, ins + len);
+    unsigned char* outs = (unsigned char*)ins;
+    reverse(outs, outs + len * 16);
+
+    memcpy(out, outs, len * 16);
+    delete[] ins;
+}
+
+inline void hex_to_block(block* out, const unsigned char* in, size_t len) {
+    if (len % 16 != 0)
+        error("the length of the bytes is incorrect!\n");
+    unsigned char* ins = new unsigned char[len];
+    memcpy(ins, in, len);
+
+    reverse(ins, ins + len);
+    block* outs = (block*)ins;
+    reverse(outs, outs + len / 16);
+
+    memcpy(out, outs, len);
+    delete[] ins;
 }
 #endif

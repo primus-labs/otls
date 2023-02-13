@@ -1,27 +1,52 @@
+#include "cipher/aead.h"
 #include "emp-tool/emp-tool.h"
+#include "cipher/utils.h"
 #include "backend/backend.h"
-#include "cipher/aesgcm.h"
-#include <iostream>
 
-using namespace emp;
-using namespace std;
+void convert(int party) {
+    // PRG prg;
+    // block* x = new block[2];
+    // prg.random_block(x, 2);
+    // cout << x[0] << " " << x[1] << endl;
+    // unsigned char* y = new unsigned char[16 * 2];
 
-void aes_test() {
-    unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
-                            0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
-    reverse(keyc, keyc + 16);
-    Integer key(128, keyc, ALICE);
-    cout << key.reveal<string>() << endl;
+    // block_to_hex(y, x, 2);
 
-    Integer c(128, 0, PUBLIC);
-    concat(c, &key, 1);
+    // for (int i = 0; i < 32; i++) {
+    //     cout << hex << (int)y[i];
+    // }
+    // cout << dec << endl;
 
-    Integer o(128, 0, PUBLIC);
-    aes.compute(o.bits.data(), c.bits.data());
-    cout << o.reveal<string>(PUBLIC) << endl;
+    // hex_to_block(x, y, 32);
+    // cout << x[0] << " " << x[1] << endl;
+
+    Integer a(256, 10, ALICE);
+    block* b = new block[2];
+    if (party == ALICE) {
+        for (int i = 0; i < 256; i++) {
+            cout << getLSB(a[i].bit);
+        }
+        cout << endl;
+    }
+    cout << "a reveal: " << a.reveal<string>() << endl;
+    integer_to_block(b, a);
+    if (party == ALICE)
+        cout << b[0] << " " << b[1] << endl;
+
+    unsigned char* c = new unsigned char[32];
+    integer_to_chars(c, a);
+    if (party == ALICE) {
+        cout << "c: ";
+        for (int i = 0; i < 32; i++) {
+            cout << hex << (int)c[i];
+        }
+        cout << dec << endl;
+    }
+    // delete[] b;
+    delete[] c;
 }
 
-void aes_gcm_enc_test(NetIO* io, int party) {
+void aead_enc_fin_test(NetIO* io, COT<NetIO>* ot, int party) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
@@ -48,10 +73,8 @@ void aes_gcm_enc_test(NetIO* io, int party) {
     unsigned char tag[16];
 
     auto start = emp::clock_start();
-    AESGCM<NetIO> aesgcm(key, iv, iv_len);
-    // aesgcm.init(key);
-    // aesgcm.enc_finished_msg(io, ctxt, tag, iv, iv_len, msg, msg_len, aad, aad_len, party);
-    aesgcm.enc_finished_msg(io, ctxt, tag, msg, msg_len, aad, aad_len, party);
+    AEAD<NetIO> aead(io, ot, key, iv, iv_len);
+    aead.enc_finished_msg(io, ctxt, tag, msg, msg_len, aad, aad_len, party);
 
     cout << "time: " << emp::time_from(start) << " us" << endl;
     cout << "tag: ";
@@ -66,11 +89,10 @@ void aes_gcm_enc_test(NetIO* io, int party) {
     }
     cout << endl;
 
-    cout << "h: " << aesgcm.h << endl;
     delete[] ctxt;
 }
 
-void aes_gcm_dec_test(NetIO* io, int party) {
+void aead_dec_fin_test(NetIO* io, COT<NetIO>* ot, int party) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
@@ -114,11 +136,9 @@ void aes_gcm_dec_test(NetIO* io, int party) {
                            0x94, 0xfa, 0xe9, 0x5a, 0xe7, 0x12, 0x1a, 0x47};
 
     auto start = emp::clock_start();
-    AESGCM<NetIO> aesgcm(key, iv, iv_len);
-    // aesgcm.init(key);
-    // bool res =
-    //   aesgcm.dec_finished_msg(io, msg, ctxt, ctxt_len, tag, iv, iv_len, aad, aad_len, party);
-    bool res = aesgcm.dec_finished_msg(io, msg, ctxt, ctxt_len, tag, aad, aad_len, party);
+    AEAD<NetIO> aead(io, ot, key, iv, iv_len);
+
+    bool res = aead.dec_finished_msg(io, msg, ctxt, ctxt_len, tag, aad, aad_len, party);
 
     cout << "time: " << emp::time_from(start) << " us" << endl;
     if (party == ALICE) {
@@ -139,64 +159,11 @@ void aes_gcm_dec_test(NetIO* io, int party) {
     }
 }
 
-void aes_gcm_circ_test(NetIO* io, int party) {
+void aead_enc_record_msg_test(NetIO* io, COT<NetIO>* ot, int party) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
     Integer key(128, keyc, ALICE);
-
-    unsigned char keys[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
-                            0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x09};
-    reverse(keys, keys + 16);
-    Integer key1(128, keys, ALICE);
-
-    // unsigned char msg[] = {0xd9, 0x31, 0x32, 0x25, 0xf8, 0x84, 0x06, 0xe5, 0xa5, 0x59,
-    //                        0x09, 0xc5, 0xaf, 0xf5, 0x26, 0x9a, 0x86, 0xa7, 0xa9, 0x53,
-    //                        0x15, 0x34, 0xf7, 0xda, 0x2e, 0x4c, 0x30, 0x3d, 0x8a, 0x31,
-    //                        0x8a, 0x72, 0x1c, 0x3c, 0x0c, 0x95, 0x95, 0x68, 0x09, 0x53,
-    //                        0x2f, 0xcf, 0x0e, 0x24, 0x49, 0xa6, 0xb5, 0x25, 0xb1, 0x6a,
-    //                        0xed, 0xf5, 0xaa, 0x0d, 0xe6, 0x57, 0xba, 0x63, 0x7b, 0x39};
-
-    unsigned char msg[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    size_t msg_len = sizeof(msg);
-
-    unsigned char aad[] = {0xfe, 0xed, 0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef, 0xfe, 0xed,
-                           0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef, 0xab, 0xad, 0xda, 0xd2};
-
-    size_t aad_len = sizeof(aad);
-
-    unsigned char iv[] = {0xca, 0xfe, 0xba, 0xbe, 0xfa, 0xce,
-                          0xdb, 0xad, 0xde, 0xca, 0xf8, 0x88};
-
-    size_t iv_len = sizeof(iv);
-
-    unsigned char ctxt[] = {0x42, 0x83, 0x1e, 0xc2, 0x21, 0x77,
-                            0x74, 0x24, 0x4b, 0x72, 0x21, 0xb7};
-
-    size_t ctxt_len = sizeof(ctxt);
-
-    unsigned char tag[] = {0x5b, 0xc9, 0x4f, 0xbc, 0x32, 0x21, 0xa5, 0xdb,
-                           0x94, 0xfa, 0xe9, 0x5a, 0xe7, 0x12, 0x1a, 0x47};
-
-    AESGCM<NetIO> aesgcm_c(key, iv, iv_len);
-    aesgcm_c.enc_finished_msg(io, ctxt, tag, msg, msg_len, aad, aad_len, party);
-
-    AESGCM<NetIO> aesgcm_s(key1, iv, iv_len);
-    aesgcm_s.dec_finished_msg(io, msg, ctxt, ctxt_len, tag, aad, aad_len, party);
-}
-
-void aesgcm_enc_record_msg_test(NetIO* io, COT<NetIO>* ot, int party) {
-    unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
-                            0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
-    reverse(keyc, keyc + 16);
-    Integer key(128, keyc, ALICE);
-    Integer zero(128, 0, PUBLIC);
-    Integer o(128, 0, PUBLIC);
-    o = computeAES(key, zero);
-
-    block h = zero_block;
-    o.reveal<block>((block*)&h, ALICE);
 
     unsigned char msg[] = {0xd9, 0x31, 0x32, 0x25, 0xf8, 0x84, 0x06, 0xe5, 0xa5, 0x59,
                            0x09, 0xc5, 0xaf, 0xf5, 0x26, 0x9a, 0x86, 0xa7, 0xa9, 0x53,
@@ -221,12 +188,9 @@ void aesgcm_enc_record_msg_test(NetIO* io, COT<NetIO>* ot, int party) {
     memset(tag, 0, 16);
 
     auto start = emp::clock_start();
-    AESGCM<NetIO> aesgcm(key, iv, iv_len);
+    AEAD<NetIO> aead(io, ot, key, iv, iv_len);
 
-    // make sure h is consistent.
-    aesgcm.h = h;
-    aesgcm.InitVOPE(io, ot);
-    aesgcm.enc_record_msg(io, ctxt, tag, msg, msg_len, aad, aad_len, party);
+    aead.enc_record_msg(io, ctxt, tag, msg, msg_len, aad, aad_len, party);
 
     cout << "time: " << emp::time_from(start) << " us" << endl;
     cout << "tag: ";
@@ -245,17 +209,11 @@ void aesgcm_enc_record_msg_test(NetIO* io, COT<NetIO>* ot, int party) {
     delete[] tag;
 }
 
-void aesgcm_dec_record_msg_test(NetIO* io, COT<NetIO>* ot, int party) {
+void aead_dec_record_msg(NetIO* io, COT<NetIO>* ot, int party) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
     Integer key(128, keyc, ALICE);
-    Integer zero(128, 0, PUBLIC);
-    Integer o(128, 0, PUBLIC);
-    o = computeAES(key, zero);
-
-    block h = zero_block;
-    o.reveal<block>((block*)&h, ALICE);
 
     // unsigned char msg[] = {0xd9, 0x31, 0x32, 0x25, 0xf8, 0x84, 0x06, 0xe5, 0xa5, 0x59,
     //                        0x09, 0xc5, 0xaf, 0xf5, 0x26, 0x9a, 0x86, 0xa7, 0xa9, 0x53,
@@ -295,12 +253,8 @@ void aesgcm_dec_record_msg_test(NetIO* io, COT<NetIO>* ot, int party) {
                            0x94, 0xfa, 0xe9, 0x5a, 0xe7, 0x12, 0x1a, 0x47};
 
     auto start = emp::clock_start();
-    AESGCM<NetIO> aesgcm(key, iv, iv_len);
-    // make sure h is consistent.
-    aesgcm.h = h;
-    aesgcm.InitVOPE(io, ot);
-    bool res =
-      aesgcm.dec_record_msg_with_check(io, msg, ctxt, ctxt_len, tag, aad, aad_len, party);
+    AEAD<NetIO> aead(io, ot, key, iv, iv_len);
+    bool res = aead.dec_record_msg(io, msg, ctxt, ctxt_len, tag, aad, aad_len, party);
 
     cout << "time: " << emp::time_from(start) << " us" << endl;
     if (party == ALICE) {
@@ -320,7 +274,6 @@ void aesgcm_dec_record_msg_test(NetIO* io, COT<NetIO>* ot, int party) {
         cout << endl;
     }
 }
-
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
@@ -328,16 +281,14 @@ int main(int argc, char** argv) {
     setup_backend(io, party);
     auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
-    //aes_test();
-    //aes_gcm_enc_test(io, party);
-    //aes_gcm_dec_test(io, party);
-    //aes_gcm_circ_test(io, party);
-    aesgcm_enc_record_msg_test(io, cot, party);
-    //aesgcm_dec_record_msg_test(io, cot, party);
 
+    //aead_enc_fin_test(io, cot, party);
+    //aead_dec_fin_test(io, cot, party);
+    aead_enc_record_msg_test(io, cot, party);
+    //aead_dec_record_msg(io, cot, party);
+    //convert(party);
     cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and() << endl;
     finalize_backend();
     cout << io->counter << endl;
-
     delete io;
 }

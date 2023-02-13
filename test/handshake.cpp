@@ -1,4 +1,4 @@
-#include "handshake/handshake.h"
+#include "protocol/handshake.h"
 #include "backend/backend.h"
 #include <iostream>
 
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
 
     auto start = emp::clock_start();
 
-    if (party == ALICE) {
+    if (party == BOB) {
         hs->compute_pado_VA(V, t, Ts);
     } else {
         hs->compute_client_VB(Tc, V, t, Ts);
@@ -77,13 +77,13 @@ int main(int argc, char** argv) {
     hs->compute_finished_msg(ufinc, ms, client_finished_label, client_finished_label_length,
                              tau_c, 32);
 
-    AESGCM<NetIO> aesgcm_c(key_c, iv_oct + 12, 12);
-    AESGCM<NetIO> aesgcm_s(key_s, iv_oct, 12);
+    AEAD<NetIO> aead_c(io, cot, key_c, iv_oct + 12, 12);
+    AEAD<NetIO> aead_s(io, cot, key_s, iv_oct, 12);
 
     unsigned char* ctxt = new unsigned char[finished_msg_bit_length / 8];
     unsigned char* tag = new unsigned char[16];
 
-    hs->encrypt_client_finished_msg(aesgcm_c, ctxt, tag, ufinc, finished_msg_bit_length * 8, aad, aad_len, party);
+    hs->encrypt_client_finished_msg(aead_c, ctxt, tag, ufinc, finished_msg_bit_length * 8, aad, aad_len, party);
 
     cout << "tag: ";
     for (int i = 0; i < 16; i++) {
@@ -101,12 +101,12 @@ int main(int argc, char** argv) {
                              tau_s, 32);
 
     // ctxt and tag are received from Server. res should be false
-    bool res = hs->decrypt_and_check_server_finished_msg(aesgcm_s, ufins, ctxt, finished_msg_bit_length * 8, tag, aad,
+    bool res = hs->decrypt_and_check_server_finished_msg(aead_s, ufins, ctxt, finished_msg_bit_length * 8, tag, aad,
                                                          aad_len, party);
     cout << res << endl;
     cout << "time " << emp::time_from(start) << " us" << endl;
     cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and() << endl;
-    cout << "communication: "<< io->counter << " Bytes"<< endl;
+    cout << "communication: " << io->counter << " Bytes" << endl;
     EC_POINT_free(V);
     EC_POINT_free(Tc);
     BN_free(t);

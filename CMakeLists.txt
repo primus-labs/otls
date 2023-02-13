@@ -8,6 +8,9 @@ include(${CMAKE_FOLDER}/cmake/emp-base.cmake)
 find_package(emp-ot REQUIRED)
 include_directories(${EMP-OT_INCLUDE_DIRS})
 
+find_package(emp-zk REQUIRED)
+include_directories(${EMP-ZK_INCLUDE_DIRS})
+
 # Installation
 # install(FILES cmake/emp-sh2pc-config.cmake DESTINATION cmake/)
 # install(DIRECTORY emp-sh2pc DESTINATION include/)
