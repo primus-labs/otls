@@ -2,8 +2,8 @@
 #define _HAND_SHAKE_H_
 #include "emp-tool/emp-tool.h"
 #include "cipher/hmac_sha256.h"
-//#include "cipher/aead.h"
-#include "cipher/aesgcm.h"
+#include "cipher/aead.h"
+//#include "cipher/aesgcm.h"
 #include "cipher/prf.h"
 #include "add.h"
 #include "e2f.h"
@@ -218,7 +218,7 @@ class HandShake {
         ufin_int.reveal<unsigned char>((unsigned char*)ufin, PUBLIC);
     }
 
-    inline void encrypt_client_finished_msg(AESGCM<IO>& aead_c,
+    inline void encrypt_client_finished_msg(AEAD<IO>& aead_c,
                                             unsigned char* ctxt,
                                             unsigned char* tag,
                                             const unsigned char* ufinc,
@@ -231,7 +231,7 @@ class HandShake {
     }
 
     // The ufins string is computed by pado and client, need to check the equality with the decrypted string
-    inline bool decrypt_and_check_server_finished_msg(AESGCM<IO>& aead_s,
+    inline bool decrypt_and_check_server_finished_msg(AEAD<IO>& aead_s,
                                                       unsigned char* ufins,
                                                       const unsigned char* ctxt,
                                                       size_t finished_msg_bit_length0,
