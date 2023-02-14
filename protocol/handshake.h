@@ -248,6 +248,35 @@ class HandShake {
 
         return res1;
     }
+    inline void encrypt_record_msg(AEAD<IO>& aead_c,
+                                   unsigned char* ctxt,
+                                   unsigned char* tag,
+                                   const unsigned char* ufinc,
+                                   size_t msg_bit_length,
+                                   const unsigned char* aad,
+                                   size_t aad_len,
+                                   int party) {
+        aead_c.enc_record_msg(io, ctxt, tag, ufinc, msg_bit_length / 8, aad,
+                                  aad_len, party);
+    }
+
+    inline bool decrypt_record_msg(AEAD<IO>& aead_s,
+                                   unsigned char* ufins,
+                                   const unsigned char* ctxt,
+                                   size_t msg_bit_length,
+                                   const unsigned char* tag,
+                                   const unsigned char* aad,
+                                   size_t aad_len,
+                                   int party) {
+        unsigned char* msg = new unsigned char[msg_bit_length / 8];
+        bool res1 = aead_s.dec_record_msg(io, msg, ctxt, msg_bit_length / 8, tag,
+                                              aad, aad_len, party);
+
+        memcpy(ufins, msg, msg_bit_length / 8);
+        delete[] msg;
+
+        return res1;
+    }
 };
 
 #endif

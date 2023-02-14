@@ -321,7 +321,7 @@ int tls1_prf_finish_mac_mpc(const unsigned char* sec, size_t sec_len, const unsi
     return 1;
 }
 
-int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char* msg, size_t msg_len, const unsigned char* aad, size_t aad_len, const unsigned char* iv, size_t iv_len) {
+int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char* msg, size_t msg_len, const unsigned char* aad, size_t aad_len, const unsigned char* iv, size_t iv_len, int finish) {
     unsigned char buf[12];
     memcpy(buf, g_fixed_iv_c, 4);
     memcpy(buf + 4, iv, 8);
@@ -337,7 +337,10 @@ int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char*
     for (int i = 0; i < aad_len; i++)
         printf("%2x ", aad[i]);
     printf("\n");
-    g_hs->encrypt_client_finished_msg(*g_aead_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
+    if (finish)
+        g_hs->encrypt_client_finished_msg(*g_aead_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
+    else
+        g_hs->encrypt_record_msg(*g_aead_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
     printf("ctxt[%d]", 16);
     for (int i = 0; i < 16; i++)
         printf("%2x ", ctxt[i]);
@@ -350,7 +353,7 @@ int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char*
     return 1;
 }
 
-int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_len, const unsigned char* tag, const unsigned char* aad, size_t aad_len, const unsigned char* iv, size_t iv_len) {
+int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_len, const unsigned char* tag, const unsigned char* aad, size_t aad_len, const unsigned char* iv, size_t iv_len, int finish) {
     unsigned char buf[12];
     memcpy(buf, g_fixed_iv_s, 4);
     memcpy(buf + 4, iv, 8);
@@ -371,7 +374,12 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
     for (int i = 0; i < 16; i++)
         printf("%2x ", tag[i]);
     printf("\n");
-    bool res = g_hs->decrypt_and_check_server_finished_msg(*g_aead_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
+
+    bool res;
+    if (finish)
+        res = g_hs->decrypt_and_check_server_finished_msg(*g_aead_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
+    else
+        res = g_hs->decrypt_record_msg(*g_aead_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
     printf("msg[%d]", ctxt_len);
     for (int i = 0; i < ctxt_len; i++)
         printf("%2x ", msg[i]);
