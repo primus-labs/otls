@@ -94,7 +94,7 @@ void dec_msg() {
 
 void run_pado() {
     OPENSSL_init_MPC_METH(set_priv_key_mpc, EC_POINT_mul_mpc, get_client_pub_key_mpc, get_pms_mpc, tls1_prf_P_hash_mpc, tls1_prf_master_secret_mpc, tls1_prf_block_key_mpc, tls1_prf_finish_mac_mpc, enc_aesgcm_mpc, dec_aesgcm_mpc, transfer_hash_mpc);
-    init_mpc(1);
+    init_mpc(2);
     
     printf("begin tranfer client random\n");
     unsigned char client_random[32];
@@ -108,23 +108,25 @@ void run_pado() {
     print_random("server random", server_random, 32);
     printf("end transfer server random\n");
 
-    EC_POINT* s_pub_key = EC_POINT_new_mpc();
-    EC_POINT* z_pub_key = EC_POINT_new_mpc();
-    printf("begin mul tls\n");
-    EC_POINT_mul_tls(z_pub_key, s_pub_key);
-    printf("end mul tls\n");
-    
-    printf("begin get pms\n");
-    BIGNUM* x = BN_new();
-    get_pms_tls(x, z_pub_key);
-    size_t len = BN_num_bytes(x);
-    unsigned char* pmsbuf = new unsigned char[len];
-    BN_bn2bin(x, pmsbuf);
-    printf("end get pms\n");
+    get_pms_tls(NULL, NULL);
 
-    printf("begin get client key\n");
-    get_client_pub_key_tls(NULL);
-    printf("end get client key\n");
+//    EC_POINT* s_pub_key = EC_POINT_new_mpc();
+//    EC_POINT* z_pub_key = EC_POINT_new_mpc();
+//    printf("begin mul tls\n");
+//    EC_POINT_mul_tls(z_pub_key, s_pub_key);
+//    printf("end mul tls\n");
+//    
+//    printf("begin get pms\n");
+//    BIGNUM* x = BN_new();
+//    get_pms_tls(x, z_pub_key);
+//    size_t len = BN_num_bytes(x);
+//    unsigned char* pmsbuf = new unsigned char[len];
+//    BN_bn2bin(x, pmsbuf);
+//    printf("end get pms\n");
+//
+//    printf("begin get client key\n");
+//    get_client_pub_key_tls(NULL);
+//    printf("end get client key\n");
 
     printf("begin transfer hash\n");
     unsigned char hash[32];
@@ -132,7 +134,7 @@ void run_pado() {
     printf("end transfer hash\n");
 
     printf("begin generate master secret\n");
-    tls1_prf_master_secret_tls(pmsbuf, 32, hash, 32, NULL, 48);
+    tls1_prf_master_secret_tls(NULL, 32, hash, 32, NULL, 48);
     printf("end generate master secret\n");
 
     printf("begin generate block key\n");
@@ -140,7 +142,7 @@ void run_pado() {
     char random[64];
     memcpy(random, server_random, 32);
     memcpy(random + 32, client_random, 32);
-    tls1_prf_key_block_tls(pmsbuf, 48, (unsigned char*)random, 64, (unsigned char*)block_key, 56);
+    tls1_prf_key_block_tls(NULL, 48, (unsigned char*)client_random, 32, (unsigned char*)server_random, 32, (unsigned char*)block_key, 56);
     printf("end generate block key\n");
 
     printf("begin transfer finish hash\n");
@@ -150,7 +152,7 @@ void run_pado() {
 
     printf("begin generate client finish mac\n");
     unsigned char finish_md[12];
-    tls1_prf_finish_mac_tls(pmsbuf, 48, finish_hash, 32, finish_md, 12, 1);
+    tls1_prf_finish_mac_tls(NULL, 48, finish_hash, 32, finish_md, 12, 1);
     printf("end generate client finish mac\n");
 
     // ==================encrypt aesgcm=============
@@ -166,7 +168,7 @@ void run_pado() {
 
     printf("begin generate server finish mac\n");
     unsigned char server_finish_md[12];
-    tls1_prf_finish_mac_tls(pmsbuf, 48, server_finish_hash, 32, server_finish_md, 12, 0);
+    tls1_prf_finish_mac_tls(NULL, 48, server_finish_hash, 32, server_finish_md, 12, 0);
     printf("end generate server finish mac\n");
 
 

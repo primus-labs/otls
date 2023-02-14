@@ -12,11 +12,13 @@ using namespace emp;
 using namespace std;
 
 static unsigned char master_key_label[] = {"master key"};
+static unsigned char extended_master_key_label[] = {"extended master secret"};
 static unsigned char key_expansion_label[] = {"key expansion"};
 static unsigned char client_finished_label[] = {"client finished"};
 static unsigned char server_finished_label[] = {"server finished"};
 
 static size_t master_key_label_length = sizeof(master_key_label) - 1;
+static size_t extended_master_key_label_length = sizeof(extended_master_key_label) - 1;
 static size_t key_expansion_label_length = sizeof(key_expansion_label) - 1;
 static size_t client_finished_label_length = sizeof(client_finished_label) - 1;
 static size_t server_finished_label_length = sizeof(server_finished_label) - 1;
@@ -116,14 +118,13 @@ class HandShake {
         BN_free(y);
     }
 
-    inline void compute_master_and_expansion_keys(Integer& ms,
-                                                  Integer& key,
-                                                  const BIGNUM* pms,
-                                                  const unsigned char* rc,
-                                                  size_t rc_len,
-                                                  const unsigned char* rs,
-                                                  size_t rs_len,
-                                                  int party) {
+    inline void compute_master_key(Integer& ms,
+                                   const BIGNUM* pms,
+                                   const unsigned char* rc,
+                                   size_t rc_len,
+                                   const unsigned char* rs,
+                                   size_t rs_len,
+                                   int party) {
         size_t len = BN_num_bytes(pms);
         unsigned char* buf = new unsigned char[len];
         BN_bn2bin(pms, buf);
@@ -150,6 +151,50 @@ class HandShake {
         prf.opt_compute(hmac, ms, master_key_bit_length, pmsbits, master_key_label,
                         master_key_label_length, seed, seed_len, true, true);
 
+
+        delete[] buf;
+        delete[] seed;
+    }
+
+    inline void compute_extended_master_secret(Integer& ms,
+                                               const BIGNUM* pms,
+                                               const unsigned char* hash,
+                                               size_t hash_len,
+                                               int party) {
+        size_t len = BN_num_bytes(pms);
+        unsigned char* buf = new unsigned char[len];
+        BN_bn2bin(pms, buf);
+        reverse(buf, buf + len);
+        Integer pmsa, pmsb;
+
+        if (party == ALICE) {
+            pmsa = Integer(len * 8, buf, ALICE);
+            pmsb = Integer(len * 8, 0, BOB);
+        } else {
+            pmsa = Integer(len * 8, 0, ALICE);
+            pmsb = Integer(len * 8, buf, BOB);
+        }
+
+        Integer pmsbits;
+        addmod(pmsbits, pmsa, pmsb, q);
+
+        prf.init(hmac, pmsbits);
+        prf.opt_compute(hmac, ms, master_key_bit_length, pmsbits, extended_master_key_label,
+                        extended_master_key_label_length, hash, hash_len, true, true);
+
+
+        delete[] buf;
+    }
+
+    inline void compute_expansion_keys(Integer& key,
+                                       const Integer& ms,
+                                       const unsigned char* rc,
+                                       size_t rc_len,
+                                       const unsigned char* rs,
+                                       size_t rs_len) {
+        size_t seed_len = rc_len + rs_len;
+        unsigned char* seed = new unsigned char[seed_len];
+
         memcpy(seed, rs, rs_len);
         memcpy(seed + rs_len, rc, rc_len);
 
@@ -157,7 +202,6 @@ class HandShake {
         prf.opt_compute(hmac, key, expansion_key_bit_length, ms, key_expansion_label,
                         key_expansion_label_length, seed, seed_len, true, true);
 
-        delete[] buf;
         delete[] seed;
     }
 
@@ -168,6 +212,7 @@ class HandShake {
                                      const unsigned char* tau,
                                      size_t tau_len) {
         Integer ufin_int;
+        prf.init(hmac, ms);
         prf.opt_compute(hmac, ufin_int, finished_msg_bit_length, ms, label, label_len, tau,
                         tau_len, true, true);
         ufin_int.reveal<unsigned char>((unsigned char*)ufin, PUBLIC);

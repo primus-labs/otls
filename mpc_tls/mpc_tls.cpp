@@ -90,25 +90,52 @@ int EC_POINT_mul_mpc(EC_POINT* out, EC_POINT* pub_key) {
     return 1;
 }
 
+static BIGNUM *g_pms = NULL;
+static EC_POINT *g_Tc = NULL;
 int get_client_pub_key_mpc(EC_POINT* out) {
-    if (g_party == ALICE) {
-        send_point(g_pub_key);
-    } else {
-        EC_POINT* tmp = EC_POINT_new(g_group);
-        recv_point(tmp);
-
-        EC_POINT_add(g_group, out, tmp, g_pub_key, g_ctx);
-        EC_POINT_free(tmp);
-    }
+//    if (g_party == ALICE) {
+//        send_point(g_pub_key);
+//    } else {
+//        EC_POINT* tmp = EC_POINT_new(g_group);
+//        recv_point(tmp);
+//
+//        EC_POINT_add(g_group, out, tmp, g_pub_key, g_ctx);
+//        EC_POINT_free(tmp);
+//    }
+    EC_POINT_copy(out, g_Tc);
     printf("finish get client pub key mpc\n");
 
     return 1;
 }
 
-int get_pms_mpc(BIGNUM *pms, EC_POINT* Z) {
+int get_pms_mpc(EC_POINT *Tc, EC_POINT* Ts) {
+    EC_POINT* V = EC_POINT_new(g_group);
+    BIGNUM* t = BN_new();
+
+    g_Tc = EC_POINT_new(g_group);
+    Tc = g_Tc;
+
+    if (g_party == BOB) {
+        Ts = EC_POINT_new(g_group);
+        recv_point(Ts);
+        g_hs->compute_pado_VA(V, t, Ts);
+        EC_POINT_free(Ts);
+    } else {
+        send_point(Ts);
+        g_hs->compute_client_VB(Tc, V, t, Ts);
+    }
+
     g_hs->compute_pms_offline(g_party);
 
-    g_hs->compute_pms_online(pms, Z, g_party);
+    g_pms = BN_new();
+    g_hs->compute_pms_online(g_pms, V, g_party);
+
+    EC_POINT_free(V);
+    BN_free(t);
+
+    // g_hs->compute_pms_offline(g_party);
+
+    // g_hs->compute_pms_online(pms, Z, g_party);
     printf("finish get pms mpc\n");
     return 1;
 }
@@ -231,7 +258,7 @@ int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned
 }
 
 int transfer_hash_mpc(unsigned char* hash, size_t n) {
-    if (g_party == ALICE) {
+    if (g_party == BOB) {
         g_io->recv_data(hash, n);
     }
     else {
@@ -247,29 +274,50 @@ int transfer_hash_mpc(unsigned char* hash, size_t n) {
 
 
 int tls1_prf_master_secret_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
-    char buf[256]; // 22 + 32
-    strcpy(buf, "extended master secret");
-    memcpy(buf + 22, seed, 32);
+//    char buf[256]; // 22 + 32
+//    strcpy(buf, "extended master secret");
+//    memcpy(buf + 22, seed, 32);
+//
+//    tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 54, out, olen);
 
-    tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 54, out, olen);
+    g_ms = new Integer();
+    g_hs->compute_extended_master_secret(*g_ms, g_pms, seed, seed_len, g_party);
     return 1;
 }
 
-int tls1_prf_block_key_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
-    char buf[256]; // 13 + 32 + 32
-    strcpy(buf, "key expansion");
-    memcpy(buf + 13, seed, 64);
+int tls1_prf_block_key_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* rc, size_t rc_len, const unsigned char* rs, size_t rs_len, unsigned char* out, size_t olen) {
+//    char buf[256]; // 13 + 32 + 32
+//    strcpy(buf, "key expansion");
+//    memcpy(buf + 13, seed, 64);
+//
+//    tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 77, out, olen);
 
-    tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 77, out, olen);
+    g_block_key = new Integer();
+    g_hs->compute_expansion_keys(*g_block_key, *g_ms, rc, rc_len, rs, rs_len); 
+    
+    g_iv.bits.insert(g_iv.bits.begin(), g_block_key->bits.begin() + 128, g_block_key->bits.begin() + 128 + 32 * 2);
+    g_key_s.bits.insert(g_key_s.bits.begin(), g_block_key->bits.begin() + 128 + 2 * 32,
+                        g_block_key->bits.begin() + 128 + 2 * 32 + 128);
+    g_key_c.bits.insert(g_key_c.bits.begin(), g_block_key->bits.begin() + 128 + 2 * 32 + 128,
+                        g_block_key->bits.begin() + 128 + 2 * (32 + 128));
+    g_iv.reveal<unsigned char>((unsigned char*)g_iv_oct, PUBLIC);
+
+    for (int i = 0; i < 4; i++)
+        g_fixed_iv_c[i] = g_iv_oct[4 + 4 - 1 - i];
+
+    for (int i = 0; i < 4; i++)
+        g_fixed_iv_s[i] = g_iv_oct[4 - 1 - i];
+
     return 1;
 }
 
 int tls1_prf_finish_mac_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen, int client) {
     char buf[256]; // 15 + 32
     strcpy(buf, client ? "client finished":"server finished");
-    memcpy(buf + 15, seed, 32);
+    printf("finish mac:%s\n", buf);
+    g_hs->compute_finished_msg(out, *g_ms, (unsigned char*)buf, 15, seed, seed_len); 
+    reverse(out, out + olen);
 
-    tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 47, out, olen);
     return 1;
 }
 

@@ -27,7 +27,7 @@ int verify_callback(int ok, X509_STORE_CTX* ctx) {
 
 void run_client() {
     OPENSSL_init_MPC_METH(set_priv_key_mpc, EC_POINT_mul_mpc, get_client_pub_key_mpc, get_pms_mpc, tls1_prf_P_hash_mpc, tls1_prf_master_secret_mpc, tls1_prf_block_key_mpc, tls1_prf_finish_mac_mpc, enc_aesgcm_mpc, dec_aesgcm_mpc, transfer_hash_mpc);
-    init_mpc(2);
+    init_mpc(1);
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         printf("create socket error %s\n", strerror(errno));

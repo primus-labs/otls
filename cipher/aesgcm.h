@@ -82,7 +82,7 @@ class AESGCM {
         H.bits.insert(H.bits.end(), Z.bits.end() - 128, Z.bits.end());
 
         block* h_z0 = new block[2];
-        H.reveal<block>((block*)h_z0, ALICE);
+        H.reveal<block>((block*)h_z0, BOB);
 
         h = h_z0[0];
 
@@ -90,9 +90,9 @@ class AESGCM {
         Z.bits.erase(Z.bits.begin(), Z.bits.begin() + u);
 
         unsigned char* z = new unsigned char[msg_len];
-        Z.reveal<unsigned char>((unsigned char*)z, BOB);
+        Z.reveal<unsigned char>((unsigned char*)z, ALICE);
         reverse(z, z + msg_len);
-        if (party == ALICE) {
+        if (party == BOB) {
             // v = 128 * ceil(8*aad_len/128) - aad_len*8
             size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
 
@@ -130,7 +130,7 @@ class AESGCM {
             // io->flush();
 
             delete[] x;
-        } else if (party == BOB) {
+        } else if (party == ALICE) {
             for (int i = 0; i < msg_len; i++) {
                 ctxt[i] = z[i] ^ msg[i];
             }
@@ -164,7 +164,7 @@ class AESGCM {
         H.bits.insert(H.bits.end(), Z.bits.end() - 128, Z.bits.end());
 
         block* h_z0 = new block[2];
-        H.reveal<block>((block*)h_z0, ALICE);
+        H.reveal<block>((block*)h_z0, BOB);
 
         h = h_z0[0];
 
@@ -172,12 +172,12 @@ class AESGCM {
         Z.bits.erase(Z.bits.begin(), Z.bits.begin() + u);
 
         unsigned char* z = new unsigned char[ctxt_len];
-        Z.reveal<unsigned char>((unsigned char*)z, BOB);
+        Z.reveal<unsigned char>((unsigned char*)z, ALICE);
         reverse(z, z + ctxt_len);
 
         bool res = false;
 
-        if (party == ALICE) {
+        if (party == BOB) {
             // v = 128 * ceil(8*aad_len/128) - aad_len*8
             size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
 
@@ -213,7 +213,7 @@ class AESGCM {
             // io->flush();
 
             delete[] x;
-        } else if (party == BOB) {
+        } else if (party == ALICE) {
             io->recv_bool(&res, 1);
             if (res) {
                 for (int i = 0; i < ctxt_len; i++) {
