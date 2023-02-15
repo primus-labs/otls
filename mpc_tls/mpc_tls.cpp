@@ -15,9 +15,6 @@ static HandShake<NetIO>* g_hs = nullptr;
 static NetIO* g_io = nullptr;
 static IKNP<NetIO>* g_cot = nullptr;
 static BN_CTX* g_ctx = nullptr;
-static BIGNUM* g_q = nullptr;
-static BIGNUM* g_priv_key = nullptr;
-static EC_POINT* g_pub_key = nullptr;
 
 static void print_mpc(const char* str, const unsigned char* data, size_t n) {
     printf("%s[%d] ", str, n);
@@ -27,9 +24,7 @@ static void print_mpc(const char* str, const unsigned char* data, size_t n) {
 }
 
 int init_mpc(int pado) {
-    OPENSSL_init_MPC_METH(set_priv_key_mpc,
-                          get_client_pub_key_mpc,
-                          get_pms_mpc,
+    OPENSSL_init_MPC_METH(get_pms_mpc,
                           tls1_prf_master_secret_mpc,
                           tls1_prf_block_key_mpc,
                           tls1_prf_finish_mac_mpc,
@@ -49,12 +44,6 @@ int init_mpc(int pado) {
 
     g_hs = new HandShake<NetIO>(g_io, g_cot, g_group);
     g_ctx = g_hs->ctx;
-    g_q = g_hs->q;
-
-    g_priv_key = BN_new();
-    BN_rand_range(g_priv_key, g_q);
-    g_pub_key = EC_POINT_new(g_group);
-    EC_POINT_mul(g_group, g_pub_key, g_priv_key, NULL, NULL, g_ctx);
 
     return 1;
 }
@@ -88,28 +77,11 @@ static int recv_point(EC_POINT* pub_key) {
     return 1;
 }
 
-int set_priv_key_mpc(BIGNUM* priv_key) {
-    BN_copy(g_priv_key, priv_key);
-    EC_POINT_mul(g_group, g_pub_key, g_priv_key, NULL, NULL, g_ctx);
-
-    return 1;
-}
-    
 static BIGNUM *g_pms = NULL;
-static EC_POINT *g_Tc = NULL;
-int get_client_pub_key_mpc(EC_POINT* out) {
-    EC_POINT_copy(out, g_Tc);
-    printf("finish get client pub key mpc\n");
-
-    return 1;
-}
 
 int get_pms_mpc(EC_POINT *Tc, EC_POINT* Ts) {
     EC_POINT* V = EC_POINT_new(g_group);
     BIGNUM* t = BN_new();
-
-    g_Tc = EC_POINT_new(g_group);
-    Tc = g_Tc;
 
     if (g_party == BOB) {
         Ts = EC_POINT_new(g_group);
