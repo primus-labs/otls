@@ -19,7 +19,25 @@ static BIGNUM* g_q = nullptr;
 static BIGNUM* g_priv_key = nullptr;
 static EC_POINT* g_pub_key = nullptr;
 
-int init_mpc(int party) {
+static void print_mpc(const char* str, const unsigned char* data, size_t n) {
+    printf("%s[%d] ", str, n);
+    for (size_t i = 0; i < n; i++)
+        printf("%2x ", data[i]);
+    printf("\n");
+}
+
+int init_mpc(int pado) {
+    OPENSSL_init_MPC_METH(set_priv_key_mpc,
+                          get_client_pub_key_mpc,
+                          get_pms_mpc,
+                          tls1_prf_master_secret_mpc,
+                          tls1_prf_block_key_mpc,
+                          tls1_prf_finish_mac_mpc,
+                          enc_aesgcm_mpc,
+                          dec_aesgcm_mpc,
+                          transfer_hash_mpc);
+
+    int party = pado ? BOB: ALICE;
     g_io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", 8081);
     setup_backend(g_io, party);
     auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
@@ -77,31 +95,9 @@ int set_priv_key_mpc(BIGNUM* priv_key) {
     return 1;
 }
     
-int EC_POINT_mul_mpc(EC_POINT* out, EC_POINT* pub_key) {
-    if (g_party == ALICE) {
-        recv_point(pub_key);
-    } else {
-        send_point(pub_key);
-    }
-
-    EC_POINT_mul(g_group, out, NULL, pub_key, g_priv_key, g_ctx);
-    
-    printf("finish ec point mul mpc\n");
-    return 1;
-}
-
 static BIGNUM *g_pms = NULL;
 static EC_POINT *g_Tc = NULL;
 int get_client_pub_key_mpc(EC_POINT* out) {
-//    if (g_party == ALICE) {
-//        send_point(g_pub_key);
-//    } else {
-//        EC_POINT* tmp = EC_POINT_new(g_group);
-//        recv_point(tmp);
-//
-//        EC_POINT_add(g_group, out, tmp, g_pub_key, g_ctx);
-//        EC_POINT_free(tmp);
-//    }
     EC_POINT_copy(out, g_Tc);
     printf("finish get client pub key mpc\n");
 
@@ -133,9 +129,6 @@ int get_pms_mpc(EC_POINT *Tc, EC_POINT* Ts) {
     EC_POINT_free(V);
     BN_free(t);
 
-    // g_hs->compute_pms_offline(g_party);
-
-    // g_hs->compute_pms_online(pms, Z, g_party);
     printf("finish get pms mpc\n");
     return 1;
 }
@@ -149,113 +142,6 @@ static AEAD<NetIO> *g_aead_s = NULL;
 static Integer* g_block_key = NULL;
 static Integer* g_ms = NULL;
 static Integer* g_finish_mac = NULL;
-int tls1_prf_P_hash_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
-        Integer *pmsbits;
-        if (sec_len == 32) {
-            char* buf = new char[sec_len];
-            for (int i = 0; i < sec_len; i++) {
-            buf[i] = sec[sec_len - 1 - i];
-        }
-        Integer pmsa, pmsb;
-
-        if (g_party == ALICE) {
-            pmsa = Integer(sec_len * 8, buf, ALICE);
-            pmsb = Integer(sec_len * 8, 0, BOB);
-        } else {
-            pmsa = Integer(sec_len * 8, 0, ALICE);
-            pmsb = Integer(sec_len * 8, buf, BOB);
-        }
-        
-        pmsbits = new Integer();
-        addmod(*pmsbits, pmsa, pmsb, g_q);
-        delete []buf;
-    }
-    else {
-        pmsbits = g_ms;
-    }
-
-    unsigned char* pms_oct = new unsigned char[1024];
-    pmsbits->reveal<unsigned char>((unsigned char*)pms_oct, PUBLIC);
-    printf("reveal pms[%d]:", sec_len);
-    for (int i = 0; i < sec_len; i++) {
-        printf("%2x ", pms_oct[sec_len - 1 - i]);
-    }
-    printf("\n");
-
-    printf("reveal seed[%d]:", seed_len);
-    for (int i = 0; i < seed_len; i++) {
-        printf("%2x ", seed[i]);
-    }
-    printf("\n");
-
-    PRF prf;
-    HMAC_SHA256 hmac;
-    printf("hmac diglen:%d wordlen:%d olen:%d\n", hmac.DIGLEN, hmac.WORDLEN, olen);
-    Integer *ms = new Integer();
-    prf.init(hmac, *pmsbits);
-    prf.opt_phash(hmac, *ms, olen * 8, *pmsbits, seed, seed_len, true, true);
-
-    if (sec_len == 32)
-        g_ms = ms;
-    else if (olen == 56) {
-        g_block_key = ms;
-        g_iv.bits.insert(g_iv.bits.begin(), ms->bits.begin() + 128, ms->bits.begin() + 128 + 32 * 2);
-        g_key_s.bits.insert(g_key_s.bits.begin(), ms->bits.begin() + 128 + 2 * 32,
-                            ms->bits.begin() + 128 + 2 * 32 + 128);
-        g_key_c.bits.insert(g_key_c.bits.begin(), ms->bits.begin() + 128 + 2 * 32 + 128,
-                            ms->bits.begin() + 128 + 2 * (32 + 128));
-        g_iv.reveal<unsigned char>((unsigned char*)g_iv_oct, PUBLIC);
-
-        for (int i = 0; i < 4; i++)
-            g_fixed_iv_c[i] = g_iv_oct[4 + 4 - 1 - i];
-
-        for (int i = 0; i < 4; i++)
-            g_fixed_iv_s[i] = g_iv_oct[4 - 1 - i];
-
-        printf("iv_c[%d]", 4);
-        for (int i = 0; i < 4; i++)
-            printf("%2x ", g_iv_oct[4 + 4 - 1 - i]);
-        printf("\n");
-
-        printf("iv_s[%d]", 4);
-        for (int i = 0; i < 4; i++)
-            printf("%2x ", g_iv_oct[4 - 1 - i]);
-        printf("\n");
-
-        unsigned char key_oct[16];
-        g_key_c.reveal<unsigned char>(key_oct, PUBLIC);
-        printf("key_c[%d]", 16);
-        for (int i = 0; i < 16; i++)
-            printf("%2x ", key_oct[16 - 1 - i]);
-        printf("\n");
-
-        g_key_s.reveal<unsigned char>(key_oct, PUBLIC);
-        printf("key_s[%d]", 16);
-        for (int i = 0; i < 16; i++)
-            printf("%2x ", key_oct[16 - 1 - i]);
-        printf("\n");
-        // g_aead_c = new AEAD<NetIO>(g_key_c, g_iv_oct + 12, 12);
-        // g_aead_s = new AEAD<NetIO>(g_key_s, g_iv_oct, 12);
-    }
-    else
-        g_finish_mac = ms;
-
-    unsigned char* out_oct = new unsigned char[1024];
-    ms->reveal<unsigned char>((unsigned char*)out_oct, PUBLIC);
-    printf("reveal out[%d]:", olen);
-    for (int i = 0; i < olen; i++) {
-        printf("%2x ", out_oct[olen - 1 - i]);
-    }
-    printf("\n");
-    if (olen == 12) {
-        memcpy(out, out_oct, olen);
-        reverse(out, out + olen);
-    }
-
-    printf("finsih tls1 prf P hash mpc\n");
-
-    return 1;
-}
 
 int transfer_hash_mpc(unsigned char* hash, size_t n) {
     if (g_party == BOB) {
@@ -265,33 +151,18 @@ int transfer_hash_mpc(unsigned char* hash, size_t n) {
         g_io->send_data(hash, n);
         g_io->flush();
     }
-    printf("transfer hash[%d] ", n);
-    for (int i = 0; i < n; i++)
-        printf("%2x ", hash[i]);
-    printf("\n");
+    print_mpc("transfer hash", hash, n);
     return 1;
 }
 
 
 int tls1_prf_master_secret_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
-//    char buf[256]; // 22 + 32
-//    strcpy(buf, "extended master secret");
-//    memcpy(buf + 22, seed, 32);
-//
-//    tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 54, out, olen);
-
     g_ms = new Integer();
     g_hs->compute_extended_master_secret(*g_ms, g_pms, seed, seed_len, g_party);
     return 1;
 }
 
 int tls1_prf_block_key_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* rc, size_t rc_len, const unsigned char* rs, size_t rs_len, unsigned char* out, size_t olen) {
-//    char buf[256]; // 13 + 32 + 32
-//    strcpy(buf, "key expansion");
-//    memcpy(buf + 13, seed, 64);
-//
-//    tls1_prf_P_hash_mpc(sec, sec_len, (unsigned char*)buf, 77, out, olen);
-
     g_block_key = new Integer();
     g_hs->compute_expansion_keys(*g_block_key, *g_ms, rc, rc_len, rs, rs_len); 
     
@@ -302,11 +173,11 @@ int tls1_prf_block_key_mpc(const unsigned char* sec, size_t sec_len, const unsig
                         g_block_key->bits.begin() + 128 + 2 * (32 + 128));
     g_iv.reveal<unsigned char>((unsigned char*)g_iv_oct, PUBLIC);
 
-    for (int i = 0; i < 4; i++)
-        g_fixed_iv_c[i] = g_iv_oct[4 + 4 - 1 - i];
+    memcpy(g_fixed_iv_s, g_iv_oct, 4);
+    reverse(g_fixed_iv_s, g_fixed_iv_s + 4);
 
-    for (int i = 0; i < 4; i++)
-        g_fixed_iv_s[i] = g_iv_oct[4 - 1 - i];
+    memcpy(g_fixed_iv_c, g_iv_oct + 4, 4);
+    reverse(g_fixed_iv_c, g_fixed_iv_c + 4);
 
     return 1;
 }
@@ -325,31 +196,20 @@ int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char*
     unsigned char buf[12];
     memcpy(buf, g_fixed_iv_c, 4);
     memcpy(buf + 4, iv, 8);
-    // reverse(buf, buf + 12);
     g_aead_c = new AEAD<NetIO>(g_io, g_cot, g_key_c, buf, 12);
     // g_aead_c = new AEAD<NetIO>(g_key_c, buf, 12);
-    printf("msg[%d]", msg_len);
-    for (int i = 0; i < msg_len; i++)
-        printf("%2x ", msg[i]);
-    printf("\n");
 
-    printf("aad[%d]", aad_len);
-    for (int i = 0; i < aad_len; i++)
-        printf("%2x ", aad[i]);
-    printf("\n");
+    print_mpc("msg", msg, msg_len);
+    print_mpc("aad", aad, aad_len);
+
     if (finish)
         g_hs->encrypt_client_finished_msg(*g_aead_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
     else
         g_hs->encrypt_record_msg(*g_aead_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
-    printf("ctxt[%d]", 16);
-    for (int i = 0; i < 16; i++)
-        printf("%2x ", ctxt[i]);
-    printf("\n");
+    
+    print_mpc("ctxt", ctxt, msg_len);
+    print_mpc("tag", tag, 16);
 
-    printf("tag[%d]", 16);
-    for (int i = 0; i < 16; i++)
-        printf("%2x ", tag[i]);
-    printf("\n");
     return 1;
 }
 
@@ -357,33 +217,20 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
     unsigned char buf[12];
     memcpy(buf, g_fixed_iv_s, 4);
     memcpy(buf + 4, iv, 8);
-    // reverse(buf, buf + 12);
     g_aead_s = new AEAD<NetIO>(g_io, g_cot, g_key_s, buf, 12);
     // g_aead_s = new AEAD<NetIO>(g_key_s, buf, 12);
-    printf("ctxt[%d]", ctxt_len);
-    for (int i = 0; i < ctxt_len; i++)
-        printf("%2x ", ctxt[i]);
-    printf("\n");
-
-    printf("aad[%d]", aad_len);
-    for (int i = 0; i < aad_len; i++)
-        printf("%2x ", aad[i]);
-    printf("\n");
     
-    printf("tag[%d]", 16);
-    for (int i = 0; i < 16; i++)
-        printf("%2x ", tag[i]);
-    printf("\n");
+    print_mpc("ctxt", ctxt, ctxt_len);
+    print_mpc("aad", aad, aad_len);
+    print_mpc("tag", tag, 16);
 
     bool res;
     if (finish)
         res = g_hs->decrypt_and_check_server_finished_msg(*g_aead_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
     else
         res = g_hs->decrypt_record_msg(*g_aead_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
-    printf("msg[%d]", ctxt_len);
-    for (int i = 0; i < ctxt_len; i++)
-        printf("%2x ", msg[i]);
-    printf("\n");
+
+    print_mpc("msg", msg, ctxt_len);
 
     if (!res)
         printf("bad mac\n");
