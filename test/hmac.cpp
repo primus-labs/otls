@@ -2,6 +2,7 @@
 #include "cipher/sha256.h"
 #include "cipher/hmac_sha256.h"
 #include "backend/backend.h"
+#include "backend/switch.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -22,7 +23,7 @@ void sha256test() {
 
     Integer input = str_to_int(str, PUBLIC);
     auto start = clock_start();
-    sha.digest(dig, input);
+    sha.digest(dig, input, true);
     cout << "time: " << time_from(start) << "us" << endl;
     print_hex_32(dig, sha.DIGLEN);
 
@@ -32,12 +33,11 @@ void sha256test() {
 void optsha256test() {
     SHA256 sha;
     uint32_t* dig = new uint32_t[sha.DIGLEN];
-    string sec =
-      "0123456789012345678901234567890123456789012345678901234567890123";
+    string sec = "0123456789012345678901234567890123456789012345678901234567890123";
     Integer sec_input = str_to_int(sec, PUBLIC);
     unsigned char pub_input[] = {
       "0123456789012345678901234567890123456789012345678901234567890123"};
-    sha.opt_digest(dig, sec_input, pub_input, 64);
+    sha.opt_digest(dig, sec_input, pub_input, 64, true);
 
     for (int i = 0; i < sha.DIGLEN; i++) {
         cout << hex << dig[i];
@@ -72,10 +72,10 @@ void opt_hmac_sha256test() {
     string key_str = "01234567890123456789012345678901";
     unsigned char msg[] = {
       "master secret0123456789012345678901234567890101234567890123456789012345678901"};
-    Integer key = str_to_int(key_str, PUBLIC);
+    Integer key = str_to_int(key_str, ALICE);
     auto start = clock_start();
     hmac256.init(key);
-    hmac256.opt_hmac_sha256(dig, msg, 77);
+    hmac256.opt_hmac_sha256(dig, msg, 77, true, true);
     cout << "time: " << time_from(start) << "us" << endl;
     cout << "hmac_sha256: ";
     print_hex_32(dig, hmac256.DIGLEN);
@@ -99,8 +99,7 @@ void hmac_sha256circ() {
     hmac.hmac_sha256(dig, msg);
     cout << "time: " << time_from(start) << "us" << endl;
 
-    cout << "CALL Compression Function: " << hmac.compression_calls()
-         << " times" << endl;
+    cout << "CALL Compression Function: " << hmac.compression_calls() << " times" << endl;
     cout << "hmac_sha256: ";
     print_hex_32(dig, hmac.DIGLEN);
     delete[] dig;
@@ -125,8 +124,7 @@ void opt_hmac_sha256circ() {
     hmac.opt_hmac_sha256(dig, msg, 77, true, true);
     cout << "time: " << time_from(start) << "us" << endl;
 
-    cout << "CALL Compression Function: " << hmac.compression_calls()
-         << " times" << endl;
+    cout << "CALL Compression Function: " << hmac.compression_calls() << " times" << endl;
     cout << "hmac_sha256: ";
     print_hex_32(dig, hmac.DIGLEN);
     delete[] dig;
@@ -147,6 +145,33 @@ void sha256_compressiontest() {
     sha.chunk_compress(input, chunk);
 }
 
+void zk_gc_hmac_test() {
+    HMAC_SHA256 hmac256;
+    Integer* dig = new Integer[hmac256.DIGLEN];
+
+    string key_str = "01234567890123456789012345678901";
+    unsigned char msg[] = {
+      "master secret0123456789012345678901234567890101234567890123456789012345678901"};
+    Integer key = str_to_int(key_str, ALICE);
+    hmac256.init(key);
+    hmac256.opt_hmac_sha256(dig, msg, 77, true, true);
+    cout << "hmac_sha256: ";
+    print_hex_32(dig, hmac256.DIGLEN);
+
+    switch_to_zk();
+
+    key = str_to_int(key_str, ALICE);
+    hmac256.init(key);
+    hmac256.opt_hmac_sha256(dig, msg, 77, true, true, true);
+    cout << "hmac_sha256: ";
+    print_hex_32(dig, hmac256.DIGLEN);
+
+    sync_zk_gc<NetIO>();
+    switch_to_gc();
+    delete[] dig;
+}
+
+int threads = 1;
 int main(int argc, char** argv) {
     // setup_plain_prot(true, "hmacsha256.txt");
     // //setup_plain_prot(false, "");
@@ -157,18 +182,34 @@ int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
-    setup_backend(io, party);
+    //setup_backend(io, party);
 
     //hmac_sha256circ();
     //sha256test();
     //optsha256test();
     //hmac_sha256test();
     //opt_hmac_sha256test();
-    opt_hmac_sha256circ();
+    //opt_hmac_sha256circ();
     //sha256_compressiontest();
-    cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and()
-         << endl;
-    finalize_backend();
+    BoolIO<NetIO>* ios[threads];
+    for (int i = 0; i < threads; i++)
+        ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+
+    setup_protocol(io, ios, threads, party);
+    zk_gc_hmac_test();
+    finalize_protocol();
+    // cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and() << endl;
+    // finalize_backend();
+
+    for (int i = 0; i < CheatRecord::message.size(); i++) {
+        cout << CheatRecord::message[i] << endl;
+    }
+    bool cheat = CheatRecord::cheated();
+    if (cheat)
+        error("cheat!\n");
 
     delete io;
+    for (int i = 0; i < threads; i++) {
+        delete ios[i];
+    }
 }

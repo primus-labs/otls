@@ -7,6 +7,7 @@
 #include "cipher/prf.h"
 #include "add.h"
 #include "e2f.h"
+#include "backend/switch.h"
 
 using namespace emp;
 using namespace std;
@@ -36,6 +37,8 @@ class HandShake {
     EC_GROUP* group = nullptr;
     BIGNUM* q;
     BN_CTX* ctx;
+
+    Integer zkPMS_ALICE;
 
     HandShake(IO* io, COT<IO>* ot, EC_GROUP* group) : io(io) {
         ctx = BN_CTX_new();
@@ -129,6 +132,15 @@ class HandShake {
         BN_bn2bin(pms, buf);
         reverse(buf, buf + len);
         Integer pmsa, pmsb;
+
+        switch_to_zk();
+        if (party == ALICE) {
+            zkPMS_ALICE = Integer(len * 8, buf, ALICE);
+        } else {
+            zkPMS_ALICE = Integer(len * 8, 0, ALICE);
+        }
+        sync_zk_gc<IO>();
+        switch_to_gc();
 
         if (party == ALICE) {
             pmsa = Integer(len * 8, buf, ALICE);

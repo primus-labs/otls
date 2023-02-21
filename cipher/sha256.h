@@ -19,18 +19,33 @@ class SHA256 {
     static const int CHUNKLEN = 512;
 
     int compression_calls_num = 0;
-    bool in_open_flag = false;
-    bool out_open_flag = false;
-    uint32_t in_dig[DIGLEN];
-    Integer out_dig[DIGLEN];
 
-    const Integer sha256_h[VALLEN] = {
+    // gc_in_open_flag indicates already store the inner value, this indicator is for gc.
+    bool gc_in_open_flag = false;
+
+    // gc_out_open_flag indicates already store the outer value, this indicator is for gc.
+    bool gc_out_open_flag = false;
+
+    // zk_in_open_flag indicates already store the inner value, this indicator is for izk.
+    bool zk_in_open_flag = false;
+
+    // iv_in_hash stores the inner public value.
+    uint32_t iv_in_hash[DIGLEN];
+
+    // iv_out_hash stores the outer secret value (shares).
+    Integer iv_out_hash[DIGLEN];
+
+    // zk_iv_in_hash stores the inner secret value (for consistency check).
+    // Apply CheckZero to zk_iv_in_hash and iv_in_hash.
+    Integer zk_iv_in_hash[DIGLEN];
+
+    Integer sha256_h[VALLEN] = {
       Integer(WORDLEN, 0x6a09e667UL, PUBLIC), Integer(WORDLEN, 0xbb67ae85UL, PUBLIC),
       Integer(WORDLEN, 0x3c6ef372UL, PUBLIC), Integer(WORDLEN, 0xa54ff53aUL, PUBLIC),
       Integer(WORDLEN, 0x510e527fUL, PUBLIC), Integer(WORDLEN, 0x9b05688cUL, PUBLIC),
       Integer(WORDLEN, 0x1f83d9abUL, PUBLIC), Integer(WORDLEN, 0x5be0cd19UL, PUBLIC)};
 
-    const Integer sha256_k[KLEN] = {
+    Integer sha256_k[KLEN] = {
       Integer(WORDLEN, 0x428a2f98UL, PUBLIC), Integer(WORDLEN, 0x71374491UL, PUBLIC),
       Integer(WORDLEN, 0xb5c0fbcfUL, PUBLIC), Integer(WORDLEN, 0xe9b5dba5UL, PUBLIC),
       Integer(WORDLEN, 0x3956c25bUL, PUBLIC), Integer(WORDLEN, 0x59f111f1UL, PUBLIC),
@@ -80,6 +95,88 @@ class SHA256 {
     SHA256(){};
     ~SHA256(){};
 
+    inline void refresh() {
+        compression_calls_num = 0;
+        gc_in_open_flag = false;
+        gc_out_open_flag = false;
+        zk_in_open_flag = false;
+
+        sha256_h[0] = Integer(WORDLEN, 0x6a09e667UL, PUBLIC);
+        sha256_h[1] = Integer(WORDLEN, 0xbb67ae85UL, PUBLIC);
+        sha256_h[2] = Integer(WORDLEN, 0x3c6ef372UL, PUBLIC);
+        sha256_h[3] = Integer(WORDLEN, 0xa54ff53aUL, PUBLIC);
+        sha256_h[4] = Integer(WORDLEN, 0x510e527fUL, PUBLIC);
+        sha256_h[5] = Integer(WORDLEN, 0x9b05688cUL, PUBLIC);
+        sha256_h[6] = Integer(WORDLEN, 0x1f83d9abUL, PUBLIC);
+        sha256_h[7] = Integer(WORDLEN, 0x5be0cd19UL, PUBLIC);
+
+
+        sha256_k[0] = Integer(WORDLEN, 0x428a2f98UL, PUBLIC);
+        sha256_k[1] = Integer(WORDLEN, 0x71374491UL, PUBLIC);
+        sha256_k[2] = Integer(WORDLEN, 0xb5c0fbcfUL, PUBLIC);
+        sha256_k[3] = Integer(WORDLEN, 0xe9b5dba5UL, PUBLIC);
+        sha256_k[4] = Integer(WORDLEN, 0x3956c25bUL, PUBLIC);
+        sha256_k[5] = Integer(WORDLEN, 0x59f111f1UL, PUBLIC);
+        sha256_k[6] = Integer(WORDLEN, 0x923f82a4UL, PUBLIC);
+        sha256_k[7] = Integer(WORDLEN, 0xab1c5ed5UL, PUBLIC);
+        sha256_k[8] = Integer(WORDLEN, 0xd807aa98UL, PUBLIC);
+        sha256_k[9] = Integer(WORDLEN, 0x12835b01UL, PUBLIC);
+        sha256_k[10] = Integer(WORDLEN, 0x243185beUL, PUBLIC);
+        sha256_k[11] = Integer(WORDLEN, 0x550c7dc3UL, PUBLIC);
+        sha256_k[12] = Integer(WORDLEN, 0x72be5d74UL, PUBLIC);
+        sha256_k[13] = Integer(WORDLEN, 0x80deb1feUL, PUBLIC);
+        sha256_k[14] = Integer(WORDLEN, 0x9bdc06a7UL, PUBLIC);
+        sha256_k[15] = Integer(WORDLEN, 0xc19bf174UL, PUBLIC);
+        sha256_k[16] = Integer(WORDLEN, 0xe49b69c1UL, PUBLIC);
+        sha256_k[17] = Integer(WORDLEN, 0xefbe4786UL, PUBLIC);
+        sha256_k[18] = Integer(WORDLEN, 0x0fc19dc6UL, PUBLIC);
+        sha256_k[19] = Integer(WORDLEN, 0x240ca1ccUL, PUBLIC);
+        sha256_k[20] = Integer(WORDLEN, 0x2de92c6fUL, PUBLIC);
+        sha256_k[21] = Integer(WORDLEN, 0x4a7484aaUL, PUBLIC);
+        sha256_k[22] = Integer(WORDLEN, 0x5cb0a9dcUL, PUBLIC);
+        sha256_k[23] = Integer(WORDLEN, 0x76f988daUL, PUBLIC);
+        sha256_k[24] = Integer(WORDLEN, 0x983e5152UL, PUBLIC);
+        sha256_k[25] = Integer(WORDLEN, 0xa831c66dUL, PUBLIC);
+        sha256_k[26] = Integer(WORDLEN, 0xb00327c8UL, PUBLIC);
+        sha256_k[27] = Integer(WORDLEN, 0xbf597fc7UL, PUBLIC);
+        sha256_k[28] = Integer(WORDLEN, 0xc6e00bf3UL, PUBLIC);
+        sha256_k[29] = Integer(WORDLEN, 0xd5a79147UL, PUBLIC);
+        sha256_k[30] = Integer(WORDLEN, 0x06ca6351UL, PUBLIC);
+        sha256_k[31] = Integer(WORDLEN, 0x14292967UL, PUBLIC);
+        sha256_k[32] = Integer(WORDLEN, 0x27b70a85UL, PUBLIC);
+        sha256_k[33] = Integer(WORDLEN, 0x2e1b2138UL, PUBLIC);
+        sha256_k[34] = Integer(WORDLEN, 0x4d2c6dfcUL, PUBLIC);
+        sha256_k[35] = Integer(WORDLEN, 0x53380d13UL, PUBLIC);
+        sha256_k[36] = Integer(WORDLEN, 0x650a7354UL, PUBLIC);
+        sha256_k[37] = Integer(WORDLEN, 0x766a0abbUL, PUBLIC);
+        sha256_k[38] = Integer(WORDLEN, 0x81c2c92eUL, PUBLIC);
+        sha256_k[39] = Integer(WORDLEN, 0x92722c85UL, PUBLIC);
+        sha256_k[40] = Integer(WORDLEN, 0xa2bfe8a1UL, PUBLIC);
+        sha256_k[41] = Integer(WORDLEN, 0xa81a664bUL, PUBLIC);
+        sha256_k[42] = Integer(WORDLEN, 0xc24b8b70UL, PUBLIC);
+        sha256_k[43] = Integer(WORDLEN, 0xc76c51a3UL, PUBLIC);
+        sha256_k[44] = Integer(WORDLEN, 0xd192e819UL, PUBLIC);
+        sha256_k[45] = Integer(WORDLEN, 0xd6990624UL, PUBLIC);
+        sha256_k[46] = Integer(WORDLEN, 0xf40e3585UL, PUBLIC);
+        sha256_k[47] = Integer(WORDLEN, 0x106aa070UL, PUBLIC);
+        sha256_k[48] = Integer(WORDLEN, 0x19a4c116UL, PUBLIC);
+        sha256_k[49] = Integer(WORDLEN, 0x1e376c08UL, PUBLIC);
+        sha256_k[50] = Integer(WORDLEN, 0x2748774cUL, PUBLIC);
+        sha256_k[51] = Integer(WORDLEN, 0x34b0bcb5UL, PUBLIC);
+        sha256_k[52] = Integer(WORDLEN, 0x391c0cb3UL, PUBLIC);
+        sha256_k[53] = Integer(WORDLEN, 0x4ed8aa4aUL, PUBLIC);
+        sha256_k[54] = Integer(WORDLEN, 0x5b9cca4fUL, PUBLIC);
+        sha256_k[55] = Integer(WORDLEN, 0x682e6ff3UL, PUBLIC);
+        sha256_k[56] = Integer(WORDLEN, 0x748f82eeUL, PUBLIC);
+        sha256_k[57] = Integer(WORDLEN, 0x78a5636fUL, PUBLIC);
+        sha256_k[58] = Integer(WORDLEN, 0x84c87814UL, PUBLIC);
+        sha256_k[59] = Integer(WORDLEN, 0x8cc70208UL, PUBLIC);
+        sha256_k[60] = Integer(WORDLEN, 0x90befffaUL, PUBLIC);
+        sha256_k[61] = Integer(WORDLEN, 0xa4506cebUL, PUBLIC);
+        sha256_k[62] = Integer(WORDLEN, 0xbef9a3f7UL, PUBLIC);
+        sha256_k[63] = Integer(WORDLEN, 0xc67178f2UL, PUBLIC);
+    }
+
     inline void padding(Integer& padded_input, const Integer input) {
         uint64_t L = input.size();
 
@@ -98,7 +195,8 @@ class SHA256 {
         concat(padded_input, &INTL, 1);
     }
 
-    void update(Integer* dig, const Integer padded_input, bool out_flag = false) {
+    // reuse_out_hash_flag indicates to reuse outer value as an optimization.
+    void update(Integer* dig, const Integer padded_input, bool reuse_out_hash_flag = false) {
         uint64_t padded_len = padded_input.size();
         if (padded_len % CHUNKLEN == 0) {
             Integer tmp = Integer(WORDLEN, (int)0, PUBLIC);
@@ -120,16 +218,17 @@ class SHA256 {
                 tmp_block[j] = input_data[j];
             }
 
-            if (out_flag == true) {
-                if (out_open_flag == false) {
+            // check if the out_flag opened or not. If opened, will use the outer value (shares) as an optimization. Otherwise, it is the normal hash function.
+            if (reuse_out_hash_flag == true) {
+                if (gc_out_open_flag == false) {
                     chunk_compress(dig, tmp_block);
 
                     for (int i = 0; i < DIGLEN; i++)
-                        out_dig[i] = dig[i];
-                    out_open_flag = true;
+                        iv_out_hash[i] = dig[i];
+                    gc_out_open_flag = true;
                 } else {
                     for (int i = 0; i < DIGLEN; i++)
-                        dig[i] = out_dig[i];
+                        dig[i] = iv_out_hash[i];
                 }
             } else {
                 chunk_compress(dig, tmp_block);
@@ -150,21 +249,26 @@ class SHA256 {
                     const Integer sec_input,
                     unsigned char* pub_input,
                     size_t pub_len,
-                    bool in_flag = false) {
+                    bool reuse_in_hash_flag = false,
+                    bool zk_flag = false) {
         uint64_t len = sec_input.size();
-        if (len == CHUNKLEN) {
-            Integer tmp = Integer(WORDLEN, (int)0, PUBLIC);
-            vector<Integer> input_data;
-            for (int i = len - 1; i >= 0; --i) {
-                tmp.bits[i % WORDLEN] = sec_input[i];
+        assert(len == CHUNKLEN);
+        Integer tmp = Integer(WORDLEN, (int)0, PUBLIC);
+        vector<Integer> input_data;
+        for (int i = len - 1; i >= 0; --i) {
+            tmp.bits[i % WORDLEN] = sec_input[i];
 
-                if (i % WORDLEN == 0) {
-                    input_data.push_back(tmp);
-                }
+            if (i % WORDLEN == 0) {
+                input_data.push_back(tmp);
             }
+        }
 
-            if (in_flag == true) {
-                if (in_open_flag == false) {
+        // enable the reuse optimization, reuse opened value and store it in iv_in_hash.
+        if (reuse_in_hash_flag == true) {
+            // not enable zk
+            if (!zk_flag) {
+                // if iv_in_hash is empty, compute the gc shares, open it and store the value in iv_in_hash.
+                if (gc_in_open_flag == false) {
                     Integer* dig = new Integer[VALLEN];
                     for (int i = 0; i < VALLEN; i++)
                         dig[i] = sha256_h[i];
@@ -175,73 +279,91 @@ class SHA256 {
                                            std::end(dig[i].bits));
                     tmpInt.reveal<uint32_t>((uint32_t*)plain_dig, PUBLIC);
 
+                    memcpy(iv_in_hash, plain_dig, DIGLEN * sizeof(uint32_t));
+
+                    gc_in_open_flag = true;
                     delete[] dig;
-                    for (int i = 0; i < DIGLEN; i++)
-                        in_dig[i] = plain_dig[i];
 
-                    in_open_flag = true;
                 } else {
+                    //if iv_in_hash is stored,reuse it.
+                    memcpy(plain_dig, iv_in_hash, DIGLEN * sizeof(uint32_t));
+                }
+            } else {
+                // enable zk.
+                // iv_in_hash already exists in this setting. In the zk setting, we should first compute the compression function (zk shares) and check consistency.
+                // Only compute and check once.
+                if (zk_in_open_flag == false) {
+                    Integer* dig = new Integer[VALLEN];
+                    for (int i = 0; i < VALLEN; i++)
+                        dig[i] = sha256_h[i];
+                    chunk_compress(dig, input_data.data());
+
                     for (int i = 0; i < DIGLEN; i++) {
-                        plain_dig[i] = in_dig[i];
+                        zk_iv_in_hash[i] = dig[i];
                     }
+
+                    zk_in_open_flag = true;
                 }
-            } else {
-                Integer* dig = new Integer[VALLEN];
-                for (int i = 0; i < VALLEN; i++)
-                    dig[i] = sha256_h[i];
-
-                chunk_compress(dig, input_data.data());
-                Integer tmpInt;
-                for (int i = 0; i < VALLEN; ++i)
-                    tmpInt.bits.insert(tmpInt.bits.end(), std::begin(dig[i].bits),
-                                       std::end(dig[i].bits));
-                tmpInt.reveal<uint32_t>((uint32_t*)plain_dig, PUBLIC);
-
-                delete[] dig;
+                // reuse the stored value anyway.
+                memcpy(plain_dig, iv_in_hash, DIGLEN * sizeof(uint32_t));
             }
+        } else {
+            // Do not enable the reuse optimization, but still open the inner hash as an optimization.
+            Integer* dig = new Integer[VALLEN];
+            for (int i = 0; i < VALLEN; i++)
+                dig[i] = sha256_h[i];
 
-            unsigned char* data = new unsigned char[KLEN];
-            size_t datalen = 0, bitlen = 512;
+            chunk_compress(dig, input_data.data());
+            Integer tmpInt;
+            for (int i = 0; i < VALLEN; ++i)
+                tmpInt.bits.insert(tmpInt.bits.end(), std::begin(dig[i].bits),
+                                   std::end(dig[i].bits));
+            tmpInt.reveal<uint32_t>((uint32_t*)plain_dig, PUBLIC);
 
-            for (size_t i = 0; i < pub_len; i++) {
-                data[datalen] = pub_input[i];
-                datalen++;
-                if (datalen == 64) {
-                    opt_chunk_compress(plain_dig, data);
-                    bitlen += 512;
-                    datalen = 0;
-                }
+            delete[] dig;
+        }
+
+        // compute the following part in plain, not in mpc.
+
+        unsigned char* data = new unsigned char[KLEN];
+        size_t datalen = 0, bitlen = 512;
+
+        for (size_t i = 0; i < pub_len; i++) {
+            data[datalen] = pub_input[i];
+            datalen++;
+            if (datalen == 64) {
+                plain_chunk_compress(plain_dig, data);
+                bitlen += 512;
+                datalen = 0;
             }
+        }
 
-            size_t i = datalen;
+        size_t i = datalen;
 
-            if (datalen < 56) {
-                data[i++] = 0x80;
-                while (i < 56)
-                    data[i++] = 0x00;
-            } else {
-                data[i++] = 0x80;
-                while (i < 64)
-                    data[i++] = 0x00;
-                opt_chunk_compress(plain_dig, data);
-                memset(data, 0, 56);
-            }
+        if (datalen < 56) {
+            data[i++] = 0x80;
+            while (i < 56)
+                data[i++] = 0x00;
+        } else {
+            data[i++] = 0x80;
+            while (i < 64)
+                data[i++] = 0x00;
+            plain_chunk_compress(plain_dig, data);
+            memset(data, 0, 56);
+        }
 
-            bitlen += datalen * 8;
-            data[63] = bitlen;
-            data[62] = bitlen >> 8;
-            data[61] = bitlen >> 16;
-            data[60] = bitlen >> 24;
-            data[59] = bitlen >> 32;
-            data[58] = bitlen >> 40;
-            data[57] = bitlen >> 48;
-            data[56] = bitlen >> 56;
-            opt_chunk_compress(plain_dig, data);
+        bitlen += datalen * 8;
+        data[63] = bitlen;
+        data[62] = bitlen >> 8;
+        data[61] = bitlen >> 16;
+        data[60] = bitlen >> 24;
+        data[59] = bitlen >> 32;
+        data[58] = bitlen >> 40;
+        data[57] = bitlen >> 48;
+        data[56] = bitlen >> 56;
+        plain_chunk_compress(plain_dig, data);
 
-            delete[] data;
-
-        } else
-            error("wrong secret input length!\n");
+        delete[] data;
     }
 
     void chunk_compress(Integer* input_h, Integer* chunk) {
@@ -297,7 +419,7 @@ class SHA256 {
         delete[] w;
     }
 
-    void opt_chunk_compress(uint32_t* input_h, unsigned char* chunk) {
+    void plain_chunk_compress(uint32_t* input_h, unsigned char* chunk) {
         uint32_t* w = new uint32_t[KLEN];
         for (int i = 0, j = 0; i < 16; i++, j += 4) //initiate w
             w[i] =
@@ -344,18 +466,19 @@ class SHA256 {
         delete[] w;
     }
 
-    inline void digest(Integer* res, Integer input, bool out_flag = false) {
+    inline void digest(Integer* res, Integer input, bool reuse_out_hash_flag = false) {
         Integer padded_input;
         padding(padded_input, input);
-        update(res, padded_input, out_flag);
+        update(res, padded_input, reuse_out_hash_flag);
     }
 
     inline void opt_digest(uint32_t* res,
                            const Integer sec_input,
                            unsigned char* pub_input,
                            size_t pub_len,
-                           bool in_flag = false) {
-        opt_update(res, sec_input, pub_input, pub_len, in_flag);
+                           bool reuse_in_hash_flag = false,
+                           bool zk_flag = false) {
+        opt_update(res, sec_input, pub_input, pub_len, reuse_in_hash_flag, zk_flag);
     }
 
     inline size_t compression_calls() { return compression_calls_num; }

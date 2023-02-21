@@ -1,4 +1,4 @@
-#include "protocol/switch.h"
+#include "backend/switch.h"
 #include "backend/backend.h"
 #include <emp-zk/emp-zk.h>
 #include "emp-tool/emp-tool.h"
@@ -22,33 +22,32 @@ int main(int argc, char** argv) {
     for (int i = 0; i < threads; i++)
         ios[i] = new BoolIO<NetIO>(io, party == ALICE);
 
-    setup_backend(io, party);
+    setup_protocol<NetIO>(io, ios, threads, party);
+    //setup_backend(io, party);
     switch_test();
 
-    backup_gc();
-    setup_zk_bool<BoolIO<NetIO>>(ios, threads, party);
+    //backup_gc_ptr();
+    //setup_zk_bool<BoolIO<NetIO>>(ios, threads, party);
+    switch_to_zk();
     switch_test();
 
+    sync_zk_gc<NetIO>();
 
-    sync_zk_bool<BoolIO<NetIO>>();
+    switch_to_gc();
+    switch_test();
+    switch_to_zk();
 
-    switch_from_zk_to_gc();
+    switch_test();
+    sync_zk_gc<NetIO>();
+
+    switch_to_gc();
     switch_test();
 
-    switch_from_gc_to_zk();
-    switch_test();
-
-    sync_zk_bool<BoolIO<NetIO>>();
-
+    finalize_protocol();
     bool cheat = CheatRecord::cheated();
     if (cheat)
         error("cheat!\n");
-
-    switch_from_zk_to_gc();
-    switch_test();
-
-    finalize_backend();
-
+        
     delete io;
     for (int i = 0; i < threads; i++) {
         delete ios[i];

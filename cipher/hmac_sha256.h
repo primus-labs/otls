@@ -4,6 +4,7 @@
 #include "emp-tool/emp-tool.h"
 #include <iostream>
 #include <vector>
+#include <list>
 #include "sha256.h"
 #include "utils.h"
 
@@ -21,8 +22,8 @@ class HMAC_SHA256 : public SHA256 {
     Integer i_key_pad;
 
     inline void init(Integer key) {
-        in_open_flag = false;
-        out_open_flag = false;
+        refresh();
+        SHA256_call = 0;
 
         Integer pad_key;
 
@@ -55,9 +56,7 @@ class HMAC_SHA256 : public SHA256 {
         i_key_pad = pad_key ^ i_pad;
     }
 
-    //    inline void hmac_sha_256(Integer* res, const Integer key, const Integer msg) {
     inline void hmac_sha256(Integer* res, const Integer msg) {
-        //init(key);
         Integer i_msg = i_key_pad;
         concat(i_msg, &msg, 1);
 
@@ -74,15 +73,15 @@ class HMAC_SHA256 : public SHA256 {
         delete[] tmp_dig;
     }
 
-    //    void opt_hmac_sha_256(Integer* res, const Integer key, unsigned char* msg, size_t len, bool in_flag = false, bool out_flag = false) {
     void opt_hmac_sha256(Integer* res,
-                          unsigned char* msg,
-                          size_t len,
-                          bool in_flag = false,
-                          bool out_flag = false) {
-        //init(key);
+                         unsigned char* msg,
+                         size_t len,
+                         bool reuse_in_hash_flag = false,
+                         bool reuse_out_hash_flag = false,
+                         bool zk_flag = false) {
         uint32_t* dig = new uint32_t[DIGLEN];
-        opt_digest(dig, i_key_pad, msg, len, in_flag);
+
+        opt_digest(dig, i_key_pad, msg, len, reuse_in_hash_flag, zk_flag);
         SHA256_call++;
         Integer* o_msg = new Integer[DIGLEN];
         for (int i = 0; i < DIGLEN; i++) {
@@ -92,7 +91,7 @@ class HMAC_SHA256 : public SHA256 {
         Integer omsg = o_key_pad;
         concat(omsg, o_msg, DIGLEN);
 
-        digest(res, omsg, out_flag);
+        digest(res, omsg, reuse_out_hash_flag);
         SHA256_call++;
         delete[] dig;
         delete[] o_msg;
