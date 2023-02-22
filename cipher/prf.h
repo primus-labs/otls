@@ -101,8 +101,7 @@ class PRF {
             } else {
                 // in the zk setting, store the zk shares of M. Reuse the stored public M value.
                 zk_sec_M.push_back(tmpInt);
-                memcpy(tmpd, pub_M[zk_pos], hmac.DIGLEN * sizeof(uint32_t));
-                zk_pos++;
+                memcpy(tmpd, pub_M[zk_pos++], hmac.DIGLEN * sizeof(uint32_t));
             }
 
             for (int j = 0, k = 0; j < hmac.DIGLEN; j++, k += 4) {

@@ -302,6 +302,7 @@ void zk_gc_prf_test(int party) {
 
     switch_to_zk();
     secret = Integer(128, secret_u.data(), ALICE);
+    output = Integer(800, output_u.data());
     prf.init(hmac, secret);
     prf.opt_compute(hmac, res, 800, secret, label, label_u.size(), seed, seed_u.size(), true,
                     true, true);
@@ -311,21 +312,22 @@ void zk_gc_prf_test(int party) {
         cout << "zk test failed" << endl;
     }
 
-    // if (prf.pub_M.size() != prf.zk_sec_M.size()) {
-    //     error("error!\n");
-    // } else {
-    //     for (int i = 0; i < prf.pub_M.size(); i++) {
-    //         Integer M(256, prf.pub_M[i], PUBLIC);
-    //         Integer diff = prf.zk_sec_M[i] ^ M;
-    //         check_zero<NetIO>(diff, party);
-    //     }
-    // }
+    if (prf.pub_M.size() != prf.zk_sec_M.size()) {
+        error("error!\n");
+    } else {
+        for (int i = 0; i < prf.pub_M.size(); i++) {
+            Integer M(256, prf.pub_M[i], PUBLIC);
+            Integer diff = prf.zk_sec_M[i] ^ M;
+            check_zero<NetIO>(diff, party);
+        }
+    }
 
-    // for (int i = 0; i < hmac.DIGLEN; i++) {
-    //     Integer iv(32, hmac.iv_in_hash[i], PUBLIC);
-    //     Integer diff = hmac.zk_iv_in_hash[i] ^ iv;
-    //     check_zero<NetIO>(diff, party);
-    // }
+    for (int i = 0; i < hmac.DIGLEN; i++) {
+        Integer iv(32, hmac.iv_in_hash[i], PUBLIC);
+        Integer diff = hmac.zk_iv_in_hash[i] ^ iv;
+        check_zero<NetIO>(diff, party);
+    }
+
     sync_zk_gc<NetIO>();
     switch_to_gc();
 }
@@ -355,10 +357,7 @@ int main(int argc, char** argv) {
     setup_protocol(io, ios, threads, party);
     zk_gc_prf_test(party);
     finalize_protocol();
-
-    for (int i = 0; i < CheatRecord::message.size(); i++) {
-        cout << CheatRecord::message[i] << endl;
-    }
+    
     bool cheat = CheatRecord::cheated();
     if (cheat)
         error("cheat!\n");
