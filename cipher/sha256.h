@@ -110,7 +110,6 @@ class SHA256 {
         sha256_h[6] = Integer(WORDLEN, 0x1f83d9abUL, PUBLIC);
         sha256_h[7] = Integer(WORDLEN, 0x5be0cd19UL, PUBLIC);
 
-
         sha256_k[0] = Integer(WORDLEN, 0x428a2f98UL, PUBLIC);
         sha256_k[1] = Integer(WORDLEN, 0x71374491UL, PUBLIC);
         sha256_k[2] = Integer(WORDLEN, 0xb5c0fbcfUL, PUBLIC);
@@ -198,51 +197,49 @@ class SHA256 {
     // reuse_out_hash_flag indicates to reuse outer value as an optimization.
     void update(Integer* dig, const Integer padded_input, bool reuse_out_hash_flag = false) {
         uint64_t padded_len = padded_input.size();
-        if (padded_len % CHUNKLEN == 0) {
-            Integer tmp = Integer(WORDLEN, (int)0, PUBLIC);
-            vector<Integer> input_data;
-            for (int i = padded_input.size() - 1; i >= 0; --i) {
-                tmp.bits[i % WORDLEN] = padded_input[i];
+        assert(padded_len % CHUNKLEN == 0);
+        Integer tmp = Integer(WORDLEN, (int)0, PUBLIC);
+        vector<Integer> input_data;
+        for (int i = padded_input.size() - 1; i >= 0; --i) {
+            tmp.bits[i % WORDLEN] = padded_input[i];
 
-                if (i % WORDLEN == 0) {
-                    input_data.push_back(tmp);
-                }
+            if (i % WORDLEN == 0) {
+                input_data.push_back(tmp);
             }
+        }
 
-            uint64_t num_chunk = padded_len / CHUNKLEN;
-            for (int i = 0; i < VALLEN; i++)
-                dig[i] = sha256_h[i];
+        uint64_t num_chunk = padded_len / CHUNKLEN;
+        for (int i = 0; i < VALLEN; i++)
+            dig[i] = sha256_h[i];
 
-            Integer* tmp_block = new Integer[CHUNKLEN / WORDLEN]; //CHUNKLEN/WORDLEN=16
-            for (int j = 0; j < CHUNKLEN / WORDLEN; j++) {
-                tmp_block[j] = input_data[j];
-            }
+        Integer* tmp_block = new Integer[CHUNKLEN / WORDLEN]; //CHUNKLEN/WORDLEN=16
+        for (int j = 0; j < CHUNKLEN / WORDLEN; j++) {
+            tmp_block[j] = input_data[j];
+        }
 
-            // check if the out_flag opened or not. If opened, will use the outer value (shares) as an optimization. Otherwise, it is the normal hash function.
-            if (reuse_out_hash_flag == true) {
-                if (gc_out_open_flag == false) {
-                    chunk_compress(dig, tmp_block);
+        // check if the out_flag opened or not. If opened, will use the outer value (shares) as an optimization. Otherwise, it is the normal hash function.
+        if (reuse_out_hash_flag == true) {
+            if (gc_out_open_flag == false) {
+                chunk_compress(dig, tmp_block);
 
-                    for (int i = 0; i < DIGLEN; i++)
-                        iv_out_hash[i] = dig[i];
-                    gc_out_open_flag = true;
-                } else {
-                    for (int i = 0; i < DIGLEN; i++)
-                        dig[i] = iv_out_hash[i];
-                }
+                for (int i = 0; i < DIGLEN; i++)
+                    iv_out_hash[i] = dig[i];
+                gc_out_open_flag = true;
             } else {
-                chunk_compress(dig, tmp_block);
+                for (int i = 0; i < DIGLEN; i++)
+                    dig[i] = iv_out_hash[i];
             }
+        } else {
+            chunk_compress(dig, tmp_block);
+        }
 
-            for (uint64_t i = 1; i < num_chunk; i++) {
-                for (int j = 0; j < CHUNKLEN / WORDLEN; j++) {
-                    tmp_block[j] = input_data[j + i * CHUNKLEN / WORDLEN];
-                }
-                chunk_compress(dig, tmp_block);
+        for (uint64_t i = 1; i < num_chunk; i++) {
+            for (int j = 0; j < CHUNKLEN / WORDLEN; j++) {
+                tmp_block[j] = input_data[j + i * CHUNKLEN / WORDLEN];
             }
-            delete[] tmp_block;
-        } else
-            error("wrong padding length!\n");
+            chunk_compress(dig, tmp_block);
+        }
+        delete[] tmp_block;
     }
 
     void opt_update(uint32_t* plain_dig,
