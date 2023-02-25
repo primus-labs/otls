@@ -1,4 +1,8 @@
 #include"net_io_channel.h"
+#include <chrono>
+using std::chrono::time_point;
+using std::chrono::high_resolution_clock;
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/websocket.h>
@@ -8,34 +12,46 @@
 static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
 #endif
 emp::NetIO *io = nullptr;
+inline time_point<high_resolution_clock> clock_start() { 
+    return high_resolution_clock::now();
+}
+
+inline double time_from(const time_point<high_resolution_clock>& s) {
+    return std::chrono::duration_cast<std::chrono::microseconds>(high_resolution_clock::now() - s).count();
+}
 void run_client() {
     char buf[1024];
     int count = 0;
-    for (int count = 0; ; count++) {
-        snprintf(buf, sizeof(buf), "test %d", count);
+    time_t begin = time(NULL);
+    auto begin2 = clock_start();
+    double sum = 0;
+    for (int count = 1; ; count++) {
+        snprintf(buf, sizeof(buf), "hello world");
         int l = strlen(buf);
-        printf("begin send: %s\n", buf);
+        //printf("begin send: %s\n", buf);
         io->send_data(buf, l);
         io->flush();
-        printf("end send: %s\n", buf);
+        auto send_time = clock_start();
+        //printf("end send: %s\n", buf);
         //count++;
 
         char recv[256];
         memset(recv, 0, sizeof(recv));
-        printf("begin recv %d\n", l);
+        //printf("begin recv %d\n", l);
         io->recv_data(recv, l);
-        printf("recv: %s\n", recv);
+        sum += time_from(send_time);
+        //printf("recv: %s\n", recv);
+        time_t end = time(NULL);
+        double t = time_from(begin2);
+        if (end - begin > 120) {
+            printf("%lld %lld\n", begin, end);
+            printf("%f %d %f\n", t, count, (count / t)* 1e6);
+            printf("%f %f\n", sum, sum /  count / 1e3);
+            break;
+        }
     }
 }
 
-void run_server() {
-    char buf[1024];
-    while (1) {
-        memset(buf, 0, sizeof(buf));
-        io->recv_data(buf, 100);
-        printf("recv: %s\n", buf);
-    }
-}
 int main(int argc, char* argv[]) {
 #ifdef __EMSCRIPTEN__
   bridgeSocket = emscripten_init_websocket_to_posix_socket_bridge("ws://localhost:8080");
