@@ -76,7 +76,8 @@ void hs_query_resp_gc(NetIO* io, EC_GROUP* group, int party) {
     BIGNUM* pms = BN_new();
     hs->compute_pms_online(pms, V, party);
 
-    hs->compute_master_and_expansion_keys(ms, key, pms, rc, 32, rs, 32, party);
+    hs->compute_master_key(ms, pms, rc, 32, rs, 32, party);
+    hs->compute_expansion_keys(key, ms, rc, 32, rs, 32);
 
     iv.bits.insert(iv.bits.begin(), key.bits.begin(), key.bits.begin() + 96 * 2);
     key_s.bits.insert(key_s.bits.begin(), key.bits.begin() + 2 * 96,
