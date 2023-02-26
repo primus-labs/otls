@@ -25,7 +25,10 @@ class PRF {
     vector<uint32_t*> pub_M;
     size_t zk_pos = 0;
 
-    inline void init(HMAC_SHA256& hmac, const Integer secret) { hmac.init(secret); }
+    inline void init(HMAC_SHA256& hmac, const Integer secret) {
+        hmac.init(secret);
+        hmac_calls_num = 0;
+    }
 
     inline void phash(HMAC_SHA256& hmac,
                       Integer& res,
