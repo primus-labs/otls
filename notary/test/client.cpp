@@ -9,7 +9,7 @@
 #include<openssl/err.h>
 #include<openssl/mpc_tls_meth.h>
 
-#include "mpc_tls.h"
+#include "notary.h"
 
 int verify_callback(int ok, X509_STORE_CTX* ctx) {
     // printf("server certificate: %d\n", ok);

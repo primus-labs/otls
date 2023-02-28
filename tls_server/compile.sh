@@ -2,4 +2,4 @@
 
 # sudo apt install libssl-dev, etc.
 
-g++ tls_server.cpp -o tls_server -lssl -lcrypto
+g++ server.cpp -o tls_server -lssl -lcrypto

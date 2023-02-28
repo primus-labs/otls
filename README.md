@@ -22,10 +22,10 @@ python install.py --deps --tool --ot --zk
 ```
 
 
-- Compile Pado Server and Pado Client.
+- Compile Notary Server and Notary Client.
 
 ```bash
-./compile_otls.sh
+./compile_notary.sh
 ```
 
 
@@ -47,14 +47,14 @@ Run `TLS Server`:
 ./demo/tls_server
 ```
 
-Run `Pado Server`:
+Run `Notary Server`:
 
 ```bash
-./demo/otls_pado
+./demo/notary_server
 ```
 
-Run `Pado Client`:
+Run `Notary Client`:
 
 ```bash
-./demo/otls_client
+./demo/notary_client
 ```

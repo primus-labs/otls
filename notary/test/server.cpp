@@ -5,7 +5,7 @@
 
 #include<openssl/mpc_tls_meth.h>
 #include<openssl/bn.h>
-#include "mpc_tls.h"
+#include "notary.h"
 
 void print_random(const char* title, unsigned char* r, int rlen) {
     printf("%s:", title);
