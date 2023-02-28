@@ -463,9 +463,12 @@ class AEAD {
         //     out ^= out_recv;
         // }
 
-        memcpy(tag, &out, 16);
-        reverse(tag, tag + 16);
+        unsigned char* tagc = (unsigned char*)&out;
+        reverse(tagc, tagc + 16);
 
+        res = (memcmp(tag, tagc, 16) == 0);
+
+        delete[] tagc;
         delete[] x;
         return res;
     }
