@@ -17,7 +17,8 @@ fi
 mkdir -p build
 cd ${curdir}/build
 cmake ..
-make -j4
+make -j4 
+
 
 # publish
 cd ${curdir}
