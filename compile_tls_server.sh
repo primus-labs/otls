@@ -9,4 +9,4 @@ cd ${curdir}/tls_server
 #
 cd ${curdir}
 mkdir -p ${curdir}/demo
-cp ${curdir}/tls_server/tls_server ${curdir}/demo
+cp ${curdir}/tls_server/build/tls_server ${curdir}/demo

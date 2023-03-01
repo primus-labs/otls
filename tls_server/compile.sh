@@ -1,5 +1,10 @@
-#!/bin/bash
+#! /bin/bash
+curdir=`pwd`
+builddir=${curdir}/build
+mkdir -p ${builddir}
 
-# sudo apt install libssl-dev, etc.
 
-g++ server.cpp -o tls_server -lssl -lcrypto
+mkdir -p ${builddir}
+cd ${builddir}
+cmake ..
+make -j4
