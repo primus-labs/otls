@@ -174,7 +174,7 @@ void run_pado() {
     // printf("end generate server finish mac\n");
 
 
-    while (1) {
+    {
         enc_msg(0);
         dec_msg(0);
     }

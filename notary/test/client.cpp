@@ -114,7 +114,7 @@ void run_client() {
 
 
     int count = 0;
-    while (1) {
+    {
         char buf[10240];
         snprintf(buf, sizeof(buf), "message from client, id: %d", count++);
         // int len = send(fd, buf, strlen(buf), 0);

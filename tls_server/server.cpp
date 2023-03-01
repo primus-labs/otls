@@ -88,7 +88,7 @@ void run() {
     }
     printf("SSL accept success\n");
 
-    while (1) {
+    {
         char buf[10240];
         // int len = recv(cfd, buf, sizeof(buf), 0);
         int len = SSL_read(cssl, buf, sizeof(buf));
