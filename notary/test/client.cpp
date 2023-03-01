@@ -40,20 +40,24 @@ void run_client() {
 
     int ret = 0;
     int retries = 10;
-    while(true){
+    // while(true){
         ret = connect(fd, (struct sockaddr*)&server, sizeof(server));
-        if (ret >= 0) {
-            break;
-        }
-        sleep(1);
-        printf("try connect to server again %d\n", retries);
+        // if (ret >= 0) {
+        //     break;
+        // }
+        if (ret<0){
+                printf("connect error %s\n", strerror(errno));
+                exit(1);
+            }
+    //     sleep(1);
+    //     printf("try connect to server again %d\n", retries);
 
-        retries--;
-        if (retries<=0){
-            printf("connect error %s\n", strerror(errno));
-            exit(1);
-        }
-    }
+    //     retries--;
+    //     if (retries<=0){
+    //         printf("connect error %s\n", strerror(errno));
+    //         exit(1);
+    //     }
+    // }
 
 
     const SSL_METHOD* tlsv12 = TLS_method();

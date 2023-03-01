@@ -95,7 +95,7 @@ void dec_msg(int finish) {
     delete []msg;
 }
 
-void run_pado() {
+void run_notary() {
     init_mpc(1);
     
     // printf("begin tranfer client random\n");
@@ -182,6 +182,6 @@ void run_pado() {
 }
 
 int main(int argc, char* argv[]) {
-    run_pado();
+    run_notary();
     return 0;
 }

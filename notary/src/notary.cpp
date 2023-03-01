@@ -23,7 +23,7 @@ static inline void print_mpc(const char* str, const unsigned char* data, size_t 
     // printf("\n");
 }
 
-int init_mpc(int pado) {
+int init_mpc(int notary_) {
     OPENSSL_init_MPC_METH(get_pms_mpc,
                           tls1_prf_master_secret_mpc,
                           tls1_prf_block_key_mpc,
@@ -32,7 +32,7 @@ int init_mpc(int pado) {
                           dec_aesgcm_mpc,
                           transfer_hash_mpc);
 
-    int party = pado ? BOB: ALICE;
+    int party = notary_ ? BOB: ALICE;
     g_io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", 8081);
     setup_backend(g_io, party);
     auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
