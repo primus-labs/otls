@@ -32,6 +32,10 @@ void run() {
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons(8080);
 
+    int on = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on));
+
     int ret = bind(fd, (struct sockaddr*)&server, sizeof(server));
     if (ret < 0) {
         printf("bind error %s\n", strerror(errno));
@@ -89,22 +93,23 @@ void run() {
     printf("SSL accept success\n");
 
     {
-        char buf[10240];
-        // int len = recv(cfd, buf, sizeof(buf), 0);
+        char buf[128] = {0};
         int len = SSL_read(cssl, buf, sizeof(buf));
         if (len < 0) {
             printf("recv error %s\n", strerror(errno));
             exit(1);
         }
         if (len == 0) exit(0);
+        printf("recv %s\n", buf);
 
-        printf("server => recv %d %s\n", len, buf);
-        // len = send(cfd, buf, len, 0);
+
+        memset(buf, 0, sizeof(buf));
+        snprintf(buf, sizeof(buf), "hello client");
         len = SSL_write(cssl, buf, len);
         if (len < 0) {
             printf("send error %s\n", strerror(errno));
         }
-        printf("server => send %d %s\n", len, buf);
+        printf("send %s\n", buf);
     }
 
     SSL_shutdown(cssl);

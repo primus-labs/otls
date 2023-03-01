@@ -38,10 +38,21 @@ void run_client() {
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons(8080);
 
-    int ret = connect(fd, (struct sockaddr*)&server, sizeof(server));
-    if (ret < 0) {
-        printf("accept error %s\n", strerror(errno));
-        exit(1);
+    int ret = 0;
+    int retries = 10;
+    while(true){
+        ret = connect(fd, (struct sockaddr*)&server, sizeof(server));
+        if (ret >= 0) {
+            break;
+        }
+        sleep(1);
+        printf("try connect to server again %d\n", retries);
+
+        retries--;
+        if (retries<=0){
+            printf("connect error %s\n", strerror(errno));
+            exit(1);
+        }
     }
 
 
@@ -115,15 +126,14 @@ void run_client() {
 
     int count = 0;
     {
-        char buf[10240];
-        snprintf(buf, sizeof(buf), "message from client, id: %d", count++);
-        // int len = send(fd, buf, strlen(buf), 0);
+        char buf[128] = {0};
+        snprintf(buf, sizeof(buf), "hello server");
         int len = SSL_write(ssl, buf, strlen(buf));
-        printf("client => send %d %s\n", len, buf);
+        printf("send %s\n", buf);
 
-        // len = recv(fd, buf, sizeof(buf), 0);
+        memset(buf, 0, sizeof(buf));
         len = SSL_read(ssl, buf, sizeof(buf));
-        printf("client => recv %d %s\n", len, buf);
+        printf("recv %s\n", buf);
         sleep(1);
     }
 
