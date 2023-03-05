@@ -7,6 +7,24 @@
 
 #include<openssl/ssl.h>
 #include<openssl/err.h>
+#include<openssl/mpc_tls_socket.h>
+int mpc_tls_send(int fd, const char* buf, int len, int flag) {
+    printf("mpc tls send============%d\n", len);
+	for (int i = 0; i < len; i++)
+		printf("%02x ", (unsigned char)buf[i]);
+	printf("\n");
+    return send(fd, buf, len, flag);
+}
+
+int mpc_tls_recv(int fd, char* buf, int len, int flag) {
+    int ret = recv(fd, buf, len, flag);
+    printf("mpc tls recv=============%d\n", len);
+	for (int i = 0; i < ret; i++)
+		printf("%02x ", (unsigned char)buf[i]);
+	printf("\n");
+	return ret;
+}
+
 int verify_callback(int ok, X509_STORE_CTX* ctx) {
     printf("server certificate: %d\n", ok);
     X509* cert = X509_STORE_CTX_get_current_cert(ctx);
@@ -126,6 +144,7 @@ int main(int argc, char* argv[]) {
     if (ret < 0) {
         printf("init ssl error\n");
     }
+    OPENSSL_init_MPC_SOCKET(mpc_tls_send, mpc_tls_recv);
     run();
     return 0;
 }

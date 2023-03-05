@@ -20,13 +20,20 @@ static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
 #endif
 
 int mpc_tls_send(int fd, const char* buf, int len, int flag) {
-    printf("mpc tls send============\n");
+    printf("mpc tls send============%d\n", len);
+	for (int i = 0; i < len; i++)
+		printf("%02x ", (unsigned char)buf[i]);
+	printf("\n");
     return send(fd, buf, len, flag);
 }
 
 int mpc_tls_recv(int fd, char* buf, int len, int flag) {
-    printf("mpc tls recv=============\n");
-    return recv(fd, buf, len, flag);
+    int ret = recv(fd, buf, len, flag);
+    printf("mpc tls recv=============%d\n", len);
+	for (int i = 0; i < ret; i++)
+		printf("%02x ", (unsigned char)buf[i]);
+	printf("\n");
+	return ret;
 }
 
 int verify_callback(int ok, X509_STORE_CTX* ctx) {
@@ -87,6 +94,7 @@ void run_client() {
         printf("create socket error %s\n", strerror(errno));
         exit(1);
     }
+	printf("create socket ok\n");
     struct sockaddr_in server;
     memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
@@ -101,6 +109,7 @@ void run_client() {
         printf("connect error %s\n", strerror(errno));
         exit(1);
     }
+	printf("connect ok\n");
 
 
     const SSL_METHOD* tlsv12 = TLS_method();
@@ -200,7 +209,6 @@ int main(int argc, char* argv[]) {
   } while (readyState == 0);
   printf("end readystate\n");
 #endif
-    exit(0);
 
     int ret = OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL);
     if (ret < 0) {
