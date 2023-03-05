@@ -7,7 +7,7 @@ include_directories(${EMP-OT_INCLUDE_DIRS})
 add_library(otls SHARED mpc_tls.cpp)
 target_include_directories(otls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../install_openssl/include/)
 target_include_directories(otls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../)
-target_link_libraries(otls PUBLIC ${EMP-OT_LIBRARIES})
+target_link_libraries(otls PUBLIC ${EMP-OT_LIBRARIES} dl)
 message("source dir:" ${CMAKE_CURRENT_SOURCE_DIR})
 
 install(TARGETS otls DESTINATION lib)

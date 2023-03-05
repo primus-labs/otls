@@ -7,9 +7,9 @@
 
 #include<openssl/ssl.h>
 #include<openssl/err.h>
-
-#include<otls/mpc_tls.h>
 #include<openssl/mpc_tls_meth.h>
+
+#include "mpc_tls/mpc_tls.h"
 
 int verify_callback(int ok, X509_STORE_CTX* ctx) {
     printf("server certificate: %d\n", ok);
@@ -58,7 +58,7 @@ void run_client() {
     // *********************************
     
         SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, verify_callback);
-    if(SSL_CTX_load_verify_locations(ssl_ctx, "ca.crt", NULL) <= 0) {
+    if(SSL_CTX_load_verify_locations(ssl_ctx, "./mpc_tls_test/ca.crt", NULL) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }

@@ -61,11 +61,11 @@ void run() {
         ERR_print_errors_fp(stderr);
         exit(1);
     }*/
-    if (SSL_CTX_use_certificate_chain_file(ssl_ctx, "server.crt") <= 0) {
+    if (SSL_CTX_use_certificate_chain_file(ssl_ctx, "./mpc_tls_test/server.crt") <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
-    if (SSL_CTX_use_PrivateKey_file(ssl_ctx, "server.key", SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_PrivateKey_file(ssl_ctx, "./mpc_tls_test/server.key", SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
