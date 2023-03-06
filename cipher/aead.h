@@ -327,6 +327,8 @@ class AEAD {
             reverse(z, z + ctxt_len);
 
             // store opened z for consistency check
+            // In our protocol, the parties use different instance to encrypt and decrypt.
+            // We use the same buffer to store data in encryption and decryption.
             open_z.push_back(nullptr);
             open_z.back() = new unsigned char[ctxt_len];
             memcpy(open_z.back(), z, ctxt_len);
@@ -449,26 +451,11 @@ class AEAD {
         delete[] com;
         delete[] rnd;
 
-        // if (party == BOB) {
-        //     block out_recv = zero_block;
-        //     io->send_block(&out, 1);
-        //     io->recv_block(&out_recv, 1);
-
-        //     out ^= out_recv;
-        // } else {
-        //     block out_recv = zero_block;
-        //     io->recv_block(&out_recv, 1);
-        //     io->send_block(&out, 1);
-
-        //     out ^= out_recv;
-        // }
-
         unsigned char* tagc = (unsigned char*)&out;
         reverse(tagc, tagc + 16);
 
         res = (memcmp(tag, tagc, 16) == 0);
 
-        delete[] tagc;
         delete[] x;
         return res;
     }
