@@ -58,7 +58,7 @@ void run_client() {
     // *********************************
     
         SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, verify_callback);
-    if(SSL_CTX_load_verify_locations(ssl_ctx, "./mpc_tls_test/ca.crt", NULL) <= 0) {
+    if(SSL_CTX_load_verify_locations(ssl_ctx, "./ca.crt", NULL) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
