@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.0)
 project(otls-test)
 
-set(PadoSSL ${CMAKE_CURRENT_SOURCE_DIR}/../../install_openssl)
+set(PadoSSL ${CMAKE_CURRENT_SOURCE_DIR}/../../install_emopenssl)
 
-find_package(emp-ot REQUIRED)
+# find_package(emp-ot REQUIRED)
 include_directories(${EMP-OT_INCLUDE_DIRS})
 # message("cmake prefix" ${CMAKE_PREFIX_PATH})
+set(CMAKE_EXECUTABLE_SUFFIX ".html")
 
 macro (add_otls_test name)
     add_executable(otls_${name} ${name}.cpp)

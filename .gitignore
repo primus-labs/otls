@@ -1,5 +1,6 @@
 .vscode
-build
+build/
+build_wasm/
 Testing/
 *.DS_Store
 *.txt.cpp

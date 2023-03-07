@@ -12,7 +12,7 @@ using std::string;
 using std::vector;
 
 static string circuit_file_location =
-  macro_xstr(EMP_CIRCUIT_PATH) + string("bristol_fashion/");
+  string("./bristol_fashion/");
 static BristolFashion aes = BristolFashion((circuit_file_location + "aes_128.txt").c_str());
 
 static string aes_ks_file = "cipher/circuit_files/aes128_ks.txt";

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 project(otls)
 
-find_package(emp-ot REQUIRED)
+#find_package(emp-ot REQUIRED)
 include_directories(${EMP-OT_INCLUDE_DIRS})
 
 add_library(otls SHARED mpc_tls.cpp)
