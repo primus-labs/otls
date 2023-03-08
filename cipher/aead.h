@@ -204,6 +204,7 @@ class AEAD {
             integer_to_chars(z, Z);
 
             // store xor share of z
+            reverse(z, z + msg_len);
             gc_z.push_back(nullptr);
             gc_z.back() = new unsigned char[msg_len];
             memcpy(gc_z.back(), z, msg_len);
@@ -343,6 +344,7 @@ class AEAD {
             integer_to_chars(z, Z);
 
             // store xor share of z
+            reverse(z, z + ctxt_len);
             gc_z.push_back(nullptr);
             gc_z.back() = new unsigned char[ctxt_len];
             memcpy(gc_z.back(), z, ctxt_len);

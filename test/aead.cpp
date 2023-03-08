@@ -393,7 +393,7 @@ int main(int argc, char** argv) {
 
     //aead_encrypt_test(io, cot, party, true);
     aead_decrypt_test(io, cot, party, true);
-
+    //convert(party);
     //aead_dec_record_msg(io, cot, party);
     //convert(party);
     cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and() << endl;

@@ -6,7 +6,7 @@
 using namespace emp;
 
 template <typename IO>
-void check_zero(const block* blk, size_t length, int party) {
+inline void check_zero(const block* blk, size_t length, int party) {
     if (party == ALICE) {
         (((ZKProver<IO>*)(ProtocolExecution::prot_exec))->ostriple->auth_helper->hash)
           .put_block(blk, length);
@@ -17,7 +17,7 @@ void check_zero(const block* blk, size_t length, int party) {
 }
 
 template <typename IO>
-void check_zero(const Integer input, int party) {
+inline void check_zero(const Integer input, int party) {
     if (party == ALICE) {
         for (int i = 0; i < input.size(); i++) {
             (((ZKProver<IO>*)(ProtocolExecution::prot_exec))->ostriple->auth_helper->hash)

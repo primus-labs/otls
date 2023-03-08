@@ -52,19 +52,6 @@ inline void char_to_uint32(uint32_t* res, const char* in, size_t len) {
     }
 }
 
-/*inline vector<Bit> str_to_bits(string str){
-	vector<Bit> bits;
-	bool b;
-	for(uint64_t i = 0; i < str.length(); i++){
-		for(int j = sizeof(char)-1; j >= 0; j--){
-			b = ((str[i]&(1<<j))==1)? true:false;
-			bits.push_back(Bit(b));
-		}
-	}
-		return bits;
-}
-*/
-
 inline string int_to_hex(vector<uint32_t> vint) {
     string str;
     uint tmp_int;
@@ -77,7 +64,6 @@ inline string int_to_hex(vector<uint32_t> vint) {
             str += buffer;
         }
     }
-    //	cout<<str.length()<<endl;
     delete[] buffer;
 
     return str;
