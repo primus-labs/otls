@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "backend/switch.h"
 #include "backend/commitment.h"
+#include <deque>
 
 using namespace emp;
 
@@ -20,16 +21,17 @@ class AEAD {
     Integer zk_h;
 
     // xor and zk share of z0, for izk to check consistency
-    vector<block> gc_z0;
-    vector<Integer> zk_z0;
+    deque<block> gc_z0;
+    deque<Integer> zk_z0;
 
     // xor and zk share of z, for izk to check consistency
-    vector<unsigned char*> gc_z;
-    vector<Integer> zk_z;
+    deque<unsigned char*> gc_z;
+    deque<Integer> zk_z;
+    deque<size_t> z_len;
 
     // opened z values and related length. Only for the case sec_type == false
-    vector<unsigned char*> open_z;
-    vector<size_t> open_len;
+    deque<unsigned char*> open_z;
+    deque<size_t> open_len;
 
     // These are the multiplicative shares h^n for h = AES(key,0)
     vector<block> mul_hs;
@@ -187,7 +189,6 @@ class AEAD {
         if (!sec_type) {
             // message is public
             Z.reveal<unsigned char>((unsigned char*)z, PUBLIC);
-            reverse(z, z + msg_len);
 
             // store opened z for consistency check
             open_z.push_back(nullptr);
@@ -197,6 +198,7 @@ class AEAD {
             // store the length of z for consistency check.
             open_len.push_back(msg_len);
 
+            reverse(z, z + msg_len);
             for (int i = 0; i < msg_len; i++)
                 ctxt[i] = msg[i] ^ z[i];
         } else {
@@ -208,6 +210,7 @@ class AEAD {
             gc_z.push_back(nullptr);
             gc_z.back() = new unsigned char[msg_len];
             memcpy(gc_z.back(), z, msg_len);
+            z_len.push_back(msg_len);
 
             // commit ALICE's xor share of z using izk.
             switch_to_zk();
@@ -325,7 +328,6 @@ class AEAD {
         if (!sec_type) {
             // message is public
             Z.reveal<unsigned char>((unsigned char*)z, PUBLIC);
-            reverse(z, z + ctxt_len);
 
             // store opened z for consistency check
             // In our protocol, the parties use different instance to encrypt and decrypt.
@@ -337,6 +339,7 @@ class AEAD {
             // store the length of z for consistency check.
             open_len.push_back(ctxt_len);
 
+            reverse(z, z + ctxt_len);
             for (int i = 0; i < ctxt_len; i++)
                 msg[i] = ctxt[i] ^ z[i];
         } else {
@@ -348,6 +351,7 @@ class AEAD {
             gc_z.push_back(nullptr);
             gc_z.back() = new unsigned char[ctxt_len];
             memcpy(gc_z.back(), z, ctxt_len);
+            z_len.push_back(ctxt_len);
 
             // commit ALICE's xor share of z using izk.
             switch_to_zk();
