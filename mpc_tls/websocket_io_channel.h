@@ -9,6 +9,9 @@
 #include "emp-tool/io/io_channel.h"
 using std::string;
 
+#include <vector>
+#include <map>
+using namespace std;
 
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -37,7 +40,7 @@ static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
-static std::vector<uint8_t> recv_buffer;
+static std::map<uint64_t, vector<uint8_t>> recv_buffer;
 static pthread_mutex_t recvLock = PTHREAD_MUTEX_INITIALIZER;
 static int recvBufferFlag = 0;
 static EM_BOOL
@@ -46,7 +49,10 @@ bridge_socket_on_message2(int eventType,
                          void* userData) {
   pthread_mutex_lock(&recvLock);
   uint8_t *data = (uint8_t*)websocketEvent->data;
-  recv_buffer.insert(recv_buffer.end(), data, data + websocketEvent->numBytes);
+
+  uint64_t *id = (uint64_t*)data;
+  vector<uint8_t> tmp((uint8_t*)(id + 1), ((uint8_t*)(id + 1)) + websocketEvent->numBytes - sizeof(uint64_t));
+  recv_buffer.insert(std::pair<uint64_t, std::vector<uint8_t>>(*id, tmp));
   recvBufferFlag = 1;
   pthread_mutex_unlock(&recvLock);
   emscripten_futex_wake(&recvBufferFlag, INT_MAX);
@@ -79,36 +85,57 @@ EMSCRIPTEN_WEBSOCKET_T emscripten_init_websocket_to_posix_socket_bridge2(const c
   return bridgeSocket;
 }
 
-ssize_t send2(int socket, const void *message, size_t length, int flags) {
+ssize_t send2(int socket, const void *message, size_t length, int flags, uint64_t id) {
 #ifdef POSIX_SOCKET_DEBUG
   emscripten_log(EM_LOG_NO_PATHS | EM_LOG_CONSOLE | EM_LOG_ERROR | EM_LOG_JS_STACK, "send(socket=%d,message=%p,length=%zd,flags=%d)\n", socket, message, length, flags);
 #endif
-  emscripten_websocket_send_binary(bridgeSocket, (void *)message, length);
 
-  return length;
+  unsigned char *msg = new unsigned char[sizeof(uint64_t) + length];
+  memcpy(msg, &id, sizeof(uint64_t));
+  memcpy(msg + sizeof(uint64_t), message, length);
+  size_t len = length + sizeof(uint64_t);
+  printf("send info id:%llu len:%d\n", id, length);
+
+  emscripten_websocket_send_binary(bridgeSocket, (void *)msg, len);
+  delete []msg;
+
+  return len;
 }
 
-ssize_t recv2(int socket, void *buffer, size_t length, int flags) {
+ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
 #ifdef POSIX_SOCKET_DEBUG
   emscripten_log(EM_LOG_NO_PATHS | EM_LOG_CONSOLE | EM_LOG_ERROR | EM_LOG_JS_STACK, "recv(socket=%d,buffer=%p,length=%zd,flags=%d)\n", socket, buffer, length, flags);
 #endif
-
+  int len = 0;
+while (len == 0) {
   while (!recvBufferFlag)
       emscripten_futex_wait(&recvBufferFlag, 0, 1e9);
 
   pthread_mutex_lock(&recvLock);
-  ssize_t min_length = length < recv_buffer.size()? length: recv_buffer.size();
-  memcpy(buffer, recv_buffer.data(), min_length);
-  recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + min_length);
+  // ssize_t min_length = length < recv_buffer.size()? length: recv_buffer.size();
+  // memcpy(buffer, recv_buffer.data(), min_length);
+  // recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + min_length);
+
+  auto iter = recv_buffer.find(id);
+  if (iter != recv_buffer.end()) {
+      if (iter->second.size() != length) {
+          printf("recv error recv2 id:%llu need:%d actual:%d\n", id, length, iter->second.size());
+          assert(iter->second.size() == length);
+      }
+      memcpy(buffer, iter->second.data(), iter->second.size());
+      len = iter->second.size();
+      recv_buffer.erase(iter);
+  }
   if (!recv_buffer.empty()) 
       recvBufferFlag = 1;
   else
       recvBufferFlag = 0;
   pthread_mutex_unlock(&recvLock);
-
-  return min_length;
 }
 
+  return len;
+}
+/*
 int mpc_tls_send(int fd, const char* buf, int len, int flag) {
     printf("mpc tls send============ %d\n", len);
     for (int i = 0; i < len; i++)
@@ -120,7 +147,7 @@ int mpc_tls_send(int fd, const char* buf, int len, int flag) {
 int mpc_tls_recv(int fd, char* buf, int len, int flag) {
     printf("mpc tls recv============= %d\n", len);
     return recv2(fd, buf, len, flag);
-}
+}*/
 #endif
 
 namespace emp {
@@ -134,6 +161,8 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
     bool has_sent = false;
     string addr;
     int port;
+    uint64_t send_id = 0;
+    uint64_t recv_id = 0;
     WebSocketIO(const char * address, int port, bool quiet = false) {
         if (port <0 || port > 65535) {
             throw std::runtime_error("Invalid port number!");
@@ -251,8 +280,9 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
     void send_data_internal(const void * data, size_t len) {
         size_t sent = 0;
         void* d = (void*)data;
+        send_id++;
 #ifndef __EMSCRIPTEN__
-        string websocket_data = GenWebSocketMessage(data, len);
+        string websocket_data = GenWebSocketMessage(data, len, send_id);
         d = &websocket_data[0];
         len = websocket_data.size();
 #endif
@@ -261,7 +291,7 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
 #ifndef __EMSCRIPTEN__
             size_t res = fwrite(sent + (char*)d, 1, len - sent, stream);
 #else
-            size_t res = send2(0, sent + (char*)d, len - sent, 0);
+            size_t res = send2(0, sent + (char*)d, len - sent, 0, send_id);
 #endif
             if (res > 0)
                 sent+=res;
@@ -279,14 +309,15 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
             has_sent = false;
         }
         size_t sent = 0;
+        recv_id++;
         while(sent < len) {
 #ifndef __EMSCRIPTEN__
             // size_t res = fread(sent + (char*)data, 1, len - sent, stream);
-            string d = GetMessage(consocket, len - sent);
+            string d = GetMessage(consocket, len - sent, recv_id);
             size_t res = d.size();
             memcpy(sent + (char*)data, d.data(), res);
 #else
-            size_t res = recv2(0, sent + (char*)data, len - sent, 0);
+            size_t res = recv2(0, sent + (char*)data, len - sent, 0, recv_id);
 #endif
             if (res > 0)
                 sent += res;

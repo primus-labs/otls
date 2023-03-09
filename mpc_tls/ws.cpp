@@ -7,6 +7,7 @@
 #include<errno.h>
 
 #include<vector>
+#include<map>
 #include<string>
 #include "sha1.h"
 using namespace std;
@@ -289,7 +290,13 @@ void WebSocketMessageUnmaskPayload(uint8_t* payload,
   }
 }
 
-string GenWebSocketMessage(const void *buf, uint64_t numBytes) {
+string GenWebSocketMessage(const void *buf2, uint64_t numBytes, uint64_t id) {
+  printf("send info id:%llu size:%llu\n", id, numBytes);
+  unsigned char *buf = new unsigned char[numBytes + sizeof(uint64_t)];
+  memcpy(buf, &id, sizeof(uint64_t));
+  memcpy(buf + sizeof(uint64_t), buf2, numBytes);
+  numBytes += sizeof(uint64_t);
+
   uint8_t headerData[sizeof(WebSocketMessageHeader) + 8/*possible extended length*/] = {};
   WebSocketMessageHeader *header = (WebSocketMessageHeader *)headerData;
   header->opcode = 0x02;
@@ -325,18 +332,25 @@ string GenWebSocketMessage(const void *buf, uint64_t numBytes) {
   memcpy(&result[0], headerData, headerBytes);
   memcpy((char*)&result[0] + headerBytes, buf, numBytes);
 
+  delete []buf;
   return result;
 }
 
-string GetMessage(int fd, int len) {
+string GetMessage(int fd, int len, uint64_t id) {
     static std::vector<uint8_t> fragmentData;
-    static std::vector<uint8_t> tlsData;
+    static std::map<uint64_t, std::vector<uint8_t>> tlsData;
     bool continueFlag = true;
     string result;
-    if (!tlsData.empty()) {
-        int min_len = tlsData.size() < len? tlsData.size(): len;
-        result.insert(result.end(), tlsData.begin(), tlsData.begin() + min_len);
-        tlsData.erase(tlsData.begin(), tlsData.begin() + min_len);
+    auto iter = tlsData.find(id);
+    if (iter != tlsData.end()) {
+        // int min_len = tlsData.size() < len? tlsData.size(): len;
+        // result.insert(result.end(), tlsData.begin(), tlsData.begin() + min_len);
+        // tlsData.erase(tlsData.begin(), tlsData.begin() + min_len);
+        result.resize(iter->second.size());
+        if (len != iter->second.size()) 
+            printf("recv error get message1 id:%llu need:%d actual:%d\n", id, len, iter->second.size());
+        memcpy(&result[0], iter->second.data(), iter->second.size());
+        tlsData.erase(iter);
         return result;
     }
 
@@ -393,11 +407,24 @@ string GetMessage(int fd, int len) {
               for (int i = 0; i < payloadLength; i++)
                   printf("%02x ", (unsigned char)payload[i]);
               printf("\n");
-              int min_len = payloadLength < len? payloadLength: len;
-              result.resize(min_len);
-              memcpy(&result[0], payload, min_len);
-              tlsData.insert(tlsData.end(), payload + min_len, payload + payloadLength);
-              continueFlag = false;
+              // int min_len = payloadLength < len? payloadLength: len;
+              // result.resize(min_len);
+              // memcpy(&result[0], payload, min_len);
+              // tlsData.insert(tlsData.end(), payload + min_len, payload + payloadLength);
+              uint64_t *p = (uint64_t*)payload;
+              uint8_t *d = (uint8_t*)(p + 1);
+              if (*p == id) {
+                  result.resize(payloadLength - sizeof(uint64_t));
+                  if (len != payloadLength - sizeof(uint64_t))
+                      printf("recv error get message2 id:%llu need:%d actual:%d\n", id, len, payloadLength - sizeof(uint64_t));
+                  memcpy(&result[0], d, payloadLength - sizeof(uint64_t));
+                  continueFlag = false;
+              }
+              else {
+                  std::vector<uint8_t> tmp(payloadLength - sizeof(uint64_t), 0);
+                  memcpy(&tmp[0], d, payloadLength - sizeof(uint64_t));
+                  tlsData.insert(std::pair<uint64_t, std::vector<uint8_t>>(*p, tmp));
+              }
           };
           break;
           case 0x08: continueFlag = false; break;
