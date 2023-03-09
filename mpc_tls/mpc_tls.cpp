@@ -6,6 +6,7 @@
 #include "cipher/prf.h"
 #include <openssl/bn.h>
 #include "websocket_io_channel.h"
+#include "emp_io_channel.h"
 #include <emp-tool/emp-tool.h>
 
 using namespace std;

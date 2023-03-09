@@ -12,6 +12,34 @@
 #include "mpc_tls/mpc_tls.h"
 // #include <emp-tool/emp-tool.h>
 
+#include<openssl/mpc_tls_socket.h>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/websocket.h>
+#include <emscripten/threading.h>
+#include <emscripten/posix_socket.h>
+
+static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
+#endif
+
+int mpc_tls_send(int fd, const char* buf, int len, int flag) {
+    printf("mpc tls send============%d\n", len);
+    for (int i = 0; i < len; i++)
+        printf("%02x ", (unsigned char)buf[i]);
+    printf("\n");
+    return send(fd, buf, len, flag);
+}
+
+int mpc_tls_recv(int fd, char* buf, int len, int flag) {
+    int ret = recv(fd, buf, len, flag);
+    printf("mpc tls recv=============%d\n", len);
+    for (int i = 0; i < ret; i++)
+        printf("%02x ", (unsigned char)buf[i]);
+    printf("\n");
+    return ret;
+}
+
 int verify_callback(int ok, X509_STORE_CTX* ctx) {
     printf("server certificate: %d\n", ok);
     X509* cert = X509_STORE_CTX_get_current_cert(ctx);
@@ -27,9 +55,6 @@ int verify_callback(int ok, X509_STORE_CTX* ctx) {
 }
 
 void run_client() {
-    printf("begin init mpc\n");
-    init_mpc(0);
-    printf("end init mpc\n");
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         printf("create socket error %s\n", strerror(errno));
@@ -51,7 +76,9 @@ void run_client() {
 
 
     const SSL_METHOD* tlsv12 = TLS_method();
+    printf("begin new ssl ctx\n");
     SSL_CTX* ssl_ctx = SSL_CTX_new(tlsv12);
+    printf("end new ssl ctx\n");
     SSL_CTX_set_ecdh_auto(ssl_ctx, 1);
 
     // *********************************
@@ -96,6 +123,9 @@ void run_client() {
         exit(1);
     }
     
+    printf("begin init mpc\n");
+    init_mpc(0);
+    printf("end init mpc\n");
     ret = SSL_connect(ssl);
     if (ret < 0) {
         ERR_print_errors_fp(stderr);
@@ -139,11 +169,24 @@ void run_client() {
 }
 int main(int argc, char* argv[]) {
     printf("test\n");
+#ifdef __EMSCRIPTEN__
+  bridgeSocket = emscripten_init_websocket_to_posix_socket_bridge("ws://localhost:9000");
+  // Synchronously wait until connection has been established.
+  uint16_t readyState = 0;
+  printf("begin readystate\n");
+  do {
+    emscripten_websocket_get_ready_state(bridgeSocket, &readyState);
+    emscripten_thread_sleep(100);
+  } while (readyState == 0);
+  printf("end readystate\n");
+#endif
+
     int ret = OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL);
     if (ret < 0) {
         printf("init ssl error\n");
         exit(1);
     }
+    OPENSSL_init_MPC_SOCKET(mpc_tls_send, mpc_tls_recv);
     run_client();
     return 0;
 }

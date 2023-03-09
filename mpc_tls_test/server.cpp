@@ -46,6 +46,7 @@ void run() {
     struct sockaddr_in client;
     socklen_t socklen = 0;
     int cfd = accept(fd, (struct sockaddr*)&client, &socklen);
+    printf("accept ok\n");
     if (cfd < 0) {
         printf("accept error %s\n", strerror(errno));
         exit(1);

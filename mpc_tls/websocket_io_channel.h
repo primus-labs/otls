@@ -118,10 +118,10 @@ while (len == 0) {
 
   auto iter = recv_buffer.find(id);
   if (iter != recv_buffer.end()) {
-      if (iter->second.size() != length) {
+      // if (iter->second.size() != length) {
           printf("recv error recv2 id:%llu need:%d actual:%d\n", id, length, iter->second.size());
           assert(iter->second.size() == length);
-      }
+      // }
       memcpy(buffer, iter->second.data(), iter->second.size());
       len = iter->second.size();
       recv_buffer.erase(iter);

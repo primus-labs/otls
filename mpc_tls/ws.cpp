@@ -347,7 +347,7 @@ string GetMessage(int fd, int len, uint64_t id) {
         // result.insert(result.end(), tlsData.begin(), tlsData.begin() + min_len);
         // tlsData.erase(tlsData.begin(), tlsData.begin() + min_len);
         result.resize(iter->second.size());
-        if (len != iter->second.size()) 
+        // if (len != iter->second.size()) 
             printf("recv error get message1 id:%llu need:%d actual:%d\n", id, len, iter->second.size());
         memcpy(&result[0], iter->second.data(), iter->second.size());
         tlsData.erase(iter);
@@ -415,7 +415,7 @@ string GetMessage(int fd, int len, uint64_t id) {
               uint8_t *d = (uint8_t*)(p + 1);
               if (*p == id) {
                   result.resize(payloadLength - sizeof(uint64_t));
-                  if (len != payloadLength - sizeof(uint64_t))
+                  // if (len != payloadLength - sizeof(uint64_t))
                       printf("recv error get message2 id:%llu need:%d actual:%d\n", id, len, payloadLength - sizeof(uint64_t));
                   memcpy(&result[0], d, payloadLength - sizeof(uint64_t));
                   continueFlag = false;
