@@ -5,15 +5,17 @@
 #include <iostream>
 #include "cipher/prf.h"
 #include <openssl/bn.h>
+#include "websocket_io_channel.h"
+#include <emp-tool/emp-tool.h>
 
 using namespace std;
 using namespace emp;
 
 static EC_GROUP* g_group = nullptr;
 static int g_party = -1;
-static HandShake<NetIO>* g_hs = nullptr;
-static NetIO* g_io = nullptr;
-static IKNP<NetIO>* g_cot = nullptr;
+static HandShake<WebSocketIO>* g_hs = nullptr;
+static WebSocketIO* g_io = nullptr;
+static IKNP<WebSocketIO>* g_cot = nullptr;
 static BN_CTX* g_ctx = nullptr;
 
 static void print_mpc(const char* str, const unsigned char* data, size_t n) {
@@ -33,16 +35,27 @@ int init_mpc(int pado) {
                           transfer_hash_mpc);
 
     int party = pado ? BOB: ALICE;
-    g_io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", 8081);
+    g_io = new WebSocketIO(party == BOB ? nullptr : "127.0.0.1", 8081);
+    printf("create websocket io ok\n");
+    
+    char buf[256];
+    sprintf(buf, "send by %s", pado? "pado": "clnt");
+    g_io->send_data(buf, strlen(buf));
+    printf("send=> %s\n", buf);
+    memset(buf, 0, sizeof(buf));
+    g_io->recv_data(buf, 12);
+    printf("recv=> %s\n", buf);
+
     setup_backend(g_io, party);
-    auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
+    printf("setup backend ok\n");
+    auto prot = (PADOParty<WebSocketIO>*)(ProtocolExecution::prot_exec);
     g_cot = prot->ot;
 
     g_party = party;
 
     g_group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
 
-    g_hs = new HandShake<NetIO>(g_io, g_cot, g_group);
+    g_hs = new HandShake<WebSocketIO>(g_io, g_cot, g_group);
     g_ctx = g_hs->ctx;
 
     return 1;
@@ -109,8 +122,8 @@ static Integer g_iv, g_key_c, g_key_s;
 static unsigned char g_iv_oct[8];
 static unsigned char g_fixed_iv_c[4];
 static unsigned char g_fixed_iv_s[4];
-static AEAD<NetIO> *g_aead_c = NULL;
-static AEAD<NetIO> *g_aead_s = NULL;
+static AEAD<WebSocketIO> *g_aead_c = NULL;
+static AEAD<WebSocketIO> *g_aead_s = NULL;
 static Integer* g_block_key = NULL;
 static Integer* g_ms = NULL;
 static Integer* g_finish_mac = NULL;
@@ -168,8 +181,8 @@ int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char*
     unsigned char buf[12];
     memcpy(buf, g_fixed_iv_c, 4);
     memcpy(buf + 4, iv, 8);
-    g_aead_c = new AEAD<NetIO>(g_io, g_cot, g_key_c, buf, 12);
-    // g_aead_c = new AEAD<NetIO>(g_key_c, buf, 12);
+    g_aead_c = new AEAD<WebSocketIO>(g_io, g_cot, g_key_c, buf, 12);
+    // g_aead_c = new AEAD<WebSocketIO>(g_key_c, buf, 12);
 
     print_mpc("msg", msg, msg_len);
     print_mpc("aad", aad, aad_len);
@@ -189,8 +202,8 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
     unsigned char buf[12];
     memcpy(buf, g_fixed_iv_s, 4);
     memcpy(buf + 4, iv, 8);
-    g_aead_s = new AEAD<NetIO>(g_io, g_cot, g_key_s, buf, 12);
-    // g_aead_s = new AEAD<NetIO>(g_key_s, buf, 12);
+    g_aead_s = new AEAD<WebSocketIO>(g_io, g_cot, g_key_s, buf, 12);
+    // g_aead_s = new AEAD<WebSocketIO>(g_key_s, buf, 12);
     
     print_mpc("ctxt", ctxt, ctxt_len);
     print_mpc("aad", aad, aad_len);
