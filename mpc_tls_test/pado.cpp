@@ -6,6 +6,7 @@
 #include<openssl/mpc_tls_meth.h>
 #include<openssl/bn.h>
 #include "mpc_tls/mpc_tls.h"
+// #include <emp-tool/emp-tool.h>
 
 void print_random(const char* title, unsigned char* r, int rlen) {
     printf("%s:", title);

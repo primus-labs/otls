@@ -10,6 +10,7 @@
 #include<openssl/mpc_tls_meth.h>
 
 #include "mpc_tls/mpc_tls.h"
+// #include <emp-tool/emp-tool.h>
 
 int verify_callback(int ok, X509_STORE_CTX* ctx) {
     printf("server certificate: %d\n", ok);
@@ -26,7 +27,9 @@ int verify_callback(int ok, X509_STORE_CTX* ctx) {
 }
 
 void run_client() {
+    printf("begin init mpc\n");
     init_mpc(0);
+    printf("end init mpc\n");
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         printf("create socket error %s\n", strerror(errno));
@@ -37,12 +40,14 @@ void run_client() {
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons(8080);
-
+    
+    printf("begin connect\n");
     int ret = connect(fd, (struct sockaddr*)&server, sizeof(server));
     if (ret < 0) {
         printf("accept error %s\n", strerror(errno));
         exit(1);
     }
+    printf("end connect\n");
 
 
     const SSL_METHOD* tlsv12 = TLS_method();
