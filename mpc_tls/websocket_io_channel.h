@@ -197,22 +197,8 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
 #endif
         }
         else {
-#ifdef __EMSCRIPTEN__
-            char wsaddr[256];
-            snprintf(wsaddr, sizeof(wsaddr), "ws://%s:%d", address, port);
-            bridgeSocket = emscripten_init_websocket_to_posix_socket_bridge2(wsaddr);
-            // Synchronously wait until connection has been established.
-            uint16_t readyState = 0;
-            printf("begin readystate\n");
-            do {
-              emscripten_websocket_get_ready_state(bridgeSocket, &readyState);
-              emscripten_thread_sleep(100);
-            } while (readyState == 0);
-            printf("end readystate\n");
-#endif
-
-
-            /*struct sockaddr_in dest;
+#ifndef __EMSCRIPTEN__
+            struct sockaddr_in dest;
             memset(&dest, 0, sizeof(dest));
             dest.sin_family = AF_INET;
             dest.sin_addr.s_addr = inet_addr(address);
@@ -229,15 +215,28 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
                 usleep(1000);
             }
             RequestWebSocketHandshake(consocket);
-            CheckWebSocketHandshake(consocket);*/
+            CheckWebSocketHandshake(consocket);
+#else
+            char wsaddr[256];
+            snprintf(wsaddr, sizeof(wsaddr), "ws://%s:%d", address, port);
+            bridgeSocket = emscripten_init_websocket_to_posix_socket_bridge2(wsaddr);
+            // Synchronously wait until connection has been established.
+            uint16_t readyState = 0;
+            printf("begin readystate\n");
+            do {
+              emscripten_websocket_get_ready_state(bridgeSocket, &readyState);
+              emscripten_thread_sleep(100);
+            } while (readyState == 0);
+            printf("end readystate\n");
+#endif
         }
-        if (is_server) {
-            set_nodelay();
-            stream = fdopen(consocket, "wb+");
-            buffer = new char[NETWORK_BUFFER_SIZE];
-            memset(buffer, 0, NETWORK_BUFFER_SIZE);
-            setvbuf(stream, buffer, _IOFBF, NETWORK_BUFFER_SIZE);
-        }
+#ifndef __EMSCRIPTEN__
+        set_nodelay();
+        stream = fdopen(consocket, "wb+");
+        buffer = new char[NETWORK_BUFFER_SIZE];
+        memset(buffer, 0, NETWORK_BUFFER_SIZE);
+        setvbuf(stream, buffer, _IOFBF, NETWORK_BUFFER_SIZE);
+#endif
         if(!quiet)
             std::cout << "connected\n";
     }
@@ -255,11 +254,11 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
     }
 
     ~WebSocketIO(){
-        if (is_server) {
-            flush();
-            fclose(stream);
-            delete[] buffer;
-        }
+#ifndef __EMSCRIPTEN__
+        flush();
+        fclose(stream);
+        delete[] buffer;
+#endif
     }
 
     void set_nodelay() {
@@ -273,8 +272,9 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
     }
 
     void flush() {
-        if (is_server)
-            fflush(stream);
+#ifndef __EMSCRIPTEN__
+        fflush(stream);
+#endif
     }
 
     void send_data_internal(const void * data, size_t len) {
@@ -303,11 +303,11 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
     }
 
     void recv_data_internal(void  * data, size_t len) {
-        if (is_server) {
-            if(has_sent)
-                fflush(stream);
-            has_sent = false;
-        }
+#ifndef __EMSCRIPTEN__
+        if(has_sent)
+            fflush(stream);
+        has_sent = false;
+#endif
         size_t sent = 0;
         recv_id++;
         while(sent < len) {
