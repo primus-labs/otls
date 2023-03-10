@@ -46,4 +46,7 @@ emmake make -j8 VERBOSE=1
 make install
 
 cd ${curdir}
+bash ./scripts/compile.sh websocket_io
+
 exit 0
+

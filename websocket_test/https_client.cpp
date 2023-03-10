@@ -5,6 +5,8 @@
 #include<unistd.h>
 #include<errno.h>
 #include<netdb.h>
+#include<string>
+using namespace std;
 
 #include<openssl/ssl.h>
 #include<openssl/err.h>
@@ -50,7 +52,7 @@ int verify_callback(int ok, X509_STORE_CTX* ctx) {
     return ok;
 }
 
-int lookup_host(const char *host) {
+string lookup_host(const char *host) {
   struct addrinfo hints, *res;
   int errcode;
   char addrstr[100];
@@ -64,7 +66,7 @@ int lookup_host(const char *host) {
   errcode = getaddrinfo(host, NULL, &hints, &res);
   if (errcode != 0) {
     printf("getaddrinfo failed!\n");
-    return -1;
+    return "";
   }
 
   printf("Host: %s\n", host);
@@ -81,14 +83,18 @@ int lookup_host(const char *host) {
     }
     inet_ntop(res->ai_family, ptr, addrstr, 100);
     printf("IPv%d address: %s (%s)\n", res->ai_family == PF_INET6 ? 6 : 4, addrstr, res->ai_canonname);
+    if (res->ai_family != PF_INET6)
+        return string(addrstr);
     res = res->ai_next;
   }
 
-  return 0;
+  return "";
 }
 
 void run_client() {
-    // lookup_host("bing.com");
+    printf("begin loopup host\n");
+    string ip = lookup_host("api.binance.com");
+    printf("api.binance.com:%s\n", ip.c_str());
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         printf("create socket error %s\n", strerror(errno));
@@ -98,8 +104,8 @@ void run_client() {
     struct sockaddr_in server;
     memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
-    server.sin_port = htons(8000);
-    if (inet_pton(AF_INET, "127.0.0.1", &server.sin_addr) < 0) {
+    server.sin_port = htons(443);
+    if (inet_pton(AF_INET, ip.c_str(), &server.sin_addr) < 0) {
         printf("pton error\n");
         exit(1);
     }
@@ -132,7 +138,7 @@ void run_client() {
     }
     printf("end load ca file\n");
     
-    if (SSL_CTX_set_cipher_list(ssl_ctx, "ECDHE-ECDSA-AES128-GCM-SHA256") <=0) {
+    if (SSL_CTX_set_cipher_list(ssl_ctx, "ECDHE-RSA-AES128-GCM-SHA256") <=0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
@@ -172,16 +178,17 @@ void run_client() {
     X509_free(server_cert);
     // ==========================
 
-
+///sapi/v1/asset/get-funding-asset
     int count = 0;
     if (1) {
-        char httpMsg[] = "GET /hello.html HTTP/1.1\r\n"
-        "Host: localhost:9000\r\n"
+        char httpMsg[] = "GET /sapi/v1/system/status HTTP/1.1\r\n"
+        "Host: api.binance.com\r\n"
         "User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/110.0\r\n"
         "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\r\n"
         "Accept-Language: en-US,en;q=0.5\r\n"
         "Accept-Encoding: gzip, deflate, br\r\n"
         "Connection: keep-alive\r\n"
+        "Content-Type: application/x-www-form-urlencoded\r\n"
         "Upgrade-Insecure-Requests: 1\r\n"
         "Sec-Fetch-Dest: document\r\n"
         "Sec-Fetch-Mode: navigate\r\n"
@@ -190,11 +197,12 @@ void run_client() {
         "\r\n";
 
         char buf[10240];
+        int t = time(NULL);
         // snprintf(buf, sizeof(buf), "message from client, id: %d", count++);
-        snprintf(buf, sizeof(buf), "GET /hello.html HTTP/1.1\r\n\r\n");
+        int l = snprintf(buf, sizeof(buf), httpMsg, t);
         // int len = send(fd, buf, strlen(buf), 0);
-        int len = SSL_write(ssl, httpMsg, strlen(httpMsg));
-        printf("client => send %d %s\n", len, buf);
+        int len = SSL_write(ssl, buf, l);
+        printf("client => send %d %s\n", l, buf);
 
         // len = recv(fd, buf, sizeof(buf), 0);
         len = SSL_read(ssl, buf, sizeof(buf));
@@ -209,7 +217,7 @@ void run_client() {
 }
 int main(int argc, char* argv[]) {
 #ifdef __EMSCRIPTEN__
-  bridgeSocket = emscripten_init_websocket_to_posix_socket_bridge("ws://localhost:9000");
+  bridgeSocket = emscripten_init_websocket_to_posix_socket_bridge("ws://18.179.8.186:9000");
   // Synchronously wait until connection has been established.
   uint16_t readyState = 0;
   printf("begin readystate\n");
