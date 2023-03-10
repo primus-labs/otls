@@ -292,10 +292,15 @@ void WebSocketMessageUnmaskPayload(uint8_t* payload,
 
 string GenWebSocketMessage(const void *buf2, uint64_t numBytes, uint64_t id) {
   printf("send info id:%llu size:%llu\n", id, numBytes);
-  unsigned char *buf = new unsigned char[numBytes + sizeof(uint64_t)];
-  memcpy(buf, &id, sizeof(uint64_t));
-  memcpy(buf + sizeof(uint64_t), buf2, numBytes);
-  numBytes += sizeof(uint64_t);
+  unsigned char* buf = NULL;
+  if (id != 0) {
+    buf = new unsigned char[numBytes + sizeof(uint64_t)];
+    memcpy(buf, &id, sizeof(uint64_t));
+    memcpy(buf + sizeof(uint64_t), buf2, numBytes);
+    numBytes += sizeof(uint64_t);
+  }
+  else
+    buf = (unsigned char*)buf2;
 
   uint8_t headerData[sizeof(WebSocketMessageHeader) + 8/*possible extended length*/] = {};
   WebSocketMessageHeader *header = (WebSocketMessageHeader *)headerData;
@@ -332,7 +337,8 @@ string GenWebSocketMessage(const void *buf2, uint64_t numBytes, uint64_t id) {
   memcpy(&result[0], headerData, headerBytes);
   memcpy((char*)&result[0] + headerBytes, buf, numBytes);
 
-  delete []buf;
+  if (buf != buf2)
+    delete []buf;
   return result;
 }
 
@@ -356,13 +362,16 @@ string GetMessage(int fd, int len, uint64_t id) {
 
     while (continueFlag) {
         char buf[BUFFER_SIZE];
+        printf("begin recv\n");
 
         int read = recv(fd, buf, BUFFER_SIZE, 0);
-        if (!read) return 0;
+        printf("recv result:%d %d %s\n", read, errno, strerror(errno));
+        if (!read) return "";
         if (read < 0)
         {
-          fprintf(stderr, "Client read failed\n");
-          EXIT_THREAD(0);
+          fprintf(stderr, "Client read failed1 %d %s\n", errno, strerror(errno));
+          // EXIT_THREAD(0);
+          assert(false);
         }
 
         fragmentData.insert(fragmentData.end(), buf, buf + read);
@@ -411,19 +420,26 @@ string GetMessage(int fd, int len, uint64_t id) {
               // result.resize(min_len);
               // memcpy(&result[0], payload, min_len);
               // tlsData.insert(tlsData.end(), payload + min_len, payload + payloadLength);
-              uint64_t *p = (uint64_t*)payload;
-              uint8_t *d = (uint8_t*)(p + 1);
-              if (*p == id) {
-                  result.resize(payloadLength - sizeof(uint64_t));
-                  // if (len != payloadLength - sizeof(uint64_t))
-                      printf("recv error get message2 id:%llu need:%d actual:%d\n", id, len, payloadLength - sizeof(uint64_t));
-                  memcpy(&result[0], d, payloadLength - sizeof(uint64_t));
-                  continueFlag = false;
+              if (id != 0) {
+                  uint64_t *p = (uint64_t*)payload;
+                  uint8_t *d = (uint8_t*)(p + 1);
+                  if (*p == id) {
+                      result.resize(payloadLength - sizeof(uint64_t));
+                      // if (len != payloadLength - sizeof(uint64_t))
+                          printf("recv error get message2 id:%llu need:%d actual:%d\n", id, len, payloadLength - sizeof(uint64_t));
+                      memcpy(&result[0], d, payloadLength - sizeof(uint64_t));
+                      continueFlag = false;
+                  }
+                  else {
+                      std::vector<uint8_t> tmp(payloadLength - sizeof(uint64_t), 0);
+                      memcpy(&tmp[0], d, payloadLength - sizeof(uint64_t));
+                      tlsData.insert(std::pair<uint64_t, std::vector<uint8_t>>(*p, tmp));
+                  }
               }
               else {
-                  std::vector<uint8_t> tmp(payloadLength - sizeof(uint64_t), 0);
-                  memcpy(&tmp[0], d, payloadLength - sizeof(uint64_t));
-                  tlsData.insert(std::pair<uint64_t, std::vector<uint8_t>>(*p, tmp));
+                  result.resize(payloadLength);
+                  memcpy(&result[0], payload, payloadLength);
+                  continueFlag = false;
               }
           };
           break;
@@ -478,7 +494,7 @@ void ResponseWebSocketHandshake(int fd) {
 
   if (read < 0)
   {
-    fprintf(stderr, "Client read failed\n");
+    fprintf(stderr, "Client read failed2 %d %s\n", errno, strerror(errno));
     // CloseWebSocket(client_fd);
     EXIT_THREAD(0);
   }
@@ -502,12 +518,13 @@ void ResponseWebSocketHandshake(int fd) {
 
 void CheckWebSocketHandshake(int fd) {
     char buf[BUFFER_SIZE];
+    memset(buf, 0, sizeof(buf));
     int read = recv(fd, buf, BUFFER_SIZE, 0);
     if (read < 0) {
         printf("check websocket handshake:%d %s\n", errno, strerror(errno));
         EXIT_THREAD(0);
     }
 
-    printf("check websocket handshake:%s\n", buf);
+    printf("check websocket handshake:%d %s\n", fd, buf);
 }
 
