@@ -101,26 +101,33 @@ inline void itmac_hom_add_check(
 }
 template <typename IO>
 class AEAD_Proof {
-    AEAD<IO> aead;
+   public:
+    AEAD<IO>* aead = nullptr;
     Integer expanded_key;
     Integer nonce;
     Integer H;
     int party;
 
-    AEAD_Proof(AEAD<IO>& aead, Integer& key, unsigned char* iv, size_t iv_len, int party)
-        : party(party) {
-        if (iv_len != 12) {
-            error("invalid IV length!\n");
-        }
-        reverse(iv, iv + iv_len);
-        nonce = Integer(96, iv, PUBLIC);
+    AEAD_Proof(
+      AEAD<IO>* aead, Integer& key, const unsigned char* iv, size_t iv_len, int party) {
+        this->aead = aead;
+        this->party = party;
+
+        assert(iv_len == 12);
+
+        unsigned char* riv = new unsigned char[iv_len];
+        memcpy(riv, iv, iv_len);
+        reverse(riv, riv + iv_len);
+        nonce = Integer(96, riv, PUBLIC);
+        delete[] riv;
+
         Integer ONE = Integer(32, 1, PUBLIC);
         concat(nonce, &ONE, 1);
 
         expanded_key = computeKS(key);
         Integer H = computeH();
 
-        itmac_hom_add_check<IO>(H, aead.zk_h, party, aead.gc_h);
+        itmac_hom_add_check<IO>(H, aead->zk_h, party, aead->gc_h);
     }
     ~AEAD_Proof() {}
 
@@ -167,49 +174,49 @@ class AEAD_Proof {
 
         Integer Z0;
         Z0.bits.insert(Z0.bits.end(), Z.bits.end() - 128, Z.bits.end());
-        //block z0 = integer_to_block(Z0);
 
         Z.bits.erase(Z.bits.end() - 128, Z.bits.end());
         Z.bits.erase(Z.bits.begin(), Z.bits.begin() + u);
 
         if (!sec_type) {
-            assert(aead.gc_z0.size() != 0 && aead.zk_z0.size() != 0);
-            itmac_hom_add_check<IO>(Z0, aead.zk_z0.front(), party, aead.gc_z0.front());
+            assert(aead->gc_z0.size() != 0 && aead->zk_z0.size() != 0);
+            itmac_hom_add_check<IO>(Z0, aead->zk_z0.front(), party, aead->gc_z0.front());
 
             // remove the front elements in deque
-            aead.gc_z0.pop_front();
-            aead.zk_z0.pop_front();
+            aead->gc_z0.pop_front();
+            aead->zk_z0.pop_front();
 
-            assert(aead.open_z.size() != 0 && aead.open_len.size() != 0);
-            Integer OZ(8 * aead.open_len.front(), aead.open_z.front(), PUBLIC);
+            assert(aead->open_z.size() != 0 && aead->open_len.size() != 0);
+            Integer OZ(8 * aead->open_len.front(), aead->open_z.front(), PUBLIC);
             check_zero<IO>(Z ^ OZ, party);
 
             //remove the front elements in deque.
-            aead.open_len.pop_front();
-            delete[] aead.open_z.front();
-            aead.open_z.pop_front();
+            aead->open_len.pop_front();
+            delete[] aead->open_z.front();
+            aead->open_z.pop_front();
         } else {
-            assert(aead.gc_z0.size() != 0 && aead.zk_z0.size() != 0);
-            itmac_hom_add_check<IO>(Z0, aead.zk_z0.front(), party, aead.gc_z0.front());
+            assert(aead->gc_z0.size() != 0 && aead->zk_z0.size() != 0);
+            itmac_hom_add_check<IO>(Z0, aead->zk_z0.front(), party, aead->gc_z0.front());
 
             // remove the front elements in deque
-            aead.gc_z0.pop_front();
-            aead.zk_z0.pop_front();
+            aead->gc_z0.pop_front();
+            aead->zk_z0.pop_front();
 
-            assert(aead.gc_z.size() != 0 && aead.zk_z.size() != 0);
-            itmac_hom_add_check<IO>(Z, aead.zk_z.front(), party, aead.gc_z.front(),
-                                    aead.z_len.front());
+            assert(aead->gc_z.size() != 0 && aead->zk_z.size() != 0);
+            itmac_hom_add_check<IO>(Z, aead->zk_z.front(), party, aead->gc_z.front(),
+                                    aead->z_len.front());
 
             // remove the front elements in deque
-            aead.z_len.pop_front();
-            aead.zk_z.pop_front();
-            delete[] aead.gc_z.front();
-            aead.gc_z.pop_front();
+            aead->z_len.pop_front();
+            aead->zk_z.pop_front();
+            delete[] aead->gc_z.front();
+            aead->gc_z.pop_front();
 
             unsigned char* rctxt = new unsigned char[ctxt_len];
             memcpy(rctxt, ctxt, ctxt_len);
             reverse(rctxt, rctxt + ctxt_len);
             msg = Z ^ (Integer(ctxt_len * 8, rctxt, PUBLIC));
+            delete[] rctxt;
         }
     }
 };

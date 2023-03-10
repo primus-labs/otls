@@ -391,8 +391,8 @@ int main(int argc, char** argv) {
     //aead_dec_fin_test(io, cot, party);
     //aead_enc_record_msg_test(io, cot, party);
 
-    //aead_encrypt_test(io, cot, party, true);
-    aead_decrypt_test(io, cot, party, true);
+    aead_encrypt_test(io, cot, party);
+    //aead_decrypt_test(io, cot, party, true);
     //convert(party);
     //aead_dec_record_msg(io, cot, party);
     //convert(party);

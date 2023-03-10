@@ -37,14 +37,16 @@ class AEAD {
     vector<block> mul_hs;
 
     OLEF2K<IO>* ole = nullptr;
-    AEAD(IO* io, COT<IO>* ot, Integer& key, unsigned char* iv, size_t iv_len) {
+    AEAD(IO* io, COT<IO>* ot, Integer& key, const unsigned char* iv, size_t iv_len) {
         ole = new OLEF2K<IO>(io, ot);
+        assert(iv_len == 12);
 
-        if (iv_len != 12) {
-            error("invalid IV length!\n");
-        }
-        reverse(iv, iv + iv_len);
-        nonce = Integer(96, iv, PUBLIC);
+        unsigned char* riv = new unsigned char[iv_len];
+        memcpy(riv, iv, iv_len);
+        reverse(riv, riv + iv_len);
+        nonce = Integer(96, riv, PUBLIC);
+        delete[] riv;
+
         Integer ONE = Integer(32, 1, PUBLIC);
         concat(nonce, &ONE, 1);
 
@@ -206,15 +208,15 @@ class AEAD {
             integer_to_chars(z, Z);
 
             // store xor share of z
-            reverse(z, z + msg_len);
             gc_z.push_back(nullptr);
             gc_z.back() = new unsigned char[msg_len];
             memcpy(gc_z.back(), z, msg_len);
+            reverse(gc_z.back(), gc_z.back() + msg_len);
             z_len.push_back(msg_len);
 
             // commit ALICE's xor share of z using izk.
             switch_to_zk();
-            zk_z.push_back(Integer(8 * msg_len, z, ALICE));
+            zk_z.push_back(Integer(8 * msg_len, gc_z.back(), ALICE));
             sync_zk_gc<IO>();
             switch_to_gc();
 
@@ -347,15 +349,15 @@ class AEAD {
             integer_to_chars(z, Z);
 
             // store xor share of z
-            reverse(z, z + ctxt_len);
             gc_z.push_back(nullptr);
             gc_z.back() = new unsigned char[ctxt_len];
             memcpy(gc_z.back(), z, ctxt_len);
+            reverse(gc_z.back(), gc_z.back() + ctxt_len);
             z_len.push_back(ctxt_len);
 
             // commit ALICE's xor share of z using izk.
             switch_to_zk();
-            zk_z.push_back(Integer(8 * ctxt_len, z, ALICE));
+            zk_z.push_back(Integer(8 * ctxt_len, gc_z.back(), ALICE));
             sync_zk_gc<IO>();
             switch_to_gc();
 
