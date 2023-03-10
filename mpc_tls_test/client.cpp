@@ -21,6 +21,11 @@
 #include <emscripten/posix_socket.h>
 
 static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
+#else
+#include "mpc_tls/my_proxy.h"
+int proxy_send(int fd, const void* buf, size_t len) {
+    return send(fd, buf, len, 0);
+}
 #endif
 
 int mpc_tls_send(int fd, const char* buf, int len, int flag) {
@@ -28,11 +33,19 @@ int mpc_tls_send(int fd, const char* buf, int len, int flag) {
     for (int i = 0; i < len; i++)
         printf("%02x ", (unsigned char)buf[i]);
     printf("\n");
+#ifdef __EMSCRIPTEN__
     return send(fd, buf, len, flag);
+#else
+    return send3(fd, buf, len, flag);
+#endif
 }
 
 int mpc_tls_recv(int fd, char* buf, int len, int flag) {
+#ifdef __EMSCRIPTEN__
     int ret = recv(fd, buf, len, flag);
+#else
+    int ret = recv3(fd, buf, len, flag);
+#endif
     printf("mpc tls recv=============%d\n", len);
     for (int i = 0; i < ret; i++)
         printf("%02x ", (unsigned char)buf[i]);
@@ -55,7 +68,11 @@ int verify_callback(int ok, X509_STORE_CTX* ctx) {
 }
 
 void run_client() {
+#ifdef __EMSCRIPTEN__
     int fd = socket(AF_INET, SOCK_STREAM, 0);
+#else
+    int fd = socket3(AF_INET, SOCK_STREAM, 0);
+#endif
     if (fd < 0) {
         printf("create socket error %s\n", strerror(errno));
         exit(1);
@@ -67,7 +84,11 @@ void run_client() {
     server.sin_port = htons(8080);
     
     printf("begin connect\n");
+#ifdef __EMSCRIPTEN__
     int ret = connect(fd, (struct sockaddr*)&server, sizeof(server));
+#else
+    int ret = connect3(fd, (struct sockaddr*)&server, sizeof(server));
+#endif
     if (ret < 0) {
         printf("accept error %s\n", strerror(errno));
         exit(1);
@@ -179,6 +200,11 @@ int main(int argc, char* argv[]) {
     emscripten_thread_sleep(100);
   } while (readyState == 0);
   printf("end readystate\n");
+#else
+  printf("begin connect to proxy\n");
+  int consocket = emscripten_init_websocket_to_posix_socket_bridge("127.0.0.1", 9000);
+  init_proxy(proxy_send);
+  printf("end connect to proxy\n");
 #endif
 
     int ret = OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL);

@@ -209,13 +209,13 @@ static void wait_for_call_result(PosixSocketCallResult *b) {
 #endif
 }
 
+#ifndef __EMSCRIPTEN__
 int emscripten_init_websocket_to_posix_socket_bridge(const char *address, int port) {
   struct sockaddr_in dest;
   memset(&dest, 0, sizeof(dest));
   dest.sin_family = AF_INET;
   dest.sin_addr.s_addr = inet_addr(address);
   dest.sin_port = htons(port);
-  //int bridgeSocket;
 
   while(1) {
       bridgeSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -234,6 +234,7 @@ int emscripten_init_websocket_to_posix_socket_bridge(const char *address, int po
   printf("handshake ok\n");
   return bridgeSocket;
 }
+#endif
 
 #define POSIX_SOCKET_MSG_SOCKET 1
 #define POSIX_SOCKET_MSG_SOCKETPAIR 2
