@@ -26,6 +26,11 @@ void run() {
         printf("create socket error %s\n", strerror(errno));
         exit(1);
     }
+    int on = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
+        printf("reuse addr error %s\n", strerror(errno));
+        exit(1);
+    }
     struct sockaddr_in server;
     memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
@@ -46,6 +51,7 @@ void run() {
     struct sockaddr_in client;
     socklen_t socklen = 0;
     int cfd = accept(fd, (struct sockaddr*)&client, &socklen);
+    close(fd);
     printf("accept ok\n");
     if (cfd < 0) {
         printf("accept error %s\n", strerror(errno));

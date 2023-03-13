@@ -32,6 +32,16 @@ static void print_mpc(const char* str, const unsigned char* data, size_t n) {
     printf("\n");
 }
 
+static void sync_send(const char* buf, int len) {
+    g_io->send_data(buf, len);
+    printf("send=> %s\n", buf);
+}
+
+static void sync_recv(char* buf, int len) {
+    g_io->recv_data(buf, len);
+    printf("recv=> %s\n", buf);
+}
+
 int init_mpc(int pado) {
     OPENSSL_init_MPC_METH(get_pms_mpc,
                           tls1_prf_master_secret_mpc,
@@ -45,14 +55,21 @@ int init_mpc(int pado) {
     g_io = new PadoIO(party == BOB ? nullptr : "127.0.0.1", 8081);
     printf("create websocket io ok\n");
     
-    char buf[256];
-    sprintf(buf, "send by %s", pado? "pado": "clnt");
-    g_io->send_data(buf, strlen(buf));
-    printf("send=> %s\n", buf);
-    memset(buf, 0, sizeof(buf));
-    g_io->recv_data(buf, 12);
-    printf("recv=> %s\n", buf);
+    char send_buf[256];
+    char recv_buf[256];
+    sprintf(send_buf, "send by %s", pado? "pado": "clnt");
+    memset(recv_buf, 0, sizeof(recv_buf));
 
+    if (pado) {
+        sync_recv(recv_buf, 12);
+        sync_send(send_buf, 12);
+    }
+    else {
+        sync_send(send_buf, 12);
+        sync_recv(recv_buf, 12);
+    }
+
+    if (1) {
     setup_backend(g_io, party);
     printf("setup backend ok\n");
     auto prot = (PADOParty<PadoIO>*)(ProtocolExecution::prot_exec);
@@ -64,6 +81,7 @@ int init_mpc(int pado) {
 
     g_hs = new HandShake<PadoIO>(g_io, g_cot, g_group);
     g_ctx = g_hs->ctx;
+    }
 
     return 1;
 }
