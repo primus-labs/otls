@@ -201,7 +201,7 @@ static void wait_for_call_result(PosixSocketCallResult *b) {
   //   emscripten_futex_wait(&b->operationCompleted, 0, 1e9);
   // }
   while (!b->operationCompleted) {
-      string s = GetMessage(bridgeSocket, b->bytes, 0);
+      string s = GetMessage(bridgeSocket, b->bytes, (uint64_t)b->callId, false);
       bridge_socket_on_message(s.data(), s.size());
   }
 #ifdef POSIX_SOCKET_DEEP_DEBUG
@@ -266,7 +266,7 @@ int init_proxy(send_meth send) {
 }
 
 static int websocket_send_binary(int fd, const void* buf, int len, int id) {
-    string s = GenWebSocketMessage(buf, len, 0);
+    string s = GenWebSocketMessage(buf, len, (uint64_t)id, false);
     return send_binary(fd, s.data(), s.size());
 }
 

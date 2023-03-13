@@ -282,7 +282,7 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
         void* d = (void*)data;
         send_id++;
 #ifndef __EMSCRIPTEN__
-        string websocket_data = GenWebSocketMessage(data, len, send_id);
+        string websocket_data = GenWebSocketMessage(data, len, send_id, true);
         d = &websocket_data[0];
         len = websocket_data.size();
 #endif
@@ -313,7 +313,7 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
         while(sent < len) {
 #ifndef __EMSCRIPTEN__
             // size_t res = fread(sent + (char*)data, 1, len - sent, stream);
-            string d = GetMessage(consocket, len - sent, recv_id);
+            string d = GetMessage(consocket, len - sent, recv_id, true);
             size_t res = d.size();
             memcpy(sent + (char*)data, d.data(), res);
 #else

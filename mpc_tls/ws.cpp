@@ -290,10 +290,10 @@ void WebSocketMessageUnmaskPayload(uint8_t* payload,
   }
 }
 
-string GenWebSocketMessage(const void *buf2, uint64_t numBytes, uint64_t id) {
+string GenWebSocketMessage(const void *buf2, uint64_t numBytes, uint64_t id, bool enable_id) {
   printf("send info id:%llu size:%llu\n", id, numBytes);
   unsigned char* buf = NULL;
-  if (id != 0) {
+  if (enable_id) {
     buf = new unsigned char[numBytes + sizeof(uint64_t)];
     memcpy(buf, &id, sizeof(uint64_t));
     memcpy(buf + sizeof(uint64_t), buf2, numBytes);
@@ -342,7 +342,7 @@ string GenWebSocketMessage(const void *buf2, uint64_t numBytes, uint64_t id) {
   return result;
 }
 
-string GetMessage(int fd, int len, uint64_t id) {
+string GetMessage(int fd, int len, uint64_t id, bool enable_id) {
     static std::vector<uint8_t> fragmentData;
     static std::map<uint64_t, std::vector<uint8_t>> tlsData;
     bool continueFlag = true;
@@ -362,7 +362,7 @@ string GetMessage(int fd, int len, uint64_t id) {
 
     while (continueFlag) {
         char buf[BUFFER_SIZE];
-        printf("begin recv\n");
+        printf("begin recv ws id:%llu %d\n", id, len);
 
         int read = recv(fd, buf, BUFFER_SIZE, 0);
         printf("recv result:%d %d %s\n", read, errno, strerror(errno));
@@ -420,7 +420,7 @@ string GetMessage(int fd, int len, uint64_t id) {
               // result.resize(min_len);
               // memcpy(&result[0], payload, min_len);
               // tlsData.insert(tlsData.end(), payload + min_len, payload + payloadLength);
-              if (id != 0) {
+              if (enable_id) {
                   uint64_t *p = (uint64_t*)payload;
                   uint8_t *d = (uint8_t*)(p + 1);
                   if (*p == id) {
