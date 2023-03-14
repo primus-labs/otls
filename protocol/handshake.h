@@ -475,6 +475,11 @@ class HandShake {
         Integer msg;
         aead_proof_c->prove_aead(msg, ctxt, finished_msg_length);
     }
+
+    inline void handshake_check(int party) {
+        prf.prf_check<IO>(party);
+        hmac.sha256_check<IO>(party);
+    }
 };
 
 #endif

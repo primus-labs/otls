@@ -59,6 +59,8 @@ void handshake_test(IO* io, COT<IO>* cot, int party) {
 
     hs->compute_client_finished_msg(client_finished_label, client_finished_label_length, tau_c,
                                     32);
+    hs->compute_server_finished_msg(server_finished_label, server_finished_label_length, tau_s,
+                                    32);
 
     AEAD<NetIO>* aead_c = new AEAD<NetIO>(io, cot, hs->client_write_key, hs->iv_oct + 12, 12);
     AEAD<NetIO>* aead_s = new AEAD<NetIO>(io, cot, hs->server_write_key, hs->iv_oct, 12);
@@ -89,6 +91,7 @@ void handshake_test(IO* io, COT<IO>* cot, int party) {
     unsigned char* ctxt2 = new unsigned char[finished_msg_length];
     unsigned char* tag2 = new unsigned char[tag_length];
     unsigned char* msg2 = new unsigned char[finished_msg_length];
+
     aead_s_server->encrypt(io, ctxt2, tag2, hs->server_ufin, finished_msg_length, aad, aad_len,
                            party);
 
@@ -124,8 +127,16 @@ void handshake_test(IO* io, COT<IO>* cot, int party) {
       new AEAD_Proof<IO>(aead_c, key_c, hs->iv_oct + 12, 12, party);
     AEAD_Proof<IO>* aead_proof_s = new AEAD_Proof<IO>(aead_s, key_s, hs->iv_oct, 12, party);
 
+    hs->prove_client_finished_msg(ms, client_finished_label, client_finished_label_length,
+                                  tau_c, 32, party);
+    hs->prove_server_finished_msg(ms, server_finished_label, server_finished_label_length,
+                                  tau_s, 32, party);
+
     hs->prove_enc_dec_finished_msg(aead_proof_c, ctxt);
     hs->prove_enc_dec_finished_msg(aead_proof_s, ctxt2);
+
+    hs->handshake_check(party);
+
     sync_zk_gc<IO>();
     switch_to_gc();
 
