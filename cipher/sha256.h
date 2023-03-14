@@ -3,6 +3,7 @@
 
 #include "emp-tool/emp-tool.h"
 #include "utils.h"
+#include "backend/check_zero.h"
 #include <iostream>
 #include <vector>
 
@@ -30,14 +31,21 @@ class SHA256 {
     bool zk_in_open_flag = false;
 
     // iv_in_hash stores the inner public value.
-    uint32_t iv_in_hash[DIGLEN];
+    //uint32_t iv_in_hash[DIGLEN];
+
+    vector<uint32_t*> iv_in_hashes;
 
     // iv_out_hash stores the outer secret value (shares).
     Integer iv_out_hash[DIGLEN];
 
     // zk_iv_in_hash stores the inner secret value (for consistency check).
     // Apply CheckZero to zk_iv_in_hash and iv_in_hash.
-    Integer zk_iv_in_hash[DIGLEN];
+    //Integer zk_iv_in_hash[DIGLEN];
+
+    vector<Integer> zk_iv_in_hashes;
+
+    size_t pos = -1;
+    size_t zpos = -1;
 
     Integer sha256_h[VALLEN] = {
       Integer(WORDLEN, 0x6a09e667UL, PUBLIC), Integer(WORDLEN, 0xbb67ae85UL, PUBLIC),
@@ -93,7 +101,12 @@ class SHA256 {
       0x90befffaUL, 0xa4506cebUL, 0xbef9a3f7UL, 0xc67178f2UL};
 
     SHA256(){};
-    ~SHA256(){};
+    ~SHA256() {
+        for (int i = 0; i < iv_in_hashes.size(); i++) {
+            if (iv_in_hashes[i] != nullptr)
+                delete[] iv_in_hashes[i];
+        }
+    };
 
     inline void refresh() {
         compression_calls_num = 0;
@@ -276,14 +289,19 @@ class SHA256 {
                                            std::end(dig[i].bits));
                     tmpInt.reveal<uint32_t>((uint32_t*)plain_dig, PUBLIC);
 
-                    memcpy(iv_in_hash, plain_dig, DIGLEN * sizeof(uint32_t));
+                    iv_in_hashes.push_back(nullptr);
+                    iv_in_hashes.back() = new uint32_t[DIGLEN];
+                    memcpy(iv_in_hashes.back(), plain_dig, DIGLEN * sizeof(uint32_t));
 
                     gc_in_open_flag = true;
+                    pos++;
+
                     delete[] dig;
 
                 } else {
                     //if iv_in_hash is stored,reuse it.
-                    memcpy(plain_dig, iv_in_hash, DIGLEN * sizeof(uint32_t));
+                    memcpy(plain_dig, iv_in_hashes[pos], DIGLEN * sizeof(uint32_t));
+                    // memcpy(plain_dig, iv_in_hash, DIGLEN * sizeof(uint32_t));
                 }
             } else {
                 // enable zk.
@@ -295,14 +313,17 @@ class SHA256 {
                         dig[i] = sha256_h[i];
                     chunk_compress(dig, input_data.data());
 
-                    for (int i = 0; i < DIGLEN; i++) {
-                        zk_iv_in_hash[i] = dig[i];
-                    }
+                    Integer zk_iv_in_hash;
+                    concat(zk_iv_in_hash, dig, DIGLEN);
+                    zk_iv_in_hashes.push_back(zk_iv_in_hash);
 
                     zk_in_open_flag = true;
+                    zpos++;
+
+                    delete[] dig;
                 }
                 // reuse the stored value anyway.
-                memcpy(plain_dig, iv_in_hash, DIGLEN * sizeof(uint32_t));
+                memcpy(plain_dig, iv_in_hashes[zpos], DIGLEN * sizeof(uint32_t));
             }
         } else {
             // Do not enable the reuse optimization, but still open the inner hash as an optimization.
@@ -321,7 +342,6 @@ class SHA256 {
         }
 
         // compute the following part in plain, not in mpc.
-
         unsigned char* data = new unsigned char[KLEN];
         size_t datalen = 0, bitlen = 512;
 
@@ -479,6 +499,17 @@ class SHA256 {
     }
 
     inline size_t compression_calls() { return compression_calls_num; }
+
+    template <typename IO>
+    inline void sha256_check(int party) {
+        uint32_t* tmp = new uint32_t[DIGLEN];
+        for (int i = 0; i < iv_in_hashes.size(); i++) {
+            memcpy(tmp, iv_in_hashes[i], DIGLEN * sizeof(uint32_t));
+            reverse(tmp, tmp + DIGLEN);
+            check_zero<IO>(zk_iv_in_hashes[i], tmp, DIGLEN, party);
+        }
+        delete[] tmp;
+    }
 };
 
 #endif

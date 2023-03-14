@@ -19,5 +19,7 @@ class Record {
                                int party) {
         aead_c.enc_record_msg(io, ctxt, tag, msg, msg_len, aad, aad_len, party);
     }
+
+    inline void prove_record() {}
 };
 #endif

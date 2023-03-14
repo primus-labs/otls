@@ -3,7 +3,7 @@
 #include "cipher/prf.h"
 #include "cipher/hmac_sha256.h"
 #include "backend/switch.h"
-#include "backend/checkzero.h"
+#include "backend/check_zero.h"
 
 #include <iostream>
 #include <vector>
@@ -312,21 +312,8 @@ void zk_gc_prf_test(int party) {
         cout << "zk test failed" << endl;
     }
 
-    if (prf.pub_M.size() != prf.zk_sec_M.size()) {
-        error("error!\n");
-    } else {
-        for (int i = 0; i < prf.pub_M.size(); i++) {
-            Integer M(256, prf.pub_M[i], PUBLIC);
-            Integer diff = prf.zk_sec_M[i] ^ M;
-            check_zero<NetIO>(diff, party);
-        }
-    }
-
-    for (int i = 0; i < hmac.DIGLEN; i++) {
-        Integer iv(32, hmac.iv_in_hash[i], PUBLIC);
-        Integer diff = hmac.zk_iv_in_hash[i] ^ iv;
-        check_zero<NetIO>(diff, party);
-    }
+    prf.prf_check<NetIO>(party);
+    hmac.sha256_check<NetIO>(party);
 
     sync_zk_gc<NetIO>();
     switch_to_gc();
@@ -357,7 +344,7 @@ int main(int argc, char** argv) {
     setup_protocol(io, ios, threads, party);
     zk_gc_prf_test(party);
     finalize_protocol();
-    
+
     bool cheat = CheatRecord::cheated();
     if (cheat)
         error("cheat!\n");

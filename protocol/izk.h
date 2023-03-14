@@ -65,14 +65,14 @@ class IZK {
         memcpy(seed + rc_len, rs, rs_len);
 
         prf.init(hmac, pmsbits);
-        prf.opt_compute(hmac, ms, master_key_bit_length, pmsbits, master_key_label,
+        prf.opt_compute(hmac, ms, master_key_length * 8, pmsbits, master_key_label,
                         master_key_label_length, seed, seed_len, true, true);
 
         memcpy(seed, rs, rs_len);
         memcpy(seed + rs_len, rc, rc_len);
 
         prf.init(hmac, ms);
-        prf.opt_compute(hmac, key, expansion_key_bit_length, ms, key_expansion_label,
+        prf.opt_compute(hmac, key, expansion_key_length * 8, ms, key_expansion_label,
                         key_expansion_label_length, seed, seed_len, true, true);
 
         delete[] seed;
@@ -87,7 +87,7 @@ class IZK {
                                            const unsigned char* tau,
                                            size_t tau_len) {
         Integer ufin_int;
-        prf.opt_compute(hmac, ufin_int, finished_msg_bit_length, ms, label, label_len, tau,
+        prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, ms, label, label_len, tau,
                         tau_len, true, true);
         ufin_int.reveal<unsigned char>((unsigned char*)ufin, PUBLIC);
     }

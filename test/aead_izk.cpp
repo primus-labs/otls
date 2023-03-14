@@ -3,7 +3,7 @@
 #include "cipher/utils.h"
 #include "backend/backend.h"
 #include "backend/switch.h"
-#include "backend/checkzero.h"
+#include "backend/check_zero.h"
 
 using namespace emp;
 

@@ -4,7 +4,7 @@
 #include "emp-zk/emp-zk.h"
 #include "utils.h"
 #include "aead.h"
-#include "backend/checkzero.h"
+#include "backend/check_zero.h"
 
 using namespace emp;
 class AEAD_IZK {
@@ -187,8 +187,7 @@ class AEAD_Proof {
             aead->zk_z0.pop_front();
 
             assert(aead->open_z.size() != 0 && aead->open_len.size() != 0);
-            Integer OZ(8 * aead->open_len.front(), aead->open_z.front(), PUBLIC);
-            check_zero<IO>(Z ^ OZ, party);
+            check_zero<IO>(Z, aead->open_z.front(), aead->open_len.front(), party);
 
             //remove the front elements in deque.
             aead->open_len.pop_front();

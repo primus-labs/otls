@@ -168,6 +168,13 @@ class PRF {
     }
 
     inline size_t hmac_calls() { return hmac_calls_num; }
+
+    template <typename IO>
+    inline void prf_check(int party) {
+        assert(pub_M.size() == zk_sec_M.size());
+        for (int i = 0; i < pub_M.size(); i++)
+            check_zero<IO>(zk_sec_M[i], pub_M[i], 8, party);
+    }
 };
 
 #endif

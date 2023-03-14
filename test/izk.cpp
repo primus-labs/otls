@@ -15,8 +15,8 @@ void izk_test(EC_GROUP* group, int party) {
     unsigned char* rc = new unsigned char[32];
     unsigned char* rs = new unsigned char[32];
 
-    unsigned char* ufinc = new unsigned char[finished_msg_bit_length / 8];
-    unsigned char* ufins = new unsigned char[finished_msg_bit_length / 8];
+    unsigned char* ufinc = new unsigned char[finished_msg_length];
+    unsigned char* ufins = new unsigned char[finished_msg_length];
 
     unsigned char* tau_c = new unsigned char[32];
     unsigned char* tau_s = new unsigned char[32];
@@ -52,12 +52,12 @@ void izk_test(EC_GROUP* group, int party) {
     AEAD_IZK aead_s(key_s, iv_oct, 12);
 
     Integer ctxt, msg;
-    izk->prove_encrypt_client_finished_msg(aead_c, ctxt, finished_msg_bit_length);
+    izk->prove_encrypt_client_finished_msg(aead_c, ctxt, finished_msg_length * 8);
 
     izk->prove_compute_finished_msg(ufins, ms, server_finished_label,
                                     server_finished_label_length, tau_s, 32);
 
-    izk->prove_decrypt_server_finished_msg(aead_s, msg, finished_msg_bit_length);
+    izk->prove_decrypt_server_finished_msg(aead_s, msg, finished_msg_length * 8);
 
     size_t q_length = 2 * 1024 * 8;
     size_t r_length = 2 * 1024 * 8;

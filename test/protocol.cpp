@@ -9,14 +9,13 @@
 #include "cipher/aead.h"
 #include "cipher/aead_izk.h"
 #if defined(__linux__)
-	#include <sys/time.h>
-	#include <sys/resource.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #elif defined(__APPLE__)
-	#include <unistd.h>
-	#include <sys/resource.h>
-	#include <mach/mach.h>
+#include <unistd.h>
+#include <sys/resource.h>
+#include <mach/mach.h>
 #endif
-
 
 using namespace std;
 using namespace emp;
@@ -46,8 +45,8 @@ void hs_query_resp_gc(NetIO* io, EC_GROUP* group, int party) {
     unsigned char* rc = new unsigned char[32];
     unsigned char* rs = new unsigned char[32];
 
-    unsigned char* ufinc = new unsigned char[finished_msg_bit_length / 8];
-    unsigned char* ufins = new unsigned char[finished_msg_bit_length / 8];
+    unsigned char* ufinc = new unsigned char[finished_msg_length];
+    unsigned char* ufins = new unsigned char[finished_msg_length];
 
     unsigned char* tau_c = new unsigned char[32];
     unsigned char* tau_s = new unsigned char[32];
@@ -89,7 +88,7 @@ void hs_query_resp_gc(NetIO* io, EC_GROUP* group, int party) {
     AEAD<NetIO> aead_c(io, cot, key_c, iv_oct + 12, 12);
     AEAD<NetIO> aead_s(io, cot, key_s, iv_oct, 12);
 
-    unsigned char* ctxt = new unsigned char[finished_msg_bit_length / 8];
+    unsigned char* ctxt = new unsigned char[finished_msg_length];
     unsigned char* tag = new unsigned char[16];
 
     hs->compute_finished_msg(ufinc, ms, client_finished_label, client_finished_label_length,
@@ -157,8 +156,8 @@ void hs_query_resp_izk(BoolIO<NetIO>* ios[threads],
     unsigned char* rc = new unsigned char[32];
     unsigned char* rs = new unsigned char[32];
 
-    unsigned char* ufinc = new unsigned char[finished_msg_bit_length / 8];
-    unsigned char* ufins = new unsigned char[finished_msg_bit_length / 8];
+    unsigned char* ufinc = new unsigned char[finished_msg_length];
+    unsigned char* ufins = new unsigned char[finished_msg_length];
 
     unsigned char* tau_c = new unsigned char[32];
     unsigned char* tau_s = new unsigned char[32];
@@ -193,12 +192,12 @@ void hs_query_resp_izk(BoolIO<NetIO>* ios[threads],
     AEAD_IZK aead_s(key_s, iv_oct, 12);
 
     Integer ctxt, msg;
-    izk->prove_encrypt_client_finished_msg(aead_c, ctxt, finished_msg_bit_length);
+    izk->prove_encrypt_client_finished_msg(aead_c, ctxt, finished_msg_length * 8);
 
     izk->prove_compute_finished_msg(ufins, ms, server_finished_label,
                                     server_finished_label_length, tau_s, 32);
 
-    izk->prove_decrypt_server_finished_msg(aead_s, msg, finished_msg_bit_length);
+    izk->prove_decrypt_server_finished_msg(aead_s, msg, finished_msg_length * 8);
     auto hs_izk_time = emp::time_from(start);
     cout << "handshake izk time: " << (hs_izk_time * 1.0) / 1000 << " ms" << endl;
 
@@ -256,10 +255,9 @@ void com_conv(NetIO* io, EC_GROUP* group, vector<block>& input, int party) {
     PedersenComm pc(h, group);
     BIGNUM* q = BN_new();
     BN_copy(q, EC_GROUP_get0_order(group));
-    if(party == BOB)
-		cot->Delta=zero_block;
+    if (party == BOB)
+        cot->Delta = zero_block;
     ComConv<NetIO> conv(io, cot, q);
-	
 
     vector<EC_POINT*> coms;
     vector<BIGNUM*> rnds;
@@ -322,18 +320,22 @@ int main(int argc, char** argv) {
 
     EC_GROUP_free(group);
 #if defined(__linux__)
-	struct rusage rusage;
-	if (!getrusage(RUSAGE_SELF, &rusage))
-		std::cout << "[Linux]Peak resident set size: " << (size_t)rusage.ru_maxrss << std::endl;
-	else std::cout << "[Linux]Query RSS failed" << std::endl;
+    struct rusage rusage;
+    if (!getrusage(RUSAGE_SELF, &rusage))
+        std::cout << "[Linux]Peak resident set size: " << (size_t)rusage.ru_maxrss
+                  << std::endl;
+    else
+        std::cout << "[Linux]Query RSS failed" << std::endl;
 #elif defined(__APPLE__)
-	struct mach_task_basic_info info;
-	mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
-	if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) == KERN_SUCCESS)
-		std::cout << "[Mac]Peak resident set size: " << (size_t)info.resident_size_max << std::endl;
-	else std::cout << "[Mac]Query RSS failed" << std::endl;
+    struct mach_task_basic_info info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) ==
+        KERN_SUCCESS)
+        std::cout << "[Mac]Peak resident set size: " << (size_t)info.resident_size_max
+                  << std::endl;
+    else
+        std::cout << "[Mac]Query RSS failed" << std::endl;
 #endif
-
 
     delete io1;
     return 0;
