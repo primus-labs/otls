@@ -121,6 +121,11 @@ inline void concat(Integer& res, const Integer* in, size_t len) {
         res.bits.insert(res.bits.begin(), in[i].bits.begin(), in[i].bits.end());
 }
 
+inline void reverse_concat(Integer& res, const Integer* in, size_t len) {
+    for (int i = 0; i < len; i++)
+        res.bits.insert(res.bits.end(), in[i].bits.begin(), in[i].bits.end());
+}
+
 inline void move_concat(Integer& res, const Integer* in, size_t len) {
     for (int i = 0; i < len; i++)
         res.bits.insert(res.bits.begin(), make_move_iterator(in[i].bits.begin()),

@@ -161,6 +161,7 @@ class AEAD_Proof {
     }
 
     void prove_aead(Integer& msg,
+                    Integer& tag_z0,
                     const unsigned char* ctxt,
                     size_t ctxt_len,
                     bool sec_type = false) {
@@ -174,6 +175,8 @@ class AEAD_Proof {
 
         Integer Z0;
         Z0.bits.insert(Z0.bits.end(), Z.bits.end() - 128, Z.bits.end());
+
+        tag_z0 = Z0;
 
         Z.bits.erase(Z.bits.end() - 128, Z.bits.end());
         Z.bits.erase(Z.bits.begin(), Z.bits.begin() + u);
@@ -217,6 +220,33 @@ class AEAD_Proof {
             msg = Z ^ (Integer(ctxt_len * 8, rctxt, PUBLIC));
             delete[] rctxt;
         }
+    }
+
+    inline void prove_aead_last(Integer& msg,
+                                Integer& tag_z0,
+                                const unsigned char* ctxt,
+                                size_t ctxt_len) {
+        // u = 128 * ceil(ctxt_len/128) - 8*ctxt_len
+        size_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
+
+        size_t ctr_len = (ctxt_len * 8 + 128 - 1) / 128;
+
+        Integer Z;
+        gctr(Z, 1 + ctr_len);
+
+        Integer Z0;
+        Z0.bits.insert(Z0.bits.end(), Z.bits.end() - 128, Z.bits.end());
+
+        tag_z0 = Z0;
+
+        Z.bits.erase(Z.bits.end() - 128, Z.bits.end());
+        Z.bits.erase(Z.bits.begin(), Z.bits.begin() + u);
+
+        unsigned char* rctxt = new unsigned char[ctxt_len];
+        memcpy(rctxt, ctxt, ctxt_len);
+        reverse(rctxt, rctxt + ctxt_len);
+        msg = Z ^ (Integer(ctxt_len * 8, rctxt, PUBLIC));
+        delete[] rctxt;
     }
 };
 

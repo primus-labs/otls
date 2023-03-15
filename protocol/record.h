@@ -22,7 +22,9 @@ class Record {
         aead_c->encrypt(io, ctxt, tag, msg, msg_len, aad, aad_len, party, true);
     }
 
-    inline void decrypt(AEAD<IO>* aead_s,
+    // Note that: the last message from server does not need to be decrypted in MPC.
+    // This function is invoked in the multi-round setting.
+    inline bool decrypt(AEAD<IO>* aead_s,
                         IO* io,
                         unsigned char* msg,
                         const unsigned char* ctxt,
@@ -31,7 +33,7 @@ class Record {
                         const unsigned char* aad,
                         size_t aad_len,
                         int party) {
-        aead_s->decrypt(io, msg, ctxt, ctxt_len, tag, aad, aad_len, party, true);
+        return aead_s->decrypt(io, msg, ctxt, ctxt_len, tag, aad, aad_len, party, true);
     }
 
     inline void enc_record_msg(AEAD<IO>& aead_c,
@@ -44,13 +46,6 @@ class Record {
                                size_t aad_len,
                                int party) {
         aead_c.enc_record_msg(io, ctxt, tag, msg, msg_len, aad, aad_len, party);
-    }
-
-    inline void prove_record(AEAD_Proof<IO>* aead_proof,
-                             Integer& msg,
-                             const unsigned char* ctxt,
-                             size_t ctxt_len) {
-        aead_proof->prove_aead(msg, ctxt, ctxt_len, true);
     }
 };
 #endif

@@ -469,11 +469,12 @@ class HandShake {
         check_zero<IO>(ufin, server_ufin, finished_msg_length, party);
     }
 
-    inline void prove_enc_dec_finished_msg(AEAD_Proof<IO>* aead_proof_c,
+    inline void prove_enc_dec_finished_msg(AEAD_Proof<IO>* aead_proof,
+                                           Integer& z0,
                                            const unsigned char* ctxt) {
         // Dummy variable.
         Integer msg;
-        aead_proof_c->prove_aead(msg, ctxt, finished_msg_length);
+        aead_proof->prove_aead(msg, z0, ctxt, finished_msg_length);
     }
 
     inline void handshake_check(int party) {

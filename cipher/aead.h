@@ -803,4 +803,57 @@ class AEAD {
         return res;
     }
 };
+
+inline void compute_tag(unsigned char* tag,
+                        const block h,
+                        const block z0,
+                        const unsigned char* ctxt,
+                        size_t ctxt_len,
+                        const unsigned char* aad,
+                        size_t aad_len) {
+    size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
+    size_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
+    size_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
+
+    unsigned char* x = new unsigned char[len];
+    unsigned char ilen[8], mlen[8];
+    for (int i = 0; i < 8; i++) {
+        ilen[i] = (8 * aad_len) >> (7 - i) * 8;
+        mlen[i] = (8 * ctxt_len) >> (7 - i) * 8;
+    }
+
+    memcpy(x, aad, aad_len);
+    memset(x + aad_len, 0, v / 8);
+    memcpy(x + aad_len + v / 8, ctxt, ctxt_len);
+    memset(x + aad_len + v / 8 + ctxt_len, 0, u / 8);
+    memcpy(x + aad_len + v / 8 + ctxt_len + u / 8, ilen, 8);
+    memcpy(x + aad_len + v / 8 + ctxt_len + u / 8 + 8, mlen, 8);
+
+    reverse(x, x + len);
+    block* xblk = (block*)x;
+    reverse(xblk, xblk + (8 * len) / 128);
+    block t = ghash(h, xblk, 8 * len / 128);
+    t = t ^ z0;
+
+    unsigned char* tagc = (unsigned char*)&t;
+    reverse(tagc, tagc + 16);
+    memcpy(tag, tagc, 16);
+    delete[] x;
+}
+
+inline bool compare_tag(const unsigned char* tag,
+                        const block h,
+                        const block z0,
+                        const unsigned char* ctxt,
+                        size_t ctxt_len,
+                        const unsigned char* aad,
+                        size_t aad_len) {
+    unsigned char* ctag = new unsigned char[16];
+    compute_tag(ctag, h, z0, ctxt, ctxt_len, aad, aad_len);
+    bool res = (memcmp(tag, ctag, 16) == 0);
+    delete[] ctag;
+
+    return res;
+}
+
 #endif

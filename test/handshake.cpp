@@ -131,9 +131,9 @@ void handshake_test(IO* io, COT<IO>* cot, int party) {
                                   tau_c, 32, party);
     hs->prove_server_finished_msg(ms, server_finished_label, server_finished_label_length,
                                   tau_s, 32, party);
-
-    hs->prove_enc_dec_finished_msg(aead_proof_c, ctxt);
-    hs->prove_enc_dec_finished_msg(aead_proof_s, ctxt2);
+    Integer client_z0, server_z0;
+    hs->prove_enc_dec_finished_msg(aead_proof_c, client_z0, ctxt);
+    hs->prove_enc_dec_finished_msg(aead_proof_s, server_z0, ctxt2);
 
     hs->handshake_check(party);
 

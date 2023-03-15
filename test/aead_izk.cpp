@@ -173,8 +173,8 @@ void aead_dec_garble_then_prove_test(IO* io, COT<IO>* ot, int party, bool sec_ty
     switch_to_zk();
     Integer key_zk(128, keyc, ALICE);
     AEAD_Proof<IO>* aead_proof = new AEAD_Proof<IO>(aead, key_zk, iv, iv_len, party);
-    Integer msg_zk;
-    aead_proof->prove_aead(msg_zk, ctxt, msg_len, sec_type);
+    Integer msg_zk, msg_z0;
+    aead_proof->prove_aead(msg_zk, msg_z0, ctxt, msg_len, sec_type);
     if (sec_type) {
         cout << msg_zk.reveal<string>() << endl;
     }
