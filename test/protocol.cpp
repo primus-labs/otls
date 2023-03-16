@@ -8,6 +8,7 @@
 #include "protocol/com_conv.h"
 #include "cipher/aead.h"
 #include "cipher/aead_izk.h"
+#include "protocol/post_record.h"
 #if defined(__linux__)
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -24,6 +25,137 @@ const size_t QUERY_BYTE_LEN = 2 * 1024;
 const size_t RESPONSE_BYTE_LEN = 2 * 1024;
 
 const int threads = 1;
+
+template <typename IO>
+void full_protocol(IO* io, COT<IO>* cot, int party) {
+    EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
+    HandShake<NetIO>* hs = new HandShake<NetIO>(io, cot, group);
+
+    EC_POINT* V = EC_POINT_new(group);
+    EC_POINT* Tc = EC_POINT_new(group);
+    BIGNUM* t = BN_new();
+
+    BIGNUM* ts = BN_new();
+    EC_POINT* Ts = EC_POINT_new(hs->group);
+    BN_set_word(ts, 1);
+    EC_POINT_mul(hs->group, Ts, ts, NULL, NULL, hs->ctx);
+
+    unsigned char* rc = new unsigned char[32];
+    unsigned char* rs = new unsigned char[32];
+
+    unsigned char* ufinc = new unsigned char[finished_msg_length];
+    unsigned char* ufins = new unsigned char[finished_msg_length];
+
+    unsigned char* tau_c = new unsigned char[32];
+    unsigned char* tau_s = new unsigned char[32];
+
+    unsigned char* cmsg = new unsigned char[QUERY_BYTE_LEN];
+    unsigned char* smsg = new unsigned char[RESPONSE_BYTE_LEN];
+
+    memset(rc, 0x11, 32);
+    memset(rs, 0x22, 32);
+    memset(tau_c, 0x33, 32);
+    memset(tau_s, 0x44, 32);
+    memset(cmsg, 0x55, QUERY_BYTE_LEN);
+    memset(smsg, 0x66, QUERY_BYTE_LEN);
+
+    unsigned char aad[] = {0xfe, 0xed, 0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef, 0xfe, 0xed,
+                           0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef, 0xab, 0xad, 0xda, 0xd2};
+
+    size_t aad_len = sizeof(aad);
+
+    if (party == BOB) {
+        hs->compute_pado_VA(V, Ts);
+    } else {
+        hs->compute_client_VB(Tc, V, Ts);
+    }
+
+    hs->compute_pms_offline(party);
+
+    BIGNUM* pms = BN_new();
+    BIGNUM* full_pms = BN_new();
+    hs->compute_pms_online(pms, V, party);
+
+    hs->compute_master_key(pms, rc, 32, rs, 32);
+
+    hs->compute_expansion_keys(rc, 32, rs, 32);
+
+    hs->compute_client_finished_msg(client_finished_label, client_finished_label_length, tau_c,
+                                    32);
+    hs->compute_server_finished_msg(server_finished_label, server_finished_label_length, tau_s,
+                                    32);
+
+    AEAD<IO>* aead_c = new AEAD<IO>(io, cot, hs->client_write_key, hs->iv_oct + 12, 12);
+    AEAD<IO>* aead_s = new AEAD<IO>(io, cot, hs->server_write_key, hs->iv_oct, 12);
+
+    Record<IO>* rd = new Record<IO>;
+
+    unsigned char* finc_ctxt = new unsigned char[finished_msg_length];
+    unsigned char* finc_tag = new unsigned char[tag_length];
+    unsigned char* msg = new unsigned char[finished_msg_length];
+
+    hs->encrypt_client_finished_msg(aead_c, finc_ctxt, finc_tag, aad, aad_len, party);
+
+    bool res2 = hs->decrypt_and_check_server_finished_msg(aead_s, finc_ctxt, finc_tag, aad,
+                                                          aad_len, party);
+    // should be false.
+    cout << "res2: " << res2 << endl;
+
+    unsigned char* cctxt = new unsigned char[QUERY_BYTE_LEN];
+    unsigned char* ctag = new unsigned char[tag_length];
+
+    unsigned char* sctxt = new unsigned char[RESPONSE_BYTE_LEN];
+    unsigned char* stag = new unsigned char[tag_length];
+
+    // the client encrypts the first message, and sends to the server.
+    rd->encrypt(aead_c, io, cctxt, ctag, cmsg, QUERY_BYTE_LEN, aad, aad_len, party);
+
+    // prove handshake in post-record phase.
+    switch_to_zk();
+    PostRecord<IO>* prd = new PostRecord<IO>(io, hs, aead_c, aead_s, rd, party);
+    prd->reveal_pms();
+    prd->prove_and_check_handshake(finc_ctxt, finc_ctxt, rc, 32, rs, 32, tau_c, 32, tau_s, 32);
+    Integer prd_cmsg, prd_cmsg2, prd_smsg, prd_smsg2, prd_cz0, prd_c2z0, prd_sz0, prd_s2z0;
+    prd->prove_record_client(prd_cmsg, prd_cz0, cctxt, QUERY_BYTE_LEN);
+    prd->prove_record_server_last(prd_smsg2, prd_s2z0, cctxt, RESPONSE_BYTE_LEN);
+
+    bool res3 =
+      prd->finalize_check(finc_ctxt, finc_tag, aad, finc_ctxt, finc_tag, aad, {prd_cz0},
+                          {cctxt}, {ctag}, {QUERY_BYTE_LEN}, {aad}, 1, {prd_sz0}, {sctxt},
+                          {stag}, {RESPONSE_BYTE_LEN}, {aad}, 1, aad_len);
+
+    //should be false
+    cout << "res3: " << res3 << endl;
+    sync_zk_gc<IO>();
+    switch_to_gc();
+
+    EC_POINT_free(V);
+    EC_POINT_free(Tc);
+    BN_free(t);
+    BN_free(ts);
+    BN_free(pms);
+    BN_free(full_pms);
+    EC_POINT_free(Ts);
+
+    delete hs;
+    delete[] rc;
+    delete[] rs;
+    delete[] ufinc;
+    delete[] ufins;
+    delete[] tau_c;
+    delete[] tau_s;
+    delete[] finc_ctxt;
+    delete[] finc_tag;
+    delete[] msg;
+    delete[] cmsg;
+    delete[] smsg;
+
+    delete aead_c;
+    delete aead_s;
+    delete rd;
+    delete prd;
+    EC_GROUP_free(group);
+}
 
 void hs_query_resp_gc(NetIO* io, EC_GROUP* group, int party) {
     setup_backend(io, party);
@@ -288,37 +420,59 @@ void com_conv(NetIO* io, EC_GROUP* group, vector<block>& input, int party) {
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
-
-    EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
-
     NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
-
-    // GC
-    hs_query_resp_gc(io, group, party);
-
     BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; ++i)
+    for (int i = 0; i < threads; i++)
         ios[i] = new BoolIO<NetIO>(io, party == ALICE);
 
-    vector<block> out;
+    auto start = emp::clock_start();
+    setup_protocol<NetIO>(io, ios, threads, party);
+    cout << "setup time: " << emp::time_from(start) << " us" << endl;
+    auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
+    IKNP<NetIO>* cot = prot->ot;
+    start = emp::clock_start();
+    full_protocol<NetIO>(io, cot, party);
+    cout << "post_record time: " << emp::time_from(start) << " us" << endl;
+    finalize_protocol();
 
-    // IZK
-    hs_query_resp_izk(ios, group, out, party);
-    for (int i = 0; i < threads; ++i) {
-        delete ios[i]->io;
-        delete ios[i];
-    }
+    bool cheat = CheatRecord::cheated();
+    if (cheat)
+        error("cheat!\n");
 
-    // vector<block> out(QUERY_BYTE_LEN * 8 + RESPONSE_BYTE_LEN * 8);
-    // for (int i = 0; i < out.size(); i++)
-    //     out[i] = zero_block;
+        // int port, party;
+        // parse_party_and_port(argv, &party, &port);
 
-    NetIO* io1 = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
+        // EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
 
-    // Com conversion
-    com_conv(io1, group, out, party);
+        // NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
 
-    EC_GROUP_free(group);
+        // // GC
+        // hs_query_resp_gc(io, group, party);
+
+        // BoolIO<NetIO>* ios[threads];
+        // for (int i = 0; i < threads; ++i)
+        //     ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+
+        // vector<block> out;
+
+        // // IZK
+        // hs_query_resp_izk(ios, group, out, party);
+        // for (int i = 0; i < threads; ++i) {
+        //     delete ios[i]->io;
+        //     delete ios[i];
+        // }
+
+        // // vector<block> out(QUERY_BYTE_LEN * 8 + RESPONSE_BYTE_LEN * 8);
+        // // for (int i = 0; i < out.size(); i++)
+        // //     out[i] = zero_block;
+
+        // NetIO* io1 = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
+
+        // // Com conversion
+        // com_conv(io1, group, out, party);
+
+        // EC_GROUP_free(group);
+
 #if defined(__linux__)
     struct rusage rusage;
     if (!getrusage(RUSAGE_SELF, &rusage))
@@ -336,7 +490,10 @@ int main(int argc, char** argv) {
     else
         std::cout << "[Mac]Query RSS failed" << std::endl;
 #endif
-
-    delete io1;
+    delete io;
+    for (int i = 0; i < threads; i++) {
+        delete ios[i];
+    }
+    // delete io1;
     return 0;
 }
