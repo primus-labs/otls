@@ -95,10 +95,8 @@ void full_protocol(IO* io, COT<IO>* cot, int party) {
 
     hs->encrypt_client_finished_msg(aead_c, finc_ctxt, finc_tag, aad, aad_len, party);
 
-    bool res2 = hs->decrypt_and_check_server_finished_msg(aead_s, finc_ctxt, finc_tag, aad,
-                                                          aad_len, party);
-    // should be false.
-    cout << "res2: " << res2 << endl;
+    hs->decrypt_and_check_server_finished_msg(aead_s, finc_ctxt, finc_tag, aad, aad_len,
+                                              party);
 
     unsigned char* cctxt = new unsigned char[QUERY_BYTE_LEN];
     unsigned char* ctag = new unsigned char[tag_length];
@@ -118,13 +116,10 @@ void full_protocol(IO* io, COT<IO>* cot, int party) {
     prd->prove_record_client(prd_cmsg, prd_cz0, cctxt, QUERY_BYTE_LEN);
     prd->prove_record_server_last(prd_smsg2, prd_s2z0, cctxt, RESPONSE_BYTE_LEN);
 
-    bool res3 =
-      prd->finalize_check(finc_ctxt, finc_tag, aad, finc_ctxt, finc_tag, aad, {prd_cz0},
-                          {cctxt}, {ctag}, {QUERY_BYTE_LEN}, {aad}, 1, {prd_sz0}, {sctxt},
-                          {stag}, {RESPONSE_BYTE_LEN}, {aad}, 1, aad_len);
+    prd->finalize_check(finc_ctxt, finc_tag, aad, finc_ctxt, finc_tag, aad, {prd_cz0}, {cctxt},
+                        {ctag}, {QUERY_BYTE_LEN}, {aad}, 1, {prd_sz0}, {sctxt}, {stag},
+                        {RESPONSE_BYTE_LEN}, {aad}, 1, aad_len);
 
-    //should be false
-    cout << "res3: " << res3 << endl;
     sync_zk_gc<IO>();
     switch_to_gc();
 
