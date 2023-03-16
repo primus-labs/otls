@@ -153,7 +153,7 @@ class AEAD {
     }
 
     // AEAD encryption, sec_type indicates the input message is open (false) or secret (true).
-    void encrypt(IO* io,
+    inline void encrypt(IO* io,
                  unsigned char* ctxt,
                  unsigned char* tag,
                  const unsigned char* msg,
@@ -290,7 +290,7 @@ class AEAD {
     }
 
     // AEAD decryption, sec_type indicates the input message is open (false) or secret (true).
-    bool decrypt(IO* io,
+    inline bool decrypt(IO* io,
                  unsigned char* msg,
                  const unsigned char* ctxt,
                  size_t ctxt_len,

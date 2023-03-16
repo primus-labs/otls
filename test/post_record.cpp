@@ -108,23 +108,42 @@ void post_record_test(IO* io, COT<IO>* cot, int party) {
     unsigned char* sctxt = new unsigned char[64];
     unsigned char* stag = new unsigned char[tag_length];
 
+    unsigned char* cctxt2 = new unsigned char[64];
+    unsigned char* ctag2 = new unsigned char[tag_length];
+
+    unsigned char* sctxt2 = new unsigned char[64];
+    unsigned char* stag2 = new unsigned char[tag_length];
+
+    // the client encrypts the first message, and sends to the server.
     rd->encrypt(aead_c, io, cctxt, ctag, cmsg, 64, aad, aad_len, party);
 
-    // simulate the server
+    // simulate the server, send sctxt and stag to the client.
     aead_s_server->encrypt(io, sctxt, stag, smsg, 64, aad, aad_len, party, true);
+
+    // the client decrypts the first message from the server.
+    rd->decrypt(aead_s, io, smsg, sctxt, 64, stag, aad, aad_len, party);
+
+    // the client encrypts the second message, and sends to the server.
+    rd->encrypt(aead_c, io, cctxt2, ctag2, cmsg, 64, aad, aad_len, party);
+
+    // simulate the server, send sctxt2, stag2 to the client.
+    aead_s_server->encrypt(io, sctxt2, stag2, smsg, 64, aad, aad_len, party, true);
 
     // prove handshake in post-record phase.
     switch_to_zk();
     PostRecord<IO>* prd = new PostRecord<IO>(io, hs, aead_c, aead_s, rd, party);
     prd->reveal_pms();
     prd->prove_and_check_handshake(finc_ctxt, fins_ctxt, rc, 32, rs, 32, tau_c, 32, tau_s, 32);
-    Integer prd_cmsg, prd_smsg, prd_cz0, prd_sz0;
+    Integer prd_cmsg, prd_cmsg2, prd_smsg, prd_smsg2, prd_cz0, prd_c2z0, prd_sz0, prd_s2z0;
     prd->prove_record_client(prd_cmsg, prd_cz0, cctxt, 64);
-    prd->prove_record_server_last(prd_smsg, prd_sz0, sctxt, 64);
+    prd->prove_record_server(prd_smsg, prd_sz0, sctxt, 64);
+    prd->prove_record_client(prd_cmsg2, prd_c2z0, cctxt2, 64);
+    prd->prove_record_server_last(prd_smsg2, prd_s2z0, sctxt2, 64);
 
-    bool res3 = prd->finalize_check(finc_ctxt, finc_tag, aad, fins_ctxt, fins_tag, aad,
-                                    {prd_cz0}, {cctxt}, {ctag}, {64}, {aad}, 1, {prd_sz0},
-                                    {sctxt}, {stag}, {64}, {aad}, 1, aad_len);
+    bool res3 = prd->finalize_check(
+      finc_ctxt, finc_tag, aad, fins_ctxt, fins_tag, aad, {prd_cz0, prd_c2z0}, {cctxt, cctxt2},
+      {ctag, ctag2}, {64, 64}, {aad, aad}, 2, {prd_sz0, prd_s2z0}, {sctxt, sctxt2},
+      {stag, stag2}, {64, 64}, {aad, aad}, 2, aad_len);
     cout << "res3: " << res3 << endl;
     sync_zk_gc<IO>();
     switch_to_gc();

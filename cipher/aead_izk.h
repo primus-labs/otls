@@ -125,7 +125,7 @@ class AEAD_Proof {
         concat(nonce, &ONE, 1);
 
         expanded_key = computeKS(key);
-        Integer H = computeH();
+        H = computeH();
 
         itmac_hom_add_check<IO>(H, aead->zk_h, party, aead->gc_h);
     }
