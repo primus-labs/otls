@@ -190,11 +190,14 @@ int main(int argc, char** argv) {
     for (int i = 0; i < threads; i++)
         ios[i] = new BoolIO<NetIO>(io, party == ALICE);
 
+    auto start = emp::clock_start();
     setup_protocol<NetIO>(io, ios, threads, party);
-
+    cout << "setup time: " << emp::time_from(start) << " us" << endl;
     auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
+    start = emp::clock_start();
     post_record_test<NetIO>(io, cot, party);
+    cout << "post_record time: " << emp::time_from(start) << " us" << endl;
     finalize_protocol();
 
     bool cheat = CheatRecord::cheated();
