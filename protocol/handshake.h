@@ -3,7 +3,6 @@
 #include "emp-tool/emp-tool.h"
 #include "cipher/hmac_sha256.h"
 #include "cipher/aead.h"
-//#include "cipher/aesgcm.h"
 #include "cipher/prf.h"
 #include "add.h"
 #include "e2f.h"

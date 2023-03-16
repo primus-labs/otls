@@ -35,17 +35,5 @@ class Record {
                         int party) {
         return aead_s->decrypt(io, msg, ctxt, ctxt_len, tag, aad, aad_len, party, true);
     }
-
-    inline void enc_record_msg(AEAD<IO>& aead_c,
-                               IO* io,
-                               unsigned char* ctxt,
-                               unsigned char* tag,
-                               const unsigned char* msg,
-                               size_t msg_len,
-                               const unsigned char* aad,
-                               size_t aad_len,
-                               int party) {
-        aead_c.enc_record_msg(io, ctxt, tag, msg, msg_len, aad, aad_len, party);
-    }
 };
 #endif
