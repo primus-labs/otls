@@ -40,7 +40,9 @@ static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
-static std::map<uint64_t, vector<uint8_t>> recv_buffer;
+static std::map<uint64_t, vector<uint8_t>> recv_map;
+static std::vector<uint8_t> recv_buffer;
+static uint64_t recv_id = 0;
 static pthread_mutex_t recvLock = PTHREAD_MUTEX_INITIALIZER;
 static int recvBufferFlag = 0;
 static EM_BOOL
@@ -48,14 +50,30 @@ bridge_socket_on_message2(int eventType,
                          const EmscriptenWebSocketMessageEvent* websocketEvent,
                          void* userData) {
   pthread_mutex_lock(&recvLock);
-  uint8_t *data = (uint8_t*)websocketEvent->data;
+  uint64_t *id = (uint64_t*)websocketEvent->data;
+  uint64_t data_len = websocketEvent->numBytes - sizeof(uint64_t);
+  uint8_t *data = (uint8_t*)(id + 1);
+  printf("recv id: %lu current id: %lu\n", recv_id, *id);
+  if (recv_id + 1 == *id) {
+    recv_buffer.insert(recv_buffer.end(), data, data + data_len);
+    recv_id++;
+    auto iter = recv_map.find(recv_id + 1);
+    while (iter != recv_map.end()) {
+      recv_buffer.insert(recv_buffer.end(), iter->second.data(), iter->second.data() + iter->second.size());
+      recv_map.erase(iter);
 
-  uint64_t *id = (uint64_t*)data;
-  vector<uint8_t> tmp((uint8_t*)(id + 1), ((uint8_t*)(id + 1)) + websocketEvent->numBytes - sizeof(uint64_t));
-  recv_buffer.insert(std::pair<uint64_t, std::vector<uint8_t>>(*id, tmp));
-  recvBufferFlag = 1;
-  pthread_mutex_unlock(&recvLock);
-  emscripten_futex_wake(&recvBufferFlag, INT_MAX);
+      recv_id++;
+      iter = recv_map.find(recv_id + 1);
+    }
+    recvBufferFlag = 1;
+    pthread_mutex_unlock(&recvLock);
+    emscripten_futex_wake(&recvBufferFlag, INT_MAX);
+    printf("put to recv buffer: %lu\n", recv_buffer.size());
+  }
+  else {
+    vector<uint8_t> tmp(data, data + data_len);
+    recv_map.insert(std::pair<uint64_t, std::vector<uint8_t>>(*id, tmp));
+  }
 
   return EM_TRUE;
 }
@@ -85,28 +103,48 @@ EMSCRIPTEN_WEBSOCKET_T emscripten_init_websocket_to_posix_socket_bridge2(const c
   return bridgeSocket;
 }
 
+static std::vector<uint8_t> send_buffer;
+static uint64_t send_id = 0;
+static uint64_t origin_id = 0;
 ssize_t send2(int socket, const void *message, size_t length, int flags, uint64_t id) {
+  if (id > 0) origin_id = id;
 #ifdef POSIX_SOCKET_DEBUG
   emscripten_log(EM_LOG_NO_PATHS | EM_LOG_CONSOLE | EM_LOG_ERROR | EM_LOG_JS_STACK, "send(socket=%d,message=%p,length=%zd,flags=%d)\n", socket, message, length, flags);
 #endif
+  if (length > 0 && send_buffer.size() + length < send_buffer.capacity()) {
+    send_buffer.insert(send_buffer.end(), (uint8_t*)message, (uint8_t*)message + length);
+    return length;
+  }
 
-  unsigned char *msg = new unsigned char[sizeof(uint64_t) + length];
-  memcpy(msg, &id, sizeof(uint64_t));
+  /*unsigned char *msg = new unsigned char[sizeof(uint64_t) + l];
+  send_id++;
+  memcpy(msg, &send_id, sizeof(uint64_t));
   memcpy(msg + sizeof(uint64_t), message, length);
-  size_t len = length + sizeof(uint64_t);
-  printf("send info id:%llu len:%d\n", id, length);
+  size_t len = length + sizeof(uint64_t);*/
+  //printf("send info id:%llu len:%d\n", id, length);
+  
+  if (send_buffer.size() > sizeof(uint64_t)) {
+    send_id++;
+    *(uint64_t*)&send_buffer[0] = send_id;
+    emscripten_websocket_send_binary(bridgeSocket, (void *)send_buffer.data(), send_buffer.size());
+    printf("send buffer info id:%lu len:%lu origin id:%lu\n", send_id, send_buffer.size(), length > 0? origin_id - 1: origin_id);
 
-  emscripten_websocket_send_binary(bridgeSocket, (void *)msg, len);
-  delete []msg;
+    send_buffer.reserve(NETWORK_BUFFER_SIZE);
+    send_buffer.resize(sizeof(uint64_t));
+  }
+  if (length > 0) {
+    send_buffer.insert(send_buffer.end(), (uint8_t*)message, (uint8_t*)message + length);
+  }
 
-  return len;
+  return length;
 }
 
 ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
 #ifdef POSIX_SOCKET_DEBUG
   emscripten_log(EM_LOG_NO_PATHS | EM_LOG_CONSOLE | EM_LOG_ERROR | EM_LOG_JS_STACK, "recv(socket=%d,buffer=%p,length=%zd,flags=%d)\n", socket, buffer, length, flags);
 #endif
-  int len = 0;
+  size_t len = 0;
+  //printf("begin recv2 id:%lu size:%lu\n", id, length);
 while (len == 0) {
   while (!recvBufferFlag)
       emscripten_futex_wait(&recvBufferFlag, 0, 1e9);
@@ -116,7 +154,7 @@ while (len == 0) {
   // memcpy(buffer, recv_buffer.data(), min_length);
   // recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + min_length);
 
-  auto iter = recv_buffer.find(id);
+  /*auto iter = recv_buffer.find(id);
   if (iter != recv_buffer.end()) {
       // if (iter->second.size() != length) {
           printf("recv error recv2 id:%llu need:%d actual:%d\n", id, length, iter->second.size());
@@ -129,7 +167,17 @@ while (len == 0) {
   if (!recv_buffer.empty()) 
       recvBufferFlag = 1;
   else
-      recvBufferFlag = 0;
+      recvBufferFlag = 0;*/
+  //printf("need: %lu recv buffer size:%lu\n", length, recv_buffer.size());
+  if (recv_buffer.size() >= length) {
+    memcpy(buffer, recv_buffer.data(), length);
+    recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + length);
+    len = length;
+    recvBufferFlag = recv_buffer.empty() ? 0: 1;
+  }
+  else {
+    recvBufferFlag = 0;
+  }
   pthread_mutex_unlock(&recvLock);
 }
 
@@ -228,6 +276,8 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
               emscripten_thread_sleep(100);
             } while (readyState == 0);
             printf("end readystate\n");
+            send_buffer.reserve(NETWORK_BUFFER_SIZE);
+            send_buffer.resize(sizeof(uint64_t));
 #endif
         }
 #ifndef __EMSCRIPTEN__
@@ -254,8 +304,8 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
     }
 
     ~WebSocketIO(){
-#ifndef __EMSCRIPTEN__
         flush();
+#ifndef __EMSCRIPTEN__
         fclose(stream);
         delete[] buffer;
 #endif
@@ -273,7 +323,10 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
 
     void flush() {
 #ifndef __EMSCRIPTEN__
+    send_data_internal(NULL, 0);
         fflush(stream);
+#else
+    send2(0, NULL, 0, 0, 0);
 #endif
     }
 
@@ -281,10 +334,12 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
         size_t sent = 0;
         void* d = (void*)data;
         send_id++;
+    // printf("send info id:%lu size:%lu\n", send_id, len);
 #ifndef __EMSCRIPTEN__
         string websocket_data = GenWebSocketMessage(data, len, send_id, true);
         d = &websocket_data[0];
         len = websocket_data.size();
+    // printf("send buffer info:%lu\n", len);
 #endif
 
         while(sent < len) {
@@ -298,16 +353,15 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
             else
                 error("net_send_data\n");
         }
-        flush();
+    //if (len > 0)
+        //    flush();
         has_sent = true;
     }
 
     void recv_data_internal(void  * data, size_t len) {
-#ifndef __EMSCRIPTEN__
         if(has_sent)
-            fflush(stream);
+            flush();
         has_sent = false;
-#endif
         size_t sent = 0;
         recv_id++;
         while(sent < len) {

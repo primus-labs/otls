@@ -15,14 +15,16 @@ inline void H(BIGNUM*out, block b, BIGNUM* q, BN_CTX* ctx, CCRH& ccrh) {
 	BN_mod(out, out, q, ctx);
 }
 
-inline void send_bn(NetIO* io, BIGNUM* bn) {
+template<class IO>
+inline void send_bn(IO* io, BIGNUM* bn) {
 	unsigned char arr[1000];
 	uint32_t length = BN_bn2bin(bn, arr);
 	io->send_data(&length, sizeof(uint32_t));
 	io->send_data(arr, length);
 }
 
-inline void recv_bn(NetIO* io, BIGNUM*bn, Hash * hash = nullptr) {
+template<class IO>
+inline void recv_bn(IO* io, BIGNUM*bn, Hash * hash = nullptr) {
 	unsigned char arr[1000];
 	uint32_t length = -1;
 	io->recv_data(&length, sizeof(uint32_t));

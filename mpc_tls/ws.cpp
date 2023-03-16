@@ -13,7 +13,7 @@
 using namespace std;
 
 #define WEBSOCKET
-#define PROXY_DEEP_DEBUG
+//#define PROXY_DEEP_DEBUG
 
 #ifdef WEBSOCKET
 #if defined(__unix__) || defined(__APPLE__) || defined(__linux__)
@@ -290,17 +290,10 @@ void WebSocketMessageUnmaskPayload(uint8_t* payload,
   }
 }
 
-string GenWebSocketMessage(const void *buf2, uint64_t numBytes, uint64_t id, bool enable_id) {
-  printf("send info id:%llu size:%llu\n", id, numBytes);
-  unsigned char* buf = NULL;
-  if (enable_id) {
-    buf = new unsigned char[numBytes + sizeof(uint64_t)];
-    memcpy(buf, &id, sizeof(uint64_t));
-    memcpy(buf + sizeof(uint64_t), buf2, numBytes);
-    numBytes += sizeof(uint64_t);
-  }
-  else
-    buf = (unsigned char*)buf2;
+static std::vector<uint8_t> send_buffer;
+static uint64_t send_id = 0;
+static string DoGenWebSocketMessage(const void* buf, uint64_t numBytes) {
+  //printf("send info id:%llu size:%llu\n", id, numBytes);
 
   uint8_t headerData[sizeof(WebSocketMessageHeader) + 8/*possible extended length*/] = {};
   WebSocketMessageHeader *header = (WebSocketMessageHeader *)headerData;
@@ -337,36 +330,57 @@ string GenWebSocketMessage(const void *buf2, uint64_t numBytes, uint64_t id, boo
   memcpy(&result[0], headerData, headerBytes);
   memcpy((char*)&result[0] + headerBytes, buf, numBytes);
 
-  if (buf != buf2)
-    delete []buf;
   return result;
 }
+#define NETWORK_BUFFER_SIZE 1024*1024
+string GenWebSocketMessage(const void *buf, uint64_t numBytes, uint64_t id, bool enable_id) {
+  string result;
+  if (send_buffer.empty()) {
+  send_buffer.reserve(NETWORK_BUFFER_SIZE);
+  send_buffer.resize(sizeof(uint64_t));
+  }
+  if (numBytes > 0 && send_buffer.size() + numBytes < send_buffer.capacity()) {
+    send_buffer.insert(send_buffer.end(), (uint8_t*)buf, (uint8_t*)buf + numBytes);
+    return result;
+  }
 
+  if (send_buffer.size() > sizeof(uint64_t)) {
+    send_id++;
+    *(uint64_t*)&send_buffer[0] = send_id;
+    result = DoGenWebSocketMessage((void *)send_buffer.data(), send_buffer.size());
+  printf("send buffer info id:%llu len:%llu\n", send_id, send_buffer.size());
+
+    send_buffer.reserve(NETWORK_BUFFER_SIZE);
+    send_buffer.resize(sizeof(uint64_t));
+  }
+  if (numBytes > 0) {
+    send_buffer.insert(send_buffer.end(), (uint8_t*)buf, (uint8_t*)buf + numBytes);
+  }
+  return result;
+}
+static std::map<uint64_t, vector<uint8_t>> recv_map;
+static std::vector<uint8_t> recv_buffer;
+static uint64_t recv_id = 0;
+static std::vector<uint8_t> fragmentData;
 string GetMessage(int fd, int len, uint64_t id, bool enable_id) {
-    static std::vector<uint8_t> fragmentData;
-    static std::map<uint64_t, std::vector<uint8_t>> tlsData;
     bool continueFlag = true;
     string result;
-    auto iter = tlsData.find(id);
-    if (iter != tlsData.end()) {
-        // int min_len = tlsData.size() < len? tlsData.size(): len;
-        // result.insert(result.end(), tlsData.begin(), tlsData.begin() + min_len);
-        // tlsData.erase(tlsData.begin(), tlsData.begin() + min_len);
-        result.resize(iter->second.size());
-        // if (len != iter->second.size()) 
-            printf("recv error get message1 id:%llu need:%d actual:%d\n", id, len, iter->second.size());
-        memcpy(&result[0], iter->second.data(), iter->second.size());
-        tlsData.erase(iter);
-        return result;
-    }
-
     while (continueFlag) {
+    // printf("need:%d recv buffer size:%lu\n", len, recv_buffer.size());
+        if (recv_buffer.size() >= len) {
+            result.resize(len);
+            // printf("recv error get message1 id:%llu need:%d\n", id, len);
+            memcpy(&result[0], recv_buffer.data(), len);
+            recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + len);
+            return result;
+        }
+
         char buf[BUFFER_SIZE];
-        printf("begin recv ws id:%llu %d\n", id, len);
+        // printf("begin recv ws id:%llu %d\n", id, len);
 
         int read = recv(fd, buf, BUFFER_SIZE, 0);
-        printf("recv result:%d %d %s\n", read, errno, strerror(errno));
-        if (!read) return "";
+        // printf("recv result:%d %d %s\n", read, errno, strerror(errno));
+        if (!read) return result;
         if (read < 0)
         {
           fprintf(stderr, "Client read failed1 %d %s\n", errno, strerror(errno));
@@ -412,41 +426,43 @@ string GetMessage(int fd, int len, uint64_t id, bool enable_id) {
           {
           // case 0x02: /*binary message*/ ProcessWebSocketMessage(client_fd, payload, payloadLength); break;
           case 0x02: /*binary message*/ {
-              printf("payload[%d] ", payloadLength);
-              for (int i = 0; i < payloadLength; i++)
-                  printf("%02x ", (unsigned char)payload[i]);
-              printf("\n");
+              // printf("payload[%d] ", payloadLength);
+              // for (int i = 0; i < payloadLength; i++)
+              //     printf("%02x ", (unsigned char)payload[i]);
+              // printf("\n");
               // int min_len = payloadLength < len? payloadLength: len;
               // result.resize(min_len);
               // memcpy(&result[0], payload, min_len);
               // tlsData.insert(tlsData.end(), payload + min_len, payload + payloadLength);
-              if (enable_id) {
-                  uint64_t *p = (uint64_t*)payload;
-                  uint8_t *d = (uint8_t*)(p + 1);
-                  if (*p == id) {
-                      result.resize(payloadLength - sizeof(uint64_t));
-                      // if (len != payloadLength - sizeof(uint64_t))
-                          printf("recv error get message2 id:%llu need:%d actual:%d\n", id, len, payloadLength - sizeof(uint64_t));
-                      memcpy(&result[0], d, payloadLength - sizeof(uint64_t));
-                      continueFlag = false;
+              if (1) {
+                  uint64_t *id = (uint64_t*)payload;
+                  uint8_t *data = (uint8_t*)(id + 1);
+                  uint64_t data_len = payloadLength - sizeof(uint64_t);
+                  printf("recv id: %lu current id: %lu\n", recv_id, *id);
+                  if (recv_id + 1 == *id) {
+                    recv_buffer.insert(recv_buffer.end(), data, data + data_len);
+                    recv_id++;
+            
+                    auto iter = recv_map.find(recv_id + 1);
+                    while (iter != recv_map.end()) {
+                      recv_buffer.insert(recv_buffer.end(), iter->second.begin(), iter->second.end());
+                      recv_map.erase(iter);
+                      recv_id++;
+              
+                      iter = recv_map.find(recv_id + 1);
+                    }
+                    printf("put to recv buffer, size:%lu\n", recv_buffer.size());
                   }
                   else {
-                      std::vector<uint8_t> tmp(payloadLength - sizeof(uint64_t), 0);
-                      memcpy(&tmp[0], d, payloadLength - sizeof(uint64_t));
-                      tlsData.insert(std::pair<uint64_t, std::vector<uint8_t>>(*p, tmp));
+                      std::vector<uint8_t> tmp(data, data + data_len);
+                      recv_map.insert(std::pair<uint64_t, std::vector<uint8_t>>(*id, tmp));
                   }
-              }
-              else {
-                  result.resize(payloadLength);
-                  memcpy(&result[0], payload, payloadLength);
-                  continueFlag = false;
               }
           };
           break;
-          case 0x08: continueFlag = false; break;
+          case 0x08: break;
           default:
             fprintf(stderr, "Unknown WebSocket opcode received %x!\n", header->opcode);
-            continueFlag = false; // Kill connection
             break;
           }
 
