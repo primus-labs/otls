@@ -490,6 +490,7 @@ int main(int argc, char** argv) {
     else
         std::cout << "[Mac]Query RSS failed" << std::endl;
 #endif
+    cout << "comm: " << ((io->counter) * 1.0) / 1024 << " KBytes" << endl;
     delete io;
     for (int i = 0; i < threads; i++) {
         delete ios[i];
