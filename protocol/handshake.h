@@ -2,12 +2,12 @@
 #define _HAND_SHAKE_H_
 #include "emp-tool/emp-tool.h"
 #include "cipher/hmac_sha256.h"
-#include "cipher/aead.h"
+#include "protocol/aead.h"
 #include "cipher/prf.h"
 #include "add.h"
 #include "e2f.h"
 #include "backend/switch.h"
-#include "cipher/aead_izk.h"
+#include "protocol/aead_izk.h"
 
 using namespace emp;
 using namespace std;

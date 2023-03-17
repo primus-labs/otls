@@ -1,8 +1,8 @@
 #ifndef _RECORD_H
 #define _RECORD_H
 #include "emp-tool/emp-tool.h"
-#include "cipher/aead.h"
-#include "cipher/aead_izk.h"
+#include "protocol/aead.h"
+#include "protocol/aead_izk.h"
 
 template <typename IO>
 class Record {

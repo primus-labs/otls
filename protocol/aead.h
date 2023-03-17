@@ -3,7 +3,7 @@
 
 #include "emp-tool/emp-tool.h"
 #include "backend/ole_f2k.h"
-#include "utils.h"
+#include "cipher/utils.h"
 #include "backend/switch.h"
 #include "backend/commitment.h"
 #include <deque>

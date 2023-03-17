@@ -2,7 +2,7 @@
 #define _AEAD_IZK_
 #include "emp-tool/emp-tool.h"
 #include "emp-zk/emp-zk.h"
-#include "utils.h"
+#include "cipher/utils.h"
 #include "aead.h"
 #include "backend/check_zero.h"
 

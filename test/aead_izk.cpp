@@ -1,4 +1,4 @@
-#include "cipher/aead_izk.h"
+#include "protocol/aead_izk.h"
 #include "emp-tool/emp-tool.h"
 #include "cipher/utils.h"
 #include "backend/backend.h"

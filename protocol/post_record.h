@@ -3,7 +3,7 @@
 #include "emp-tool/emp-tool.h"
 #include "emp-zk/emp-zk.h"
 #include "protocol/handshake.h"
-#include "cipher/aead_izk.h"
+#include "protocol/aead_izk.h"
 #include "protocol/record.h"
 
 using namespace emp;

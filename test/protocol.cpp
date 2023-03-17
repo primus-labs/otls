@@ -5,8 +5,8 @@
 #include "protocol/handshake.h"
 #include "protocol/record.h"
 #include "protocol/com_conv.h"
-#include "cipher/aead.h"
-#include "cipher/aead_izk.h"
+#include "protocol/aead.h"
+#include "protocol/aead_izk.h"
 #include "protocol/post_record.h"
 #if defined(__linux__)
 #include <sys/time.h>
@@ -62,7 +62,7 @@ void full_protocol(IO* io, COT<IO>* cot, int party) {
                            0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef, 0xab, 0xad, 0xda, 0xd2};
 
     size_t aad_len = sizeof(aad);
-
+    auto start = emp::clock_start();
     if (party == BOB) {
         hs->compute_pado_VA(V, Ts);
     } else {
@@ -83,7 +83,6 @@ void full_protocol(IO* io, COT<IO>* cot, int party) {
                                     32);
     hs->compute_server_finished_msg(server_finished_label, server_finished_label_length, tau_s,
                                     32);
-
     AEAD<IO>* aead_c = new AEAD<IO>(io, cot, hs->client_write_key, hs->iv_oct + 12, 12);
     AEAD<IO>* aead_s = new AEAD<IO>(io, cot, hs->server_write_key, hs->iv_oct, 12);
 
@@ -97,17 +96,20 @@ void full_protocol(IO* io, COT<IO>* cot, int party) {
 
     hs->decrypt_and_check_server_finished_msg(aead_s, finc_ctxt, finc_tag, aad, aad_len,
                                               party);
+    cout << "handshake time: " << emp::time_from(start) << " us" << endl;
 
     unsigned char* cctxt = new unsigned char[QUERY_BYTE_LEN];
     unsigned char* ctag = new unsigned char[tag_length];
 
     unsigned char* sctxt = new unsigned char[RESPONSE_BYTE_LEN];
     unsigned char* stag = new unsigned char[tag_length];
+    start = emp::clock_start();
 
     // the client encrypts the first message, and sends to the server.
     rd->encrypt(aead_c, io, cctxt, ctag, cmsg, QUERY_BYTE_LEN, aad, aad_len, party);
-
+    cout << "record time: " << emp::time_from(start) << " us" << endl;
     // prove handshake in post-record phase.
+    start = emp::clock_start();
     switch_to_zk();
     PostRecord<IO>* prd = new PostRecord<IO>(io, hs, aead_c, aead_s, rd, party);
     prd->reveal_pms();
@@ -122,7 +124,7 @@ void full_protocol(IO* io, COT<IO>* cot, int party) {
 
     sync_zk_gc<IO>();
     switch_to_gc();
-
+    cout << "post record: " << emp::time_from(start) << " us" << endl;
     EC_POINT_free(V);
     EC_POINT_free(Tc);
     BN_free(t);
@@ -426,7 +428,7 @@ int main(int argc, char** argv) {
     IKNP<NetIO>* cot = prot->ot;
     start = emp::clock_start();
     full_protocol<NetIO>(io, cot, party);
-    cout << "post_record time: " << emp::time_from(start) << " us" << endl;
+    cout << "total time: " << emp::time_from(start) << " us" << endl;
     finalize_protocol();
 
     bool cheat = CheatRecord::cheated();
