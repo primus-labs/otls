@@ -4,10 +4,7 @@
 #include <string.h>
 
 #include "backend/bn_utils.h"
-#include "emp-tool/emp-tool.h"
 #include "backend/ole.h"
-
-using namespace emp;
 
 class PedersenComm {
    public:
@@ -258,6 +255,7 @@ class ComConv {
         BIGNUM* Delta = BN_new();
         BN_rand_range(Delta, this->q);
         commitDelta(&(ole->ot->Delta), Delta);
+        std::cout << ole->ot->Delta << std::endl;
         BN_free(Delta);
 
         // generate IT-MAC key for random r;
