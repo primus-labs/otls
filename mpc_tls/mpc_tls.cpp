@@ -69,7 +69,6 @@ int init_mpc(int pado) {
         sync_recv(recv_buf, 12);
     }
 
-    if (1) {
     setup_backend(g_io, party);
     printf("setup backend ok\n");
     auto prot = (PADOParty<PadoIO>*)(ProtocolExecution::prot_exec);
@@ -81,7 +80,6 @@ int init_mpc(int pado) {
 
     g_hs = new HandShake<PadoIO>(g_io, g_cot, g_group);
     g_ctx = g_hs->ctx;
-    }
 
     return 1;
 }
@@ -181,7 +179,12 @@ int tls1_prf_finish_mac_mpc(const unsigned char* sec, size_t sec_len, const unsi
     char buf[256]; // 15 + 32
     strcpy(buf, client ? "client finished":"server finished");
     printf("finish mac:%s\n", buf);
-    g_hs->compute_finished_msg(out, *g_ms, (unsigned char*)buf, 15, seed, seed_len); 
+    if (client) {
+        g_hs->compute_client_finished_msg(out, (unsigned char*)buf, 15, seed, seed_len);
+    }
+    else {
+        g_hs->compute_server_finished_msg(out, (unsigned char*)buf, 15, seed, seed_len);
+    }
     reverse(out, out + olen);
 
     return 1;
@@ -198,9 +201,9 @@ int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char*
     print_mpc("aad", aad, aad_len);
 
     if (finish)
-        g_hs->encrypt_client_finished_msg(g_aead_c, ctxt, tag, aad, aad_len, g_party);
-    else
-        g_hs->encrypt_record_msg(g_aead_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
+        g_hs->encrypt_client_finished_msg(g_aead_c, ctxt, tag, msg, msg_len, aad, aad_len, g_party);
+    //else
+    //    g_hs->encrypt_record_msg(g_aead_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
     
     print_mpc("ctxt", ctxt, msg_len);
     print_mpc("tag", tag, 16);
@@ -221,9 +224,9 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
 
     bool res;
     if (finish)
-        res = g_hs->decrypt_and_check_server_finished_msg(g_aead_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
-    else
-        res = g_hs->decrypt_record_msg(g_aead_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
+        res = g_hs->decrypt_and_check_server_finished_msg(g_aead_s, msg, ctxt, ctxt_len, tag, aad, aad_len, g_party);
+    //else
+    //    res = g_hs->decrypt_record_msg(g_aead_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
 
     print_mpc("msg", msg, ctxt_len);
 

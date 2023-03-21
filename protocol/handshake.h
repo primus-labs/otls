@@ -331,7 +331,8 @@ class HandShake {
         ufin_int.reveal<unsigned char>((unsigned char*)ufin, PUBLIC);
     }
 
-    inline void compute_client_finished_msg(const unsigned char* label,
+    inline void compute_client_finished_msg(unsigned char* ufin,
+                                            const unsigned char* label,
                                             size_t label_len,
                                             const unsigned char* tau,
                                             size_t tau_len) {
@@ -339,9 +340,11 @@ class HandShake {
         prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, master_key, label, label_len,
                         tau, tau_len, true, true);
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
+        memcpy(ufin, client_ufin, finished_msg_length);
     }
 
-    inline void compute_server_finished_msg(const unsigned char* label,
+    inline void compute_server_finished_msg(unsigned char* ufin,
+                                            const unsigned char* label,
                                             size_t label_len,
                                             const unsigned char* tau,
                                             size_t tau_len) {
@@ -349,6 +352,7 @@ class HandShake {
         prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, master_key, label, label_len,
                         tau, tau_len, true, true);
         ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
+        memcpy(ufin, server_ufin, finished_msg_length);
     }
 
     inline void encrypt_client_finished_msg(AEAD<IO>* aead_c,
@@ -364,6 +368,7 @@ class HandShake {
                                             unsigned char* ctxt,
                                             unsigned char* tag,
                                             const unsigned char* ufinc,
+                                            size_t ufinc_len,
                                             const unsigned char* aad,
                                             size_t aad_len,
                                             int party) {
@@ -388,20 +393,18 @@ class HandShake {
     }
 
     inline bool decrypt_and_check_server_finished_msg(AEAD<IO>& aead_s,
-                                                      const unsigned char* ufins,
+                                                      unsigned char* msg,
                                                       const unsigned char* ctxt,
+                                                      size_t ctxt_len,
                                                       const unsigned char* tag,
                                                       const unsigned char* aad,
                                                       size_t aad_len,
                                                       int party) {
-        unsigned char* msg = new unsigned char[finished_msg_length];
-        bool res1 = aead_s.dec_finished_msg(io, msg, ctxt, finished_msg_length, tag, aad,
+        bool res1 = aead_s.dec_finished_msg(io, msg, ctxt, ctxt, tag, aad,
                                             aad_len, party);
 
-        bool res2 = (memcmp(msg, ufins, finished_msg_length) == 0);
-        delete[] msg;
 
-        return res1 & res2;
+        return res1;
     }
 
     // ALICE knows pms, which is the entire value, not a share.
