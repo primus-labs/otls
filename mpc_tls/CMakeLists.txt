@@ -1,0 +1,43 @@
+cmake_minimum_required(VERSION 3.0)
+project(otls)
+
+#find_package(emp-ot REQUIRED)
+include_directories(${EMP-OT_INCLUDE_DIRS})
+
+IF(${CMAKE_SYSTEM_PROCESSOR} MATCHES "(aarch64)|(arm64)|(x86_64)")
+  message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
+ELSE()
+  set(NO_WARN_FLAGS "-Wno-unused-function -Wno-unused-command-line-argument")
+  set(CCFLAGS "-msimd128 -msse -msse2 -msse4.1 -msse4.2 -s ASSERTIONS=1")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${NO_WARN_FLAGS} ${CCFLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${NO_WARN_FLAGS} ${CCFLAGS}")
+ENDIF()
+
+IF(${WEBSOCKET_IO})
+  set(PadoSSL ${CMAKE_CURRENT_SOURCE_DIR}/../../install_openssl)
+ELSE()
+  set(PadoSSL ${CMAKE_CURRENT_SOURCE_DIR}/../../install_emopenssl)
+ENDIF()
+  message(STATUS "PadoSSL ${PadoSSL}")
+add_compile_options(-fPIC)
+add_compile_options(-ggdb)
+#add_compile_options(-fsanitize=address)
+#add_compile_options(-gsource-map)
+#set(LINK_FLAGS " -fsanitize=address -gsource-map -lwebsocket.js -sPROXY_POSIX_SOCKETS -sUSE_PTHREADS -sPROXY_TO_PTHREAD ")
+set(LINK_FLAGS " -lwebsocket.js -sPROXY_POSIX_SOCKETS -sUSE_PTHREADS -sPROXY_TO_PTHREAD ")
+
+add_library(otls mpc_tls.cpp ws.cpp sha1.cpp my_proxy.cpp)
+target_include_directories(otls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../install_openssl/include/)
+target_include_directories(otls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../)
+target_include_directories(otls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../pado-emp/emp-tool/)
+target_include_directories(otls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../pado-emp/emp-ot/)
+target_include_directories(otls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../pado-emp/emp-zk/)
+
+target_link_libraries(otls PUBLIC emp-tool)
+target_link_libraries(otls PUBLIC ${PadoSSL}/lib/libssl.a)
+target_link_libraries(otls PUBLIC ${PadoSSL}/lib/libcrypto.a)
+target_link_libraries(otls PUBLIC dl pthread)
+
+install(TARGETS otls DESTINATION lib)
+install(FILES mpc_tls.h DESTINATION include/otls)
+
