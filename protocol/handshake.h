@@ -13,11 +13,13 @@ using namespace emp;
 using namespace std;
 
 static unsigned char master_key_label[] = {"master key"};
+static unsigned char extended_master_key_label[] = {"extended master secret"};
 static unsigned char key_expansion_label[] = {"key expansion"};
 static unsigned char client_finished_label[] = {"client finished"};
 static unsigned char server_finished_label[] = {"server finished"};
 
 static size_t master_key_label_length = sizeof(master_key_label) - 1;
+static size_t extended_master_key_label_length = sizeof(extended_master_key_label) - 1;
 static size_t key_expansion_label_length = sizeof(key_expansion_label) - 1;
 static size_t client_finished_label_length = sizeof(client_finished_label) - 1;
 static size_t server_finished_label_length = sizeof(server_finished_label) - 1;
@@ -205,6 +207,34 @@ class HandShake {
                         master_key_label_length, seed, seed_len, true, true);
 
         delete[] seed;
+        delete[] buf;
+    }
+
+    inline void compute_extended_master_key(const BIGNUM* pms,
+                                   const unsigned char* hash,
+                                   size_t hash_len) {
+        size_t len = BN_num_bytes(pms);
+        unsigned char* buf = new unsigned char[len];
+        BN_bn2bin(pms, buf);
+        reverse(buf, buf + len);
+        Integer pmsa, pmsb;
+
+        // commit the IT-MAC of zk_2 in addmod.
+        switch_to_zk();
+        zk_pms = Integer(len * 8, buf, ALICE);
+        sync_zk_gc<IO>();
+        switch_to_gc();
+
+        pmsa = Integer(len * 8, buf, ALICE);
+        pmsb = Integer(len * 8, buf, BOB);
+
+        Integer pmsbits;
+        addmod(pmsbits, pmsa, pmsb, q);
+
+        prf.init(hmac, pmsbits);
+        prf.opt_compute(hmac, master_key, master_key_length * 8, pmsbits, extended_master_key_label,
+                        extended_master_key_label_length, hash, hash_len, true, true);
+
         delete[] buf;
     }
 

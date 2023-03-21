@@ -44,3 +44,6 @@ include_directories(${EMP-ZK_INCLUDE_DIRS})
 
 ENABLE_TESTING()
 # ADD_SUBDIRECTORY(test)
+
+
+ADD_SUBDIRECTORY(mpc_tls)
