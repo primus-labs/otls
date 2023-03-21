@@ -1,7 +1,7 @@
 #!/bin/bash
 . ./scripts/_config.sh wasm
 
-ossl_root=${pado_emp_dir}/deps/install
+ossl_root=${pado_emp_dir}/deps/install_wasm
 
 #
 # compile pado-emp
@@ -41,7 +41,7 @@ emcmake cmake ${curdir}/${repo} \
   -DOPENSSL_SSL_LIBRARY=${ossl_root}/lib/libssl.a \
   -DOPENSSL_CRYPTO_LIBRARY=${ossl_root}/lib/libcrypto.a
 emmake make -j8
-make install
+# make install
 
 cd ${curdir}
 exit 0
