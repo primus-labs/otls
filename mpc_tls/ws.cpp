@@ -10,6 +10,7 @@
 #include<map>
 #include<string>
 #include "sha1.h"
+#include "ws.h"
 using namespace std;
 
 #define WEBSOCKET
@@ -141,7 +142,7 @@ void SendHandshake(int fd, const char *request)
 
   int err = send(fd, handshakeMsg, (int)strlen(handshakeMsg), 0);
   if (err < 0) on_error("Client write failed\n");
-  printf("Sent handshake:\n%s\n", handshakeMsg);
+  printf("Sent handshake[%d]:\n%s\n", strlen(handshakeMsg), handshakeMsg);
 }
 
 // Validates if the given, possibly partially received WebSocket message has enough bytes to contain a full WebSocket header.
@@ -333,17 +334,16 @@ static string DoGenWebSocketMessage(const void* buf, uint64_t numBytes) {
   return result;
 }
 #define NETWORK_BUFFER_SIZE 1024*1024
-#define DEBUG_MSG_INFO 0
 string GenWebSocketMessage(const void *buf, uint64_t numBytes, uint64_t id, bool enable_id) {
   string result;
   if (send_buffer.empty()) {
-  send_buffer.reserve(NETWORK_BUFFER_SIZE);
-  send_buffer.resize(sizeof(uint64_t));
+    send_buffer.reserve(NETWORK_BUFFER_SIZE);
+    send_buffer.resize(sizeof(uint64_t));
   }
   if (numBytes > 0 && send_buffer.size() + numBytes + 2 * sizeof(uint64_t) < send_buffer.capacity()) {
 #if DEBUG_MSG_INFO
     send_buffer.insert(send_buffer.end(), (uint8_t*)&id, (uint8_t*)(&id + 1));
-  send_buffer.insert(send_buffer.end(), (uint8_t*)&numBytes, (uint8_t*)(&numBytes + 1));
+    send_buffer.insert(send_buffer.end(), (uint8_t*)&numBytes, (uint8_t*)(&numBytes + 1));
 #endif
     send_buffer.insert(send_buffer.end(), (uint8_t*)buf, (uint8_t*)buf + numBytes);
     return result;
@@ -353,7 +353,8 @@ string GenWebSocketMessage(const void *buf, uint64_t numBytes, uint64_t id, bool
     send_id++;
     *(uint64_t*)&send_buffer[0] = send_id;
     result = DoGenWebSocketMessage((void *)send_buffer.data(), send_buffer.size());
-    printf("send buffer info id:%llu len:%llu\n", send_id, (uint64_t)send_buffer.size());
+    printf("send buffer info id:%llu len:%llu %llu\n", send_id, (uint64_t)send_buffer.size(), numBytes);
+    if (send_id == 1 && send_buffer.size() == 25) assert(false);
 
     send_buffer.reserve(NETWORK_BUFFER_SIZE);
     send_buffer.resize(sizeof(uint64_t));
@@ -362,7 +363,7 @@ string GenWebSocketMessage(const void *buf, uint64_t numBytes, uint64_t id, bool
 #if DEBUG_MSG_INFO
   //printf("debug msg info: send id: %llu length:%llu\n", id, numBytes);
     send_buffer.insert(send_buffer.end(), (uint8_t*)&id, (uint8_t*)(&id + 1));
-  send_buffer.insert(send_buffer.end(), (uint8_t*)&numBytes, (uint8_t*)(&numBytes + 1));
+    send_buffer.insert(send_buffer.end(), (uint8_t*)&numBytes, (uint8_t*)(&numBytes + 1));
 #endif
     send_buffer.insert(send_buffer.end(), (uint8_t*)buf, (uint8_t*)buf + numBytes);
   }
@@ -384,6 +385,7 @@ string GetMessage(int fd, int len, uint64_t id, bool enable_id) {
             if (*actual_id != id || *actual_len != len) {
               printf("id actual:%llu expect: %llu length actual:%llu expect:%llu\n", *actual_id, id, *actual_len, (uint64_t)len);
               assert(false);
+              exit(1);
             }
 
             result.resize(len);
@@ -457,7 +459,7 @@ string GetMessage(int fd, int len, uint64_t id, bool enable_id) {
                   uint64_t *payload_id = (uint64_t*)payload;
                   uint8_t *data = (uint8_t*)(payload_id + 1);
                   uint64_t data_len = payloadLength - sizeof(uint64_t);
-                  printf("recv id: %llu current id: %llu\n", recv_id, *payload_id);
+                  printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *payload_id);
                   if (recv_id + 1 == *payload_id) {
                     recv_buffer.insert(recv_buffer.end(), data, data + data_len);
                     recv_id++;
@@ -560,7 +562,7 @@ void CheckWebSocketHandshake(int fd) {
         EXIT_THREAD(0);
     }
 
-    printf("check websocket handshake:%d %s\n", fd, buf);
+    printf("check websocket handshake[%d]:%d %s\n", strlen(buf), fd, buf);
 }
 
 string GenWebSocketMessageProxy(const void *buf, uint64_t numBytes, uint64_t id, bool enable_id) {
@@ -643,7 +645,7 @@ static std::vector<uint8_t> fragmentData;
                   uint64_t *payload_id = (uint64_t*)&id;
                   uint8_t *data = (uint8_t*)(payload);
                   uint64_t data_len = payloadLength;
-                  printf("recv id: %llu current id: %llu\n", recv_id, *payload_id);
+                  printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *payload_id);
                   std::vector<uint8_t> tmp(data, data + data_len);
                   recv_map.insert(std::pair<uint64_t, std::vector<uint8_t>>(*payload_id, tmp));
               }

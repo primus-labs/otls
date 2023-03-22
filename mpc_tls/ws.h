@@ -1,6 +1,7 @@
 #include<string>
 using namespace std;
 
+#define DEBUG_MSG_INFO 0
 void RequestWebSocketHandshake(int fd);
 
 void ResponseWebSocketHandshake(int fd);

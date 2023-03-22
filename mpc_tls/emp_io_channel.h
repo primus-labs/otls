@@ -17,6 +17,7 @@ using std::string;
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#define RECORD_MSG_INFO 1
 namespace emp {
 
 class MyIO: public IOChannel<MyIO> { public:
@@ -28,6 +29,11 @@ class MyIO: public IOChannel<MyIO> { public:
     bool has_sent = false;
     string addr;
     int port;
+    uint64_t send_id = 0;
+    uint64_t recv_id = 0;
+#if RECORD_MSG_INFO
+    FILE* debug_file = nullptr;
+#endif
     MyIO(const char * address, int port, bool quiet = false) {
         if (port <0 || port > 65535) {
             throw std::runtime_error("Invalid port number!");
@@ -56,6 +62,9 @@ class MyIO: public IOChannel<MyIO> { public:
             }
             consocket = accept(mysocket, (struct sockaddr *)&dest, &socksize);
             close(mysocket);
+#if RECORD_MSG_INFO
+            debug_file = fopen("myio_server.log", "w");
+#endif        
         }
         else {
             addr = string(address);
@@ -76,6 +85,9 @@ class MyIO: public IOChannel<MyIO> { public:
                 close(consocket);
                 usleep(1000);
             }
+#if RECORD_MSG_INFO
+            debug_file = fopen("myio_client.log", "w");
+#endif
         }
         set_nodelay();
         stream = fdopen(consocket, "wb+");
@@ -83,7 +95,7 @@ class MyIO: public IOChannel<MyIO> { public:
         memset(buffer, 0, NETWORK_BUFFER_SIZE);
         setvbuf(stream, buffer, _IOFBF, NETWORK_BUFFER_SIZE);
         if(!quiet)
-            std::cout << "connected\n";
+            std::cout << "myio connected\n";
     }
 
     void sync() {
@@ -119,6 +131,11 @@ class MyIO: public IOChannel<MyIO> { public:
     }
 
     void send_data_internal(const void * data, size_t len) {
+        send_id++;
+#if RECORD_MSG_INFO
+        fprintf(debug_file, "send data id:%llu len:%llu\n", (uint64_t)send_id, (uint64_t)len);
+        fflush(debug_file);
+#endif
         size_t sent = 0;
         while(sent < len) {
             size_t res = fwrite(sent + (char*)data, 1, len - sent, stream);
@@ -131,6 +148,11 @@ class MyIO: public IOChannel<MyIO> { public:
     }
 
     void recv_data_internal(void  * data, size_t len) {
+        recv_id++;
+#if RECORD_MSG_INFO
+        fprintf(debug_file, "recv data id: %llu len:%llu\n", (uint64_t)recv_id, (uint64_t)len);
+        fflush(debug_file);
+#endif
         if(has_sent)
             fflush(stream);
         has_sent = false;

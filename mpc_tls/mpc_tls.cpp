@@ -11,6 +11,8 @@
 using namespace std;
 using namespace emp;
 
+#define WEBSOCKET_IO 1
+
 #if defined(__EMSCRIPTEN__) || defined(WEBSOCKET_IO)
 #include "websocket_io_channel.h"
 using PadoIO = WebSocketIO;
@@ -61,7 +63,7 @@ int init_mpc(int pado) {
     for (int i = 0; i < threads; i++)
         g_ios[i] = new BoolIO<PadoIO>(g_io, party == ALICE);
     printf("create websocket io ok\n");
-    setup_protocol<PadoIO>(g_io, ios, threads, party);
+    setup_protocol<PadoIO>(g_io, g_ios, threads, party);
     
     char send_buf[256];
     char recv_buf[256];
@@ -77,7 +79,7 @@ int init_mpc(int pado) {
         sync_recv(recv_buf, 12);
     }
 
-    setup_backend(g_io, party);
+    // setup_backend(g_io, party);
     
     printf("setup backend ok\n");
     auto prot = (PADOParty<PadoIO>*)(ProtocolExecution::prot_exec);

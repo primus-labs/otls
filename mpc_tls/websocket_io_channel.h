@@ -40,7 +40,6 @@ static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
-#define DEBUG_MSG_INFO 0
 static std::map<uint64_t, vector<uint8_t>> recv_map;
 static std::vector<uint8_t> recv_buffer;
 static uint64_t recv_id = 0;
@@ -54,7 +53,7 @@ bridge_socket_on_message2(int eventType,
   uint64_t *id = (uint64_t*)websocketEvent->data;
   uint64_t data_len = websocketEvent->numBytes - sizeof(uint64_t);
   uint8_t *data = (uint8_t*)(id + 1);
-  printf("recv id: %llu current id: %llu\n", recv_id, *id);
+  printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *id);
   if (recv_id + 1 == *id) {
     printf("recv buffer init: %llu\n", (uint64_t)recv_buffer.size());
     recv_buffer.insert(recv_buffer.end(), data, data + data_len);
@@ -192,6 +191,7 @@ ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
 }
 #endif
 
+#define RECORD_MSG_INFO 1
 namespace emp {
 
 class WebSocketIO: public IOChannel<WebSocketIO> { public:
@@ -205,6 +205,9 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
     int port;
     uint64_t send_id = 0;
     uint64_t recv_id = 0;
+#if RECORD_MSG_INFO
+    FILE* debug_file = nullptr;
+#endif
     WebSocketIO(const char * address, int port, bool quiet = false) {
         if (port <0 || port > 65535) {
             throw std::runtime_error("Invalid port number!");
@@ -236,6 +239,9 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
             consocket = accept(mysocket, (struct sockaddr *)&dest, &socksize);
             close(mysocket);
             ResponseWebSocketHandshake(consocket);
+#if RECORD_MSG_INFO
+            debug_file = fopen("websocket_server.log", "w");
+#endif        
 #endif
         }
         else {
@@ -258,6 +264,9 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
             }
             RequestWebSocketHandshake(consocket);
             CheckWebSocketHandshake(consocket);
+#if RECORD_MSG_INFO
+            debug_file = fopen("websocket_client.log", "w");
+#endif
 #else
             char wsaddr[256];
             snprintf(wsaddr, sizeof(wsaddr), "ws://%s:%d", address, port);
@@ -282,7 +291,7 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
         setvbuf(stream, buffer, _IOFBF, NETWORK_BUFFER_SIZE);
 #endif
         if(!quiet)
-            std::cout << "connected\n";
+            std::cout << "websocketio connected\n";
     }
 
     void sync() {
@@ -327,9 +336,16 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
     void send_data_internal(const void * data, size_t len) {
         size_t sent = 0;
         void* d = (void*)data;
-        if (len > 0)
+        if (len > 0) {
             send_id++;
+        }
 #ifndef __EMSCRIPTEN__
+#if RECORD_MSG_INFO
+        if (len > 0) {
+            fprintf(debug_file, "send data id:%llu len:%llu\n", (uint64_t)send_id, (uint64_t)len);
+            fflush(debug_file);
+        }
+#endif
         string websocket_data = GenWebSocketMessage(data, len, send_id, true);
         d = &websocket_data[0];
         len = websocket_data.size();
@@ -357,6 +373,10 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
         recv_id++;
         while(sent < len) {
 #ifndef __EMSCRIPTEN__
+#if RECORD_MSG_INFO
+            fprintf(debug_file, "recv data id: %llu len:%llu\n", (uint64_t)recv_id, (uint64_t)len);
+            fflush(debug_file);
+#endif
             string d = GetMessage(consocket, len - sent, recv_id, true);
             size_t res = d.size();
             memcpy(sent + (char*)data, d.data(), res);
