@@ -1,6 +1,7 @@
 #include "mpc_tls.h"
 #include <openssl/mpc_tls_meth.h>
 #include "protocol/handshake.h"
+#include "protocol/record.h"
 #include "backend/backend.h"
 #include <iostream>
 #include "cipher/prf.h"
@@ -21,7 +22,9 @@ using PadoIO = MyIO;
 static EC_GROUP* g_group = nullptr;
 static int g_party = -1;
 static HandShake<PadoIO>* g_hs = nullptr;
+static Record<PadoIO>* g_rd = nullptr;
 static PadoIO* g_io = nullptr;
+static BoolIO<PadoIO>** g_ios = nullptr;
 static IKNP<PadoIO>* g_cot = nullptr;
 static BN_CTX* g_ctx = nullptr;
 
@@ -42,6 +45,7 @@ static void sync_recv(char* buf, int len) {
     printf("recv=> %s\n", buf);
 }
 
+static const int threads = 1;
 int init_mpc(int pado) {
     OPENSSL_init_MPC_METH(get_pms_mpc,
                           tls1_prf_master_secret_mpc,
@@ -53,7 +57,11 @@ int init_mpc(int pado) {
 
     int party = pado ? BOB: ALICE;
     g_io = new PadoIO(party == BOB ? nullptr : "127.0.0.1", 8081);
+    g_ios = new BoolIO<PadoIO>*[threads];
+    for (int i = 0; i < threads; i++)
+        g_ios[i] = new BoolIO<PadoIO>(g_io, party == ALICE);
     printf("create websocket io ok\n");
+    setup_protocol<PadoIO>(g_io, ios, threads, party);
     
     char send_buf[256];
     char recv_buf[256];
@@ -70,6 +78,7 @@ int init_mpc(int pado) {
     }
 
     setup_backend(g_io, party);
+    
     printf("setup backend ok\n");
     auto prot = (PADOParty<PadoIO>*)(ProtocolExecution::prot_exec);
     g_cot = prot->ot;
@@ -80,6 +89,8 @@ int init_mpc(int pado) {
 
     g_hs = new HandShake<PadoIO>(g_io, g_cot, g_group);
     g_ctx = g_hs->ctx;
+
+    g_rd = new Record<PadoIO>();
 
     return 1;
 }
@@ -117,16 +128,15 @@ static BIGNUM *g_pms = NULL;
 
 int get_pms_mpc(EC_POINT *Tc, EC_POINT* Ts) {
     EC_POINT* V = EC_POINT_new(g_group);
-    BIGNUM* t = BN_new();
 
     if (g_party == BOB) {
         Ts = EC_POINT_new(g_group);
         recv_point(Ts);
-        g_hs->compute_pado_VA(V, t, Ts);
+        g_hs->compute_pado_VA(V, Ts);
         EC_POINT_free(Ts);
     } else {
         send_point(Ts);
-        g_hs->compute_client_VB(Tc, V, t, Ts);
+        g_hs->compute_client_VB(Tc, V, Ts);
     }
 
     g_hs->compute_pms_offline(g_party);
@@ -135,7 +145,6 @@ int get_pms_mpc(EC_POINT *Tc, EC_POINT* Ts) {
     g_hs->compute_pms_online(g_pms, V, g_party);
 
     EC_POINT_free(V);
-    BN_free(t);
 
     printf("finish get pms mpc\n");
     return 1;
@@ -192,18 +201,24 @@ int tls1_prf_finish_mac_mpc(const unsigned char* sec, size_t sec_len, const unsi
 
 int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char* msg, size_t msg_len, const unsigned char* aad, size_t aad_len, const unsigned char* iv, size_t iv_len, int finish) {
     unsigned char buf[12];
-    memcpy(buf, g_fixed_iv_c, 4);
+    memcpy(buf, g_hs->client_iv_oct, 4);
     memcpy(buf + 4, iv, 8);
-    g_aead_c = new AEAD<PadoIO>(g_io, g_cot, g_key_c, buf, 12);
+    g_aead_c = new AEAD<PadoIO>(g_io, g_cot, g_hs->client_write_key, buf, 12);
     // g_aead_c = new AEAD<PadoIO>(g_key_c, buf, 12);
 
     print_mpc("msg", msg, msg_len);
     print_mpc("aad", aad, aad_len);
+    print_mpc("iv", buf, 12);
+    Integer c_key = g_hs->client_write_key;
+    unsigned char ckey[16];
+    c_key.reveal<unsigned char>(ckey, PUBLIC);
+    reverse(ckey, ckey + 16);
+    print_mpc("key", ckey, 16);
 
     if (finish)
-        g_hs->encrypt_client_finished_msg(g_aead_c, ctxt, tag, msg, msg_len, aad, aad_len, g_party);
-    //else
-    //    g_hs->encrypt_record_msg(g_aead_c, ctxt, tag, msg, msg_len * 8, aad, aad_len, g_party);
+        g_hs->encrypt_client_finished_msg(*g_aead_c, ctxt, tag, msg, msg_len, aad, aad_len, g_party);
+    else
+        g_rd->encrypt(g_aead_c, g_io, ctxt, tag, msg, msg_len, aad, aad_len, g_party);
     
     print_mpc("ctxt", ctxt, msg_len);
     print_mpc("tag", tag, 16);
@@ -213,9 +228,9 @@ int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char*
 
 int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_len, const unsigned char* tag, const unsigned char* aad, size_t aad_len, const unsigned char* iv, size_t iv_len, int finish) {
     unsigned char buf[12];
-    memcpy(buf, g_fixed_iv_s, 4);
+    memcpy(buf, g_hs->server_iv_oct, 4);
     memcpy(buf + 4, iv, 8);
-    g_aead_s = new AEAD<PadoIO>(g_io, g_cot, g_key_s, buf, 12);
+    g_aead_s = new AEAD<PadoIO>(g_io, g_cot, g_hs->server_write_key, buf, 12);
     // g_aead_s = new AEAD<PadoIO>(g_key_s, buf, 12);
     
     print_mpc("ctxt", ctxt, ctxt_len);
@@ -224,9 +239,9 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
 
     bool res;
     if (finish)
-        res = g_hs->decrypt_and_check_server_finished_msg(g_aead_s, msg, ctxt, ctxt_len, tag, aad, aad_len, g_party);
-    //else
-    //    res = g_hs->decrypt_record_msg(g_aead_s, msg, ctxt, ctxt_len * 8, tag, aad, aad_len, g_party);
+        res = g_hs->decrypt_and_check_server_finished_msg(*g_aead_s, msg, ctxt, ctxt_len, tag, aad, aad_len, g_party);
+    else
+        res = g_rd->decrypt(g_aead_s, g_io, msg, ctxt, ctxt_len, tag, aad, aad_len, g_party);
 
     print_mpc("msg", msg, ctxt_len);
 

@@ -28,7 +28,7 @@ static size_t master_key_length = 384 / 8;
 static size_t expansion_key_length = 448 / 8;
 static const size_t finished_msg_length = 96 / 8;
 static const size_t tag_length = 16;
-static const size_t iv_length = 12;
+static const size_t iv_length = 4;
 static const size_t key_length = 128 / 8;
 
 template <typename IO>
@@ -57,6 +57,8 @@ class HandShake {
     unsigned char client_ufin[finished_msg_length];
     unsigned char server_ufin[finished_msg_length];
     unsigned char iv_oct[iv_length * 2];
+    unsigned char client_iv_oct[iv_length];
+    unsigned char server_iv_oct[iv_length];
 
     HandShake(IO* io, COT<IO>* ot, EC_GROUP* group) : io(io) {
         ctx = BN_CTX_new();
@@ -211,8 +213,8 @@ class HandShake {
     }
 
     inline void compute_extended_master_key(const BIGNUM* pms,
-                                   const unsigned char* hash,
-                                   size_t hash_len) {
+                                            const unsigned char* hash,
+                                            size_t hash_len) {
         size_t len = BN_num_bytes(pms);
         unsigned char* buf = new unsigned char[len];
         BN_bn2bin(pms, buf);
@@ -251,17 +253,23 @@ class HandShake {
         prf.init(hmac, master_key);
         prf.opt_compute(hmac, key, expansion_key_length * 8, master_key, key_expansion_label,
                         key_expansion_label_length, seed, seed_len, true, true);
+        size_t unused_bit_length = 16 * 8;
         Integer iv;
-        iv.bits.insert(iv.bits.begin(), key.bits.begin(),
-                       key.bits.begin() + iv_length * 8 * 2);
+        iv.bits.insert(iv.bits.begin(), key.bits.begin() + unused_bit_length,
+                       key.bits.begin() + unused_bit_length + iv_length * 8 * 2);
         server_write_key.bits.insert(server_write_key.bits.begin(),
-                                     key.bits.begin() + 2 * iv_length * 8,
-                                     key.bits.begin() + 2 * iv_length * 8 + key_length * 8);
+                                     key.bits.begin() + unused_bit_length + 2 * iv_length * 8,
+                                     key.bits.begin() + unused_bit_length + 2 * iv_length * 8 + key_length * 8);
         client_write_key.bits.insert(client_write_key.bits.begin(),
-                                     key.bits.begin() + 2 * iv_length * 8 + key_length * 8,
-                                     key.bits.begin() + 2 * (iv_length * 8 + key_length * 8));
+                                     key.bits.begin() + unused_bit_length + 2 * iv_length * 8 + key_length * 8,
+                                     key.bits.begin() + unused_bit_length + 2 * (iv_length * 8 + key_length * 8));
 
         iv.reveal<unsigned char>((unsigned char*)iv_oct, PUBLIC);
+        memcpy(server_iv_oct, iv_oct, 4);
+        reverse(server_iv_oct, server_iv_oct + 4);
+
+        memcpy(client_iv_oct, iv_oct + 4, 4);
+        reverse(client_iv_oct, client_iv_oct + 4);
         delete[] seed;
     }
 
@@ -372,7 +380,7 @@ class HandShake {
                                             const unsigned char* aad,
                                             size_t aad_len,
                                             int party) {
-        aead_c.enc_finished_msg(io, ctxt, tag, ufinc, finished_msg_length, aad, aad_len,
+        aead_c.encrypt(io, ctxt, tag, ufinc, ufinc_len, aad, aad_len,
                                 party);
     }
 
@@ -400,7 +408,7 @@ class HandShake {
                                                       const unsigned char* aad,
                                                       size_t aad_len,
                                                       int party) {
-        bool res1 = aead_s.dec_finished_msg(io, msg, ctxt, ctxt, tag, aad,
+        bool res1 = aead_s.decrypt(io, msg, ctxt, ctxt_len, tag, aad,
                                             aad_len, party);
 
 
