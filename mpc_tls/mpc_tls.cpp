@@ -63,7 +63,6 @@ int init_mpc(int pado) {
     for (int i = 0; i < threads; i++)
         g_ios[i] = new BoolIO<PadoIO>(g_io, party == ALICE);
     printf("create websocket io ok\n");
-    setup_protocol<PadoIO>(g_io, g_ios, threads, party);
     
     char send_buf[256];
     char recv_buf[256];
@@ -80,6 +79,7 @@ int init_mpc(int pado) {
     }
 
     // setup_backend(g_io, party);
+    setup_protocol<PadoIO>(g_io, g_ios, threads, party);
     
     printf("setup backend ok\n");
     auto prot = (PADOParty<PadoIO>*)(ProtocolExecution::prot_exec);
