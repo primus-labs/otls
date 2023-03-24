@@ -459,7 +459,7 @@ string GetMessage(int fd, int len, uint64_t id, bool enable_id) {
                   uint64_t *payload_id = (uint64_t*)payload;
                   uint8_t *data = (uint8_t*)(payload_id + 1);
                   uint64_t data_len = payloadLength - sizeof(uint64_t);
-                  printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *payload_id);
+                  // printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *payload_id);
                   if (recv_id + 1 == *payload_id) {
                     recv_buffer.insert(recv_buffer.end(), data, data + data_len);
                     recv_id++;
@@ -645,7 +645,7 @@ static std::vector<uint8_t> fragmentData;
                   uint64_t *payload_id = (uint64_t*)&id;
                   uint8_t *data = (uint8_t*)(payload);
                   uint64_t data_len = payloadLength;
-                  printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *payload_id);
+                  // printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *payload_id);
                   std::vector<uint8_t> tmp(data, data + data_len);
                   recv_map.insert(std::pair<uint64_t, std::vector<uint8_t>>(*payload_id, tmp));
               }

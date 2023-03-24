@@ -53,7 +53,7 @@ bridge_socket_on_message2(int eventType,
   uint64_t *id = (uint64_t*)websocketEvent->data;
   uint64_t data_len = websocketEvent->numBytes - sizeof(uint64_t);
   uint8_t *data = (uint8_t*)(id + 1);
-  printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *id);
+  // printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *id);
   if (recv_id + 1 == *id) {
     printf("recv buffer init: %llu\n", (uint64_t)recv_buffer.size());
     recv_buffer.insert(recv_buffer.end(), data, data + data_len);
