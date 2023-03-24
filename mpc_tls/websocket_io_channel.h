@@ -55,20 +55,20 @@ bridge_socket_on_message2(int eventType,
   uint8_t *data = (uint8_t*)(id + 1);
   // printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *id);
   if (recv_id + 1 == *id) {
-    printf("recv buffer init: %llu\n", (uint64_t)recv_buffer.size());
+    // printf("recv buffer init: %llu\n", (uint64_t)recv_buffer.size());
     recv_buffer.insert(recv_buffer.end(), data, data + data_len);
     recv_id++;
     auto iter = recv_map.find(recv_id + 1);
     while (iter != recv_map.end()) {
       recv_buffer.insert(recv_buffer.end(), iter->second.begin(), iter->second.end());
-      printf("add buffer: %llu\n", iter->second.size());
+      // printf("add buffer: %llu\n", iter->second.size());
       recv_map.erase(iter);
 
       recv_id++;
       iter = recv_map.find(recv_id + 1);
     }
     recvBufferFlag = 1;
-    printf("put to recv buffer: %llu data len: %llu\n", (uint64_t)recv_buffer.size(), data_len);
+    // printf("put to recv buffer: %llu data len: %llu\n", (uint64_t)recv_buffer.size(), data_len);
   }
   else {
     vector<uint8_t> tmp(data, data + data_len);
@@ -98,9 +98,9 @@ EMSCRIPTEN_WEBSOCKET_T emscripten_init_websocket_to_posix_socket_bridge2(const c
   attr.url = bridgeUrl;
   printf("bridgeUrl:%s\n", bridgeUrl);
   bridgeSocket = emscripten_websocket_new(&attr);
-  printf("bridgeSocket\n");
+  // printf("bridgeSocket\n");
   emscripten_websocket_set_onmessage_callback_on_thread(bridgeSocket, 0, bridge_socket_on_message2, EM_CALLBACK_THREAD_CONTEXT_MAIN_BROWSER_THREAD);
-  printf("set onmessage\n");
+  // printf("set onmessage\n");
   pthread_mutex_unlock(&bridgeLock);
   return bridgeSocket;
 }
@@ -129,7 +129,7 @@ ssize_t send2(int socket, const void *message, size_t length, int flags, uint64_
     send_id++;
     *(uint64_t*)&send_buffer[0] = send_id;
     emscripten_websocket_send_binary(bridgeSocket, (void *)send_buffer.data(), send_buffer.size());
-    printf("send buffer info id:%llu len:%llu origin id:%llu\n", send_id, (uint64_t)send_buffer.size(), length > 0? origin_id - 1: origin_id);
+    // printf("send buffer info id:%llu len:%llu origin id:%llu\n", send_id, (uint64_t)send_buffer.size(), length > 0? origin_id - 1: origin_id);
 
     send_buffer.reserve(NETWORK_BUFFER_SIZE);
     send_buffer.resize(sizeof(uint64_t));
@@ -162,7 +162,7 @@ ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
     if (recv_buffer.size() >= length + 2 * sizeof(uint64_t)) {
       uint64_t *actual_id = (uint64_t*)recv_buffer.data();
       uint64_t *actual_len = actual_id + 1;
-      printf("debug id actual:%llu expect:%llu  length: actual:%llu expect:%llu\n", *actual_id, id, *actual_len, (uint64_t)length);
+      // printf("debug id actual:%llu expect:%llu  length: actual:%llu expect:%llu\n", *actual_id, id, *actual_len, (uint64_t)length);
       if (*actual_id != id || *actual_len != length) {
         printf("id actual:%llu expect:%llu  length: actual:%llu expect:%llu\n", *actual_id, id, *actual_len, (uint64_t)length);
         assert(false);
@@ -273,12 +273,12 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
             bridgeSocket = emscripten_init_websocket_to_posix_socket_bridge2(wsaddr);
             // Synchronously wait until connection has been established.
             uint16_t readyState = 0;
-            printf("begin readystate\n");
+            // printf("begin readystate\n");
             do {
               emscripten_websocket_get_ready_state(bridgeSocket, &readyState);
               emscripten_thread_sleep(100);
             } while (readyState == 0);
-            printf("end readystate\n");
+            // printf("end readystate\n");
             send_buffer.reserve(NETWORK_BUFFER_SIZE);
             send_buffer.resize(sizeof(uint64_t));
 #endif

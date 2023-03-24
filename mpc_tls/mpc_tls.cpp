@@ -30,21 +30,33 @@ static BoolIO<PadoIO>** g_ios = nullptr;
 static IKNP<PadoIO>* g_cot = nullptr;
 static BN_CTX* g_ctx = nullptr;
 
-static void print_mpc(const char* str, const unsigned char* data, size_t n) {
+void print_mpc(const char* str, const unsigned char* data, size_t n) {
+#if DEBUG_PRINT_MPC
     printf("%s[%d] ", str, n);
     for (size_t i = 0; i < n; i++)
         printf("%2x ", data[i]);
     printf("\n");
+#endif
+}
+
+void debug_print(const char* str) {
+#if DEBUG_PRINT_MPC
+    printf(str);
+#endif
 }
 
 static void sync_send(const char* buf, int len) {
     g_io->send_data(buf, len);
+#if DEBUG_PRINT_MPC
     printf("send=> %s\n", buf);
+#endif
 }
 
 static void sync_recv(char* buf, int len) {
     g_io->recv_data(buf, len);
+#if DEBUG_PRINT_MPC
     printf("recv=> %s\n", buf);
+#endif
 }
 
 static const int threads = 1;
@@ -56,13 +68,14 @@ int init_mpc(int pado) {
                           enc_aesgcm_mpc,
                           dec_aesgcm_mpc,
                           transfer_hash_mpc);
+    OPENSSL_init_print_meth(print_mpc, debug_print);
 
     int party = pado ? BOB: ALICE;
     g_io = new PadoIO(party == BOB ? nullptr : "127.0.0.1", 8081);
     g_ios = new BoolIO<PadoIO>*[threads];
     for (int i = 0; i < threads; i++)
         g_ios[i] = new BoolIO<PadoIO>(g_io, party == ALICE);
-    printf("create websocket io ok\n");
+    debug_print("create websocket io ok\n");
     
     char send_buf[256];
     char recv_buf[256];
@@ -80,8 +93,8 @@ int init_mpc(int pado) {
 
     // setup_backend(g_io, party);
     setup_protocol<PadoIO>(g_io, g_ios, threads, party);
-    
-    printf("setup backend ok\n");
+
+    debug_print("setup backend ok\n");
     auto prot = (PADOParty<PadoIO>*)(ProtocolExecution::prot_exec);
     g_cot = prot->ot;
 
@@ -108,18 +121,14 @@ void EC_POINT_free_mpc(EC_POINT* p) {
 static int send_point(EC_POINT* pub_key) {
     unsigned char buf[65];
     int size = EC_POINT_point2oct(g_group, pub_key, POINT_CONVERSION_UNCOMPRESSED, buf, 65, g_ctx);
-    printf("begin send point:%d\n", size);
     g_io->send_data(buf, size);
     g_io->flush();
-    printf("end send point\n");
     return 1;
 }
 
 static int recv_point(EC_POINT* pub_key) {
     unsigned char buf[65];
-    printf("begin recv point:%d\n", 65);
     g_io->recv_data(buf, 65);
-    printf("end recv point\n");
 
     if (!EC_POINT_oct2point(g_group, pub_key, buf, 65, g_ctx))
         printf("error in converting oct to TA\n");
@@ -147,20 +156,13 @@ int get_pms_mpc(EC_POINT *Tc, EC_POINT* Ts) {
     g_hs->compute_pms_online(g_pms, V, g_party);
 
     EC_POINT_free(V);
+    debug_print("finish get pms mpc\n");
 
-    printf("finish get pms mpc\n");
     return 1;
 }
     
-// static Integer g_iv, g_key_c, g_key_s;
-// static unsigned char g_iv_oct[8];
-// static unsigned char g_fixed_iv_c[4];
-// static unsigned char g_fixed_iv_s[4];
 static AEAD<PadoIO> *g_aead_c = NULL;
 static AEAD<PadoIO> *g_aead_s = NULL;
-// static Integer* g_block_key = NULL;
-// static Integer* g_ms = NULL;
-// static Integer* g_finish_mac = NULL;
 
 int transfer_hash_mpc(unsigned char* hash, size_t n) {
     if (g_party == BOB) {
@@ -189,7 +191,9 @@ int tls1_prf_block_key_mpc(const unsigned char* sec, size_t sec_len, const unsig
 int tls1_prf_finish_mac_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen, int client) {
     char buf[256]; // 15 + 32
     strcpy(buf, client ? "client finished":"server finished");
+#if DEBUG_PRINT_MPC
     printf("finish mac:%s\n", buf);
+#endif
     if (client) {
         g_hs->compute_client_finished_msg(out, (unsigned char*)buf, 15, seed, seed_len);
     }
@@ -206,7 +210,6 @@ int enc_aesgcm_mpc(unsigned char* ctxt, unsigned char* tag, const unsigned char*
     memcpy(buf, g_hs->client_iv_oct, 4);
     memcpy(buf + 4, iv, 8);
     g_aead_c = new AEAD<PadoIO>(g_io, g_cot, g_hs->client_write_key, buf, 12);
-    // g_aead_c = new AEAD<PadoIO>(g_key_c, buf, 12);
 
     print_mpc("msg", msg, msg_len);
     print_mpc("aad", aad, aad_len);
@@ -233,7 +236,6 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
     memcpy(buf, g_hs->server_iv_oct, 4);
     memcpy(buf + 4, iv, 8);
     g_aead_s = new AEAD<PadoIO>(g_io, g_cot, g_hs->server_write_key, buf, 12);
-    // g_aead_s = new AEAD<PadoIO>(g_key_s, buf, 12);
     
     print_mpc("ctxt", ctxt, ctxt_len);
     print_mpc("aad", aad, aad_len);

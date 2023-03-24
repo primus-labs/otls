@@ -12,6 +12,7 @@
 #include "sha1.h"
 #include "ws.h"
 using namespace std;
+#include "mpc_tls.h"
 
 #define WEBSOCKET
 //#define PROXY_DEEP_DEBUG
@@ -353,7 +354,7 @@ string GenWebSocketMessage(const void *buf, uint64_t numBytes, uint64_t id, bool
     send_id++;
     *(uint64_t*)&send_buffer[0] = send_id;
     result = DoGenWebSocketMessage((void *)send_buffer.data(), send_buffer.size());
-    printf("send buffer info id:%llu len:%llu %llu\n", send_id, (uint64_t)send_buffer.size(), numBytes);
+    // printf("send buffer info id:%llu len:%llu %llu\n", send_id, (uint64_t)send_buffer.size(), numBytes);
     if (send_id == 1 && send_buffer.size() == 25) assert(false);
 
     send_buffer.reserve(NETWORK_BUFFER_SIZE);
@@ -472,7 +473,7 @@ string GetMessage(int fd, int len, uint64_t id, bool enable_id) {
               
                       iter = recv_map.find(recv_id + 1);
                     }
-                    printf("put to recv buffer, size:%llu\n", (uint64_t)recv_buffer.size());
+                    // printf("put to recv buffer, size:%llu\n", (uint64_t)recv_buffer.size());
                   }
                   else {
                       std::vector<uint8_t> tmp(data, data + data_len);
@@ -637,10 +638,7 @@ static std::vector<uint8_t> fragmentData;
           {
           // case 0x02: /*binary message*/ ProcessWebSocketMessage(client_fd, payload, payloadLength); break;
           case 0x02: /*binary message*/ {
-              printf("payload[%d] ", payloadLength);
-              for (int i = 0; i < payloadLength; i++)
-                  printf("%02x ", (unsigned char)payload[i]);
-              printf("\n");
+              print_mpc("payload", (const unsigned char*)payload, payloadLength);
               if (1) {
                   uint64_t *payload_id = (uint64_t*)&id;
                   uint8_t *data = (uint8_t*)(payload);

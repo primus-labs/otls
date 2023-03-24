@@ -228,11 +228,11 @@ int emscripten_init_websocket_to_posix_socket_bridge(const char *address, int po
       close(bridgeSocket);
       usleep(1000);
   }
-  printf("to request handshake\n");
+  // printf("to request handshake\n");
   RequestWebSocketHandshake(bridgeSocket);
-  printf("to check handshake\n");
+  // printf("to check handshake\n");
   CheckWebSocketHandshake(bridgeSocket);
-  printf("handshake ok\n");
+  // printf("handshake ok\n");
   return bridgeSocket;
 }
 #endif
@@ -289,12 +289,12 @@ int socket3(int domain, int type, int protocol) {
   d.domain = domain;
   d.type = type;
   d.protocol = protocol;
-  printf("begin send binary\n");
+  // printf("begin send binary\n");
   websocket_send_binary(bridgeSocket, &d, sizeof(d), b->callId);
-  printf("begin wait for call result\n");
+  // printf("begin wait for call result\n");
 
   wait_for_call_result(b);
-  printf("end wait for call result\n");
+  // printf("end wait for call result\n");
   int ret = b->data->ret;
   if (ret < 0) errno = b->data->errno_;
   free_call_result(b);
@@ -389,7 +389,7 @@ ssize_t recv3(int socket, void *buffer, size_t length, int flags) {
 
   wait_for_call_result(b);
   int ret = b->data->ret;
-  printf("recv3 result:%d\n", ret);
+  // printf("recv3 result:%d\n", ret);
   if (ret >= 0) {
     typedef struct Result {
       SocketCallResultHeader header;

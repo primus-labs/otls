@@ -4,6 +4,7 @@
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 
+#define DEBUG_PRINT_MPC 0
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -28,7 +29,9 @@ int dec_aesgcm_mpc(unsigned char* msg, const unsigned char* ctxt, size_t ctxt_le
 
 int transfer_hash_mpc(unsigned char* hash, size_t n);
 
+void debug_print(const char* s);
 
+void print_mpc(const char* str, const unsigned char* data, size_t n);
 #ifdef __cplusplus
 }
 #endif
