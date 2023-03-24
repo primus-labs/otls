@@ -26,7 +26,7 @@ add_compile_options(-ggdb)
 #set(LINK_FLAGS " -fsanitize=address -gsource-map -lwebsocket.js -sPROXY_POSIX_SOCKETS -sUSE_PTHREADS -sPROXY_TO_PTHREAD ")
 set(LINK_FLAGS " -lwebsocket.js -sPROXY_POSIX_SOCKETS -sUSE_PTHREADS -sPROXY_TO_PTHREAD ")
 
-add_library(otls mpc_tls.cpp ws.cpp sha1.cpp my_proxy.cpp)
+add_library(otls mpc_tls.cpp ws.cpp sha1.cpp proxy_client.cpp)
 target_include_directories(otls PUBLIC ${PadoSSL}/include/)
 target_include_directories(otls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../)
 target_include_directories(otls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../pado-emp/emp-tool/)

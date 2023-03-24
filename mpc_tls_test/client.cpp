@@ -25,7 +25,7 @@ using namespace std;
 
 static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
 #else
-#include "mpc_tls/my_proxy.h"
+#include "mpc_tls/proxy_client.h"
 int proxy_send(int fd, const void* buf, size_t len) {
     return send(fd, buf, len, 0);
 }
