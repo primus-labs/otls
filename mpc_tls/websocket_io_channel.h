@@ -191,7 +191,7 @@ ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
 }
 #endif
 
-#define RECORD_MSG_INFO 1
+#define RECORD_MSG_INFO 0
 namespace emp {
 
 class WebSocketIO: public IOChannel<WebSocketIO> { public:

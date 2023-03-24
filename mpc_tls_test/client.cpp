@@ -104,7 +104,7 @@ string lookup_host(const char *host) {
 }
 
 void run_client() {
-    string caFile = "binance2.crt";
+    string caFile = "binance.crt";
     // caFile = "kucoin.crt";
     //caFile = "okx.crt";
 
