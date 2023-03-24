@@ -40,3 +40,19 @@ bash ./scripts/compile_wasm.sh
 	`./build/bin/example 1 12345 123 & ./build/bin/example 2 12345 124`
 	
 	because different parties need different numbers
+
+## MPC TLS Test
+* compile mpc tls test
+```bash
+cd mpc_tls_test
+./compile.sh
+```
+   
+* start websocket proxy which lie between client and tls server
+  `./websocket_to_posix_proxy 9000`
+
+* start pado server
+  `./pado`
+
+* start client
+  `./client`
