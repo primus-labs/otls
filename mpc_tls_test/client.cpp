@@ -46,6 +46,10 @@ int mpc_tls_recv(int fd, char* buf, int len, int flag) {
 #else
     int ret = recv3(fd, buf, len, flag);
 #endif
+    if (ret < 0) {
+        printf("recv ret:%d %d %s\n", ret, errno, strerror(errno));
+        exit(1);
+    }
     print_mpc("mpc tls recv=============", (const unsigned char*)buf, len);
     return ret;
 }
@@ -103,21 +107,8 @@ string lookup_host(const char *host) {
   return "";
 }
 
-void run_client() {
-    string caFile = "binance.crt";
-    // caFile = "kucoin.crt";
-    //caFile = "okx.crt";
+void run_client(const char* caFile, const char* ip, int port, const char* host, const char* cipher, const char* curve) {
 
-    string ip = lookup_host("api.binance.com");
-    ip = "18.65.175.124"; // binance
-    // ip = "104.18.9.15"; // kucoin
-    //ip = "104.18.2.151"; // okx
-
-    string domain = "api.binance.com";
-    // domain = "api.kucoin.com";
-    //domain = "www.okx.com";
-
-    printf("api.binance.com:%s\n", ip.c_str());
 #ifdef __EMSCRIPTEN__
     int fd = socket(AF_INET, SOCK_STREAM, 0);
 #else
@@ -131,8 +122,8 @@ void run_client() {
     memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
     // server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(443);
-    if (inet_pton(AF_INET, ip.c_str(), &server.sin_addr) < 0) {
+    server.sin_port = htons(port);
+    if (inet_pton(AF_INET, ip, &server.sin_addr) < 0) {
         printf("pton error\n");
         exit(1);
     }
@@ -165,21 +156,29 @@ void run_client() {
     // *********************************
     
     SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, verify_callback);
-    if(SSL_CTX_load_verify_locations(ssl_ctx, caFile.c_str(), NULL) <= 0) {
+    if(SSL_CTX_load_verify_locations(ssl_ctx, caFile, NULL) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
+
     
-    if (SSL_CTX_set_cipher_list(ssl_ctx, "ECDHE-RSA-AES128-GCM-SHA256") <=0) {
+    if (SSL_CTX_set_cipher_list(ssl_ctx, cipher) <=0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
-    if (SSL_CTX_set1_groups_list(ssl_ctx, "P-256") <= 0) {
+    if (SSL_CTX_set1_groups_list(ssl_ctx, curve) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
 
     SSL* ssl = SSL_new(ssl_ctx);
+    if (host != NULL) {
+        printf("set host name:%s\n", host);
+        if (SSL_set_tlsext_host_name(ssl, host) <= 0) {
+            ERR_print_errors_fp(stderr);
+            exit(1);
+        }
+    }
     ret = SSL_set_fd(ssl, fd);
     if (ret < 0) {
         printf("ssl set fd error\n");
@@ -242,7 +241,7 @@ void run_client() {
 
         char buf[10240];
         // snprintf(buf, sizeof(buf), "message from client, id: %d", count++);
-        int l = snprintf(buf, sizeof(buf), httpMsg, domain.c_str());
+        int l = snprintf(buf, sizeof(buf), httpMsg, host);
         // int len = send(fd, buf, strlen(buf), 0);
         int len = SSL_write(ssl, buf, l);
         printf("client => send %d %s\n", l, buf);
@@ -283,6 +282,19 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
     OPENSSL_init_MPC_SOCKET(mpc_tls_send, mpc_tls_recv);
-    run_client();
+    const char* rsa_cipher = "ECDHE-RSA-AES128-GCM-SHA256";
+    const char* ecdsa_cipher = "ECDHE-ECDSA-AES128-GCM-SHA256";
+    const char* curve = "P-256";
+    if (argc == 2) {
+        if (strcmp(argv[1], "binance") == 0) 
+            run_client("binance.crt", "18.65.175.124", 443, NULL, rsa_cipher, curve);
+        else if (strcmp(argv[1], "kucoin") == 0)
+            run_client("kucoin.crt", "104.18.9.15", 443, "api.kucoin.com", rsa_cipher, curve);
+        else if (strcmp(argv[1], "okx") == 0)
+            run_client("okx.crt", "104.18.2.151", 443, "www.okx.com", rsa_cipher, curve);
+    }
+    else {
+        run_client("ca.crt", "127.0.0.1", 8080, NULL, ecdsa_cipher, curve);
+    }
     return 0;
 }
