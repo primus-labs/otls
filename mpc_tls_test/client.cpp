@@ -107,7 +107,7 @@ string lookup_host(const char *host) {
   return "";
 }
 
-void run_client(const char* caFile, const char* ip, int port, const char* host, const char* cipher, const char* curve) {
+void run_client(const char* caFile, const char* ip, int port, const char* host, bool set_hostname, const char* cipher, const char* curve) {
 
 #ifdef __EMSCRIPTEN__
     int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -172,7 +172,7 @@ void run_client(const char* caFile, const char* ip, int port, const char* host, 
     }
 
     SSL* ssl = SSL_new(ssl_ctx);
-    if (host != NULL) {
+    if (set_hostname) {
         printf("set host name:%s\n", host);
         if (SSL_set_tlsext_host_name(ssl, host) <= 0) {
             ERR_print_errors_fp(stderr);
@@ -253,7 +253,7 @@ void run_client(const char* caFile, const char* ip, int port, const char* host, 
     }
 
 
-    SSL_shutdown(ssl);
+    //SSL_shutdown(ssl);
     SSL_CTX_free(ssl_ctx);
     SSL_free(ssl);
 
@@ -271,7 +271,9 @@ int main(int argc, char* argv[]) {
   printf("end readystate\n");
 #else
   debug_print("begin connect to proxy\n");
-  int consocket = emscripten_init_websocket_to_posix_socket_bridge("127.0.0.1", 9000);
+  //const char* bridge_ip = "127.0.0.1";
+  const char* bridge_ip = "18.179.8.186";
+  int consocket = emscripten_init_websocket_to_posix_socket_bridge(bridge_ip, 9000);
   init_proxy(proxy_send);
   debug_print("end connect to proxy\n");
 #endif
@@ -287,14 +289,14 @@ int main(int argc, char* argv[]) {
     const char* curve = "P-256";
     if (argc == 2) {
         if (strcmp(argv[1], "binance") == 0) 
-            run_client("binance.crt", "18.65.175.124", 443, NULL, rsa_cipher, curve);
+            run_client("binance.crt", "18.65.175.124", 443, "api.binance.com", false, rsa_cipher, curve);
         else if (strcmp(argv[1], "kucoin") == 0)
-            run_client("kucoin.crt", "104.18.9.15", 443, "api.kucoin.com", rsa_cipher, curve);
+            run_client("kucoin.crt", "104.18.9.15", 443, "api.kucoin.com", true, rsa_cipher, curve);
         else if (strcmp(argv[1], "okx") == 0)
-            run_client("okx.crt", "104.18.2.151", 443, "www.okx.com", rsa_cipher, curve);
+            run_client("okx.crt", "104.18.2.151", 443, "www.okx.com", true, rsa_cipher, curve);
     }
     else {
-        run_client("ca.crt", "127.0.0.1", 8080, NULL, ecdsa_cipher, curve);
+        run_client("ca.crt", "127.0.0.1", 8080, "localhost", false, ecdsa_cipher, curve);
     }
     return 0;
 }
