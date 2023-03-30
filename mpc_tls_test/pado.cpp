@@ -33,6 +33,7 @@ void enc_msg(int finish) {
     transfer_data(aad, &aad_len, 1);
     debug_print("end transfer aad\n");
     int transfer_flag = aad[8] == 0x17 ? 0: 1;
+	finish = transfer_flag;
 
     debug_print("begin transfer msg\n");
     unsigned char *msg; // 16
@@ -66,6 +67,7 @@ void dec_msg(int finish) {
     transfer_data(aad, &aad_len, 1);
     debug_print("end transfer aad\n");
     int transfer_flag = aad[8] == 0x17 ? 0: 1;
+	finish = transfer_flag;
 
     debug_print("begin transfer msg\n");
     unsigned char *ctxt; // 16
@@ -113,7 +115,7 @@ void run_pado() {
     print_random("server random", server_random, 32);
     debug_print("end transfer server random\n");
 
-    get_pms_tls(NULL, NULL);
+    get_pms_tls(NULL, NULL, NULL);
 
 //    EC_POINT* s_pub_key = EC_POINT_new_mpc();
 //    EC_POINT* z_pub_key = EC_POINT_new_mpc();
@@ -139,17 +141,18 @@ void run_pado() {
     debug_print("end transfer hash\n");
 
     debug_print("begin generate master secret\n");
-    tls1_prf_master_secret_tls(NULL, 32, hash, 32, NULL, 48);
+	unsigned char master_secret[48];
+    tls1_prf_master_secret_tls(NULL, 32, hash, 32, master_secret, 48);
     debug_print("end generate master secret\n");
 
     debug_print("begin generate block key\n");
-    unsigned char** block_key = new unsigned char*;
+    unsigned char block_key[56];
     char random[64];
     memcpy(random, server_random, 32);
     memcpy(random + 32, client_random, 32);
     tls1_prf_key_block_tls(NULL, 48, (unsigned char*)client_random, 32, (unsigned char*)server_random, 32, (unsigned char*)block_key, 56);
     debug_print("end generate block key\n");
-
+if (1) {
     debug_print("begin transfer finish hash\n");
     unsigned char finish_hash[32];
     transfer_hash_tls(finish_hash, 32);
@@ -159,13 +162,15 @@ void run_pado() {
     unsigned char finish_md[12];
     tls1_prf_finish_mac_tls(NULL, 48, finish_hash, 32, finish_md, 12, 1);
     debug_print("end generate client finish mac\n");
-
+}
+if (0) {
     // ==================encrypt aesgcm=============
     enc_msg(1);
     
     // ==================decrypt aesgcm=============
     dec_msg(1);
-
+}
+if (1) {
     debug_print("begin transfer server finish hash\n");
     unsigned char server_finish_hash[32];
     transfer_hash_tls(server_finish_hash, 32);
@@ -175,7 +180,7 @@ void run_pado() {
     unsigned char server_finish_md[12];
     tls1_prf_finish_mac_tls(NULL, 48, server_finish_hash, 32, server_finish_md, 12, 0);
     debug_print("end generate server finish mac\n");
-
+}
 
     while (1) {
         enc_msg(0);

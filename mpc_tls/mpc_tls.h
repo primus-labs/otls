@@ -4,7 +4,7 @@
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 
-#define DEBUG_PRINT_MPC 0
+#define DEBUG_PRINT_MPC 1
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,7 +15,7 @@ EC_POINT* EC_POINT_new_mpc();
 
 void EC_POINT_free_mpc(EC_POINT* p);
 
-int get_pms_mpc(EC_POINT* Tc, EC_POINT* Ts);
+int get_pms_mpc(EC_POINT* Tc, EC_POINT* Ts, BIGNUM* pri_key);
 
 int tls1_prf_master_secret_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen);
 

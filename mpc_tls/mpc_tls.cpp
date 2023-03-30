@@ -67,7 +67,7 @@ int init_mpc(int pado) {
                           tls1_prf_finish_mac_mpc,
                           enc_aesgcm_mpc,
                           dec_aesgcm_mpc,
-                          transfer_hash_mpc);
+                          transfer_hash_mpc, 0x3f);
     OPENSSL_init_print_meth(print_mpc, debug_print);
 
     int party = pado ? BOB: ALICE;
@@ -121,6 +121,7 @@ void EC_POINT_free_mpc(EC_POINT* p) {
 static int send_point(EC_POINT* pub_key) {
     unsigned char buf[65];
     int size = EC_POINT_point2oct(g_group, pub_key, POINT_CONVERSION_UNCOMPRESSED, buf, 65, g_ctx);
+	printf("point size:%d\n", size);
     g_io->send_data(buf, size);
     g_io->flush();
     return 1;
@@ -137,15 +138,40 @@ static int recv_point(EC_POINT* pub_key) {
 
 static BIGNUM *g_pms = NULL;
 
-int get_pms_mpc(EC_POINT *Tc, EC_POINT* Ts) {
+int get_pms_mpc(EC_POINT *Tc, EC_POINT* Ts, BIGNUM* pri_key) {
     EC_POINT* V = EC_POINT_new(g_group);
 
     if (g_party == BOB) {
+		size_t len;
+		g_io->recv_data(&len, sizeof(size_t));
+		unsigned char* buf = new unsigned char[len];
+		g_io->recv_data(buf, len);
+
+		BIGNUM* b = BN_new();
+		BN_bin2bn(buf, len, b);
+		g_hs->ta_pado = b;
+
         Ts = EC_POINT_new(g_group);
         recv_point(Ts);
         g_hs->compute_pado_VA(V, Ts);
         EC_POINT_free(Ts);
     } else {
+
+    const BIGNUM* order = EC_GROUP_get0_order(g_group);
+    BIGNUM* a = BN_new();
+    BIGNUM* b = BN_new();
+    BN_priv_rand_range(a, order);
+	BN_mod_sub(b, pri_key, a, order, g_ctx);
+
+        size_t len = BN_num_bytes(b);
+        unsigned char* buf = new unsigned char[len];
+        BN_bn2bin(b, buf);
+
+		g_io->send_data(&len, sizeof(size_t));
+		g_io->send_data(buf, len);
+
+    g_hs->tb_client = a;
+
         send_point(Ts);
         g_hs->compute_client_VB(Tc, V, Ts);
     }
@@ -179,12 +205,15 @@ int transfer_hash_mpc(unsigned char* hash, size_t n) {
 
 int tls1_prf_master_secret_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* seed, size_t seed_len, unsigned char* out, size_t olen) {
     g_hs->compute_extended_master_key(g_pms, seed, seed_len);
+	memcpy(out, g_hs->master_secret, 48);
+	print_mpc("mmmmmmmm master secret", out, 48);
     return 1;
 }
 
 int tls1_prf_block_key_mpc(const unsigned char* sec, size_t sec_len, const unsigned char* rc, size_t rc_len, const unsigned char* rs, size_t rs_len, unsigned char* out, size_t olen) {
     g_hs->compute_expansion_keys(rc, rc_len, rs, rs_len); 
-    
+    memcpy(out, g_hs->key_block, 56);
+	print_mpc("mmmmmmmm key block", out, 56);
     return 1;
 }
 
@@ -201,6 +230,8 @@ int tls1_prf_finish_mac_mpc(const unsigned char* sec, size_t sec_len, const unsi
         g_hs->compute_server_finished_msg(out, (unsigned char*)buf, 15, seed, seed_len);
     }
     reverse(out, out + olen);
+
+	print_mpc("mmmmmmmmmmmmmm finish mac", out, olen);
 
     return 1;
 }

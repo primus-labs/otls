@@ -59,6 +59,8 @@ class HandShake {
     unsigned char iv_oct[iv_length * 2];
     unsigned char client_iv_oct[iv_length];
     unsigned char server_iv_oct[iv_length];
+	unsigned char key_block[56];
+	unsigned char master_secret[48];
 
     HandShake(IO* io, COT<IO>* ot, EC_GROUP* group) : io(io) {
         ctx = BN_CTX_new();
@@ -93,7 +95,12 @@ class HandShake {
     inline void compute_pado_VA(EC_POINT* Va, BIGNUM* t, const EC_POINT* Ts) {
         // BN_rand(t, BN_num_bytes(q) * 8, 0, 0);
         // BN_mod(t, t, q, ctx);
-        BN_rand_range(t, EC_GROUP_get0_order(group));
+    /*const BIGNUM* order = EC_GROUP_get0_order(group);
+    do {
+        BN_priv_rand_range(t, order);
+    }while (BN_is_zero(t)) ;*/
+
+        //BN_rand_range(t, EC_GROUP_get0_order(group));
 
         EC_POINT* Ta = EC_POINT_new(group);
         if (!EC_POINT_mul(group, Ta, t, NULL, NULL, ctx))
@@ -115,7 +122,11 @@ class HandShake {
     // The Ts value is received from the Server.
     // The Tc value will be sent to the Server.
     inline void compute_client_VB(EC_POINT* Tc, EC_POINT* Vb, const EC_POINT* Ts) {
-        BN_rand_range(tb_client, EC_GROUP_get0_order(group));
+    /*const BIGNUM* order = EC_GROUP_get0_order(group);
+    do {
+        BN_priv_rand_range(tb_client, order);
+    }while (BN_is_zero(tb_client)) ;*/
+        //BN_rand_range(tb_client, EC_GROUP_get0_order(group));
         EC_POINT* Tb = EC_POINT_new(group);
         if (!EC_POINT_mul(group, Tb, tb_client, NULL, NULL, ctx))
             error("error in computing TB!\n");
@@ -137,7 +148,11 @@ class HandShake {
     inline void compute_client_VB(EC_POINT* Tc, EC_POINT* Vb, BIGNUM* t, const EC_POINT* Ts) {
         // BN_rand(t, BN_num_bytes(q) * 8, 0, 0);
         // BN_mod(t, t, q, ctx);
-        BN_rand_range(t, EC_GROUP_get0_order(group));
+    /*const BIGNUM* order = EC_GROUP_get0_order(group);
+    do {
+        BN_priv_rand_range(t, order);
+    }while (BN_is_zero(t)) ;*/
+        //BN_rand_range(t, EC_GROUP_get0_order(group));
 
         EC_POINT* Tb = EC_POINT_new(group);
         if (!EC_POINT_mul(group, Tb, t, NULL, NULL, ctx))
@@ -237,6 +252,9 @@ class HandShake {
         prf.opt_compute(hmac, master_key, master_key_length * 8, pmsbits, extended_master_key_label,
                         extended_master_key_label_length, hash, hash_len, true, true);
 
+		master_key.reveal<unsigned char>(master_secret, PUBLIC);
+		reverse(master_secret, master_secret + 48);
+
         delete[] buf;
     }
 
@@ -253,6 +271,10 @@ class HandShake {
         prf.init(hmac, master_key);
         prf.opt_compute(hmac, key, expansion_key_length * 8, master_key, key_expansion_label,
                         key_expansion_label_length, seed, seed_len, true, true);
+
+		key.reveal<unsigned char>(key_block, PUBLIC);
+		reverse(key_block, key_block + 56);
+
         size_t unused_bit_length = 16 * 8;
         Integer iv;
         iv.bits.insert(iv.bits.begin(), key.bits.begin() + unused_bit_length,
@@ -345,10 +367,19 @@ class HandShake {
                                             const unsigned char* tau,
                                             size_t tau_len) {
         Integer ufin_int;
+		prf.init(hmac, master_key);
         prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, master_key, label, label_len,
                         tau, tau_len, true, true);
+        //prf.opt_compute(hmac, ufin_int, 48 * 8, master_key, label, label_len,
+        //                tau, tau_len, true, true);
+		//unsigned char tmp[48];
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
-        memcpy(ufin, client_ufin, finished_msg_length);
+
+		//reverse(tmp, tmp + 48);
+        //memcpy(ufin, tmp, finished_msg_length);
+		//reverse(ufin, ufin + 12);
+
+		memcpy(ufin, client_ufin, finished_msg_length);
     }
 
     inline void compute_server_finished_msg(unsigned char* ufin,
@@ -357,10 +388,19 @@ class HandShake {
                                             const unsigned char* tau,
                                             size_t tau_len) {
         Integer ufin_int;
+		prf.init(hmac, master_key);
         prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, master_key, label, label_len,
                         tau, tau_len, true, true);
+        //prf.opt_compute(hmac, ufin_int, 48 * 8, master_key, label, label_len,
+        //                tau, tau_len, true, true);
+		//unsigned char tmp[48];
         ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
-        memcpy(ufin, server_ufin, finished_msg_length);
+
+		//reverse(tmp, tmp + 48);
+        //memcpy(ufin, tmp, finished_msg_length);
+		//reverse(ufin, ufin + 12);
+
+		memcpy(ufin, server_ufin, finished_msg_length);
     }
 
     inline void encrypt_client_finished_msg(AEAD<IO>* aead_c,

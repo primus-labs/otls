@@ -107,7 +107,7 @@ string lookup_host(const char *host) {
   return "";
 }
 
-void run_client(const char* caFile, const char* ip, int port, const char* host, bool set_hostname, const char* cipher, const char* curve) {
+void run_client(const char* caFile, const char* ip, int port, const char* host, bool set_hostname, const char* cipher, const char* curve, const char* request_url) {
 
 #ifdef __EMSCRIPTEN__
     int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -190,6 +190,7 @@ void run_client(const char* caFile, const char* ip, int port, const char* host, 
     debug_print("end init mpc\n");
     ret = SSL_connect(ssl);
     if (ret < 0) {
+		printf("ret:%d errno:%d %s\n", ret, errno, strerror(errno));
         ERR_print_errors_fp(stderr);
         exit(1);
     }
@@ -223,8 +224,8 @@ void run_client(const char* caFile, const char* ip, int port, const char* host, 
         printf("client => recv %d %s\n", len, buf);
         sleep(1);
     }*/
-    if (1) {
-        char httpMsg[] = "GET /sapi/v1/system/status HTTP/1.1\r\n"
+    while (1) {
+        char httpMsg[] = "GET %s HTTP/1.1\r\n"
         "Host: %s\r\n"
         "User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/110.0\r\n"
         "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\r\n"
@@ -241,11 +242,17 @@ void run_client(const char* caFile, const char* ip, int port, const char* host, 
 
         char buf[10240];
         // snprintf(buf, sizeof(buf), "message from client, id: %d", count++);
-        int l = snprintf(buf, sizeof(buf), httpMsg, host);
+        int l = snprintf(buf, sizeof(buf), httpMsg, request_url, host);
         // int len = send(fd, buf, strlen(buf), 0);
         int len = SSL_write(ssl, buf, l);
         printf("client => send %d %s\n", l, buf);
 
+        memset(buf, 0, sizeof(buf));
+        // len = recv(fd, buf, sizeof(buf), 0);
+        len = SSL_read(ssl, buf, sizeof(buf));
+        printf("client => recv %d %s\n", len, buf);
+
+        memset(buf, 0, sizeof(buf));
         // len = recv(fd, buf, sizeof(buf), 0);
         len = SSL_read(ssl, buf, sizeof(buf));
         printf("client => recv %d %s\n", len, buf);
@@ -289,14 +296,14 @@ int main(int argc, char* argv[]) {
     const char* curve = "P-256";
     if (argc == 2) {
         if (strcmp(argv[1], "binance") == 0) 
-            run_client("binance.crt", "18.65.175.124", 443, "api.binance.com", false, rsa_cipher, curve);
+            run_client("binance.crt", "18.65.175.124", 443, "api.binance.com", false, rsa_cipher, curve, "/sapi/v1/system/status");
         else if (strcmp(argv[1], "kucoin") == 0)
-            run_client("kucoin.crt", "104.18.9.15", 443, "api.kucoin.com", true, rsa_cipher, curve);
+            run_client("kucoin.crt", "104.18.9.15", 443, "api.kucoin.com", true, rsa_cipher, curve, "/test");
         else if (strcmp(argv[1], "okx") == 0)
-            run_client("okx.crt", "104.18.2.151", 443, "www.okx.com", true, rsa_cipher, curve);
+            run_client("okx.crt", "104.18.2.151", 443, "www.okx.com", true, rsa_cipher, curve, "/api/v5/market/ticker?instId=ETH-USDT");
     }
     else {
-        run_client("ca.crt", "127.0.0.1", 8080, "localhost", false, ecdsa_cipher, curve);
+        run_client("ca.crt", "127.0.0.1", 8080, "localhost", false, ecdsa_cipher, curve, "/test");
     }
     return 0;
 }
