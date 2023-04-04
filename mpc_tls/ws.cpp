@@ -374,6 +374,7 @@ static std::map<uint64_t, vector<uint8_t>> recv_map;
 static std::vector<uint8_t> recv_buffer;
 static uint64_t recv_id = 0;
 static std::vector<uint8_t> fragmentData;
+static char *buf = new char[NETWORK_BUFFER_SIZE];
 string GetMessage(int fd, int len, uint64_t id, bool enable_id) {
     bool continueFlag = true;
     string result;
@@ -405,10 +406,10 @@ string GetMessage(int fd, int len, uint64_t id, bool enable_id) {
         }
 #endif
 
-        char buf[BUFFER_SIZE];
         // printf("begin recv ws id:%llu %d\n", id, len);
 
-        int read = recv(fd, buf, BUFFER_SIZE, 0);
+        int read = recv(fd, buf, NETWORK_BUFFER_SIZE, 0);
+        //printf("recv data size: %llu\n", (uint64_t)read);
         // printf("recv result:%d %d %s\n", read, errno, strerror(errno));
         if (!read) return result;
         if (read < 0)
@@ -663,3 +664,304 @@ static std::vector<uint8_t> fragmentData;
     }
     return result;
 }
+
+struct SendBuffer {
+private:
+    char buffer[NETWORK_BUFFER_SIZE];
+    uint64_t offset;
+    uint64_t send_id;
+public:
+    SendBuffer() {
+        offset = 0;
+        send_id = 0;
+        memset(buffer, 0, sizeof(buffer));
+        offset += 2 * sizeof(uint64_t);    
+    }
+
+    void pack() {
+        set_send_id();
+        set_length();
+    }
+
+    void set_send_id() {
+        send_id++;
+        *(uint64_t*)buffer = send_id;
+    }
+
+    void set_length() {
+        uint64_t payloadLength = offset - 2 * sizeof(uint64_t);
+        *((uint64_t*)buffer + 1) = payloadLength;
+        // printf("send id:%llu length:%llu\n", send_id, payloadLength);
+        // fflush(stdout);
+    }
+
+    bool can_put(uint64_t numBytes) {
+        return offset + numBytes < NETWORK_BUFFER_SIZE;
+    }
+
+    void put(const char *buf, uint64_t len) {
+        memcpy(buffer + offset, buf, len);
+        offset += len;
+    }
+
+    bool empty() {
+        return offset <= 2 * sizeof(uint64_t);
+    }
+
+    size_t size() {
+        return offset;
+    }
+    const char* data() {
+        return buffer;
+    }
+
+    void reset() {
+        offset = 2 * sizeof(uint64_t);
+    }
+
+};
+
+size_t GenWebSocketHeader(uint8_t* headerData, size_t numBytes) {
+    WebSocketMessageHeader *header = (WebSocketMessageHeader *)headerData;
+    header->opcode = 0x02;
+    header->fin = 1;
+    int headerBytes = 2;
+
+    if (numBytes < 126) {
+        header->payloadLength = numBytes;
+    } else if (numBytes <= 65535) {
+        header->payloadLength = 126;
+        *(uint16_t*)(headerData+headerBytes) = htons((unsigned short)numBytes);
+        headerBytes += 2;
+    } else {
+        header->payloadLength = 127;
+        *(uint64_t*)(headerData+headerBytes) = hton64(numBytes);
+        headerBytes += 8;
+    }
+    return headerBytes;
+}
+
+ssize_t DoSendMessage(const char* buf, size_t len, FILE* stream) {
+    uint8_t headerData[sizeof(WebSocketMessageHeader) + 8/*possible extended length*/] = {};
+    memset(headerData, 0, sizeof(headerData));
+    size_t headerBytes = GenWebSocketHeader(headerData, len);
+    int ret = fwrite(headerData, 1, headerBytes, stream);
+    if (ret != headerBytes) {
+        printf("ret:%d errno:%d %s\n", ret, errno, strerror(errno));
+        fflush(stdout);
+        assert(false);
+        return -1;
+    }
+    if (fwrite(buf, 1, len, stream) != len) {
+        assert(false);
+        return -1;
+    }
+    // printf("do send message:%d\n", len);
+    // fflush(stdout);
+    return len;
+}
+
+
+ssize_t SendMessage(const char* buf, size_t len, uint64_t id, FILE* stream) {
+     static SendBuffer* send_buffer = new SendBuffer();
+    static uint64_t send_id = 0;
+    if (len > 0 && send_buffer->can_put(len)) {
+        send_buffer->put(buf, len);
+        return len;
+    }
+
+    if (!send_buffer->empty()) {
+        send_buffer->pack();
+        if (DoSendMessage(send_buffer->data(), send_buffer->size(), stream) < 0) {
+            return -1;
+        }
+
+        send_buffer->reset();
+    }
+
+    if (len > 0 && send_buffer->can_put(len)) {
+        send_buffer->put(buf, len);
+        return len;
+    }
+    else if (len > 0) {
+        assert(false);
+    }
+    return len == 0? 1: len;
+
+}
+
+struct RecvList {
+    RecvList *next;
+    char data[];
+};
+struct RecvBuffer {
+    uint64_t id;
+    uint64_t length;
+    char payload[];
+};
+struct RecvInfo {
+    uint64_t id;
+    char *payload;
+    uint64_t offset;
+    uint64_t length;
+    uint64_t prev_id;
+    bool valid;
+};
+ssize_t RecvMessage(char* buf, size_t len, uint64_t id, FILE* stream) {
+    static RecvList *recv_list = NULL;
+    static RecvInfo *recv_info = NULL;
+    uint64_t recv_bytes = 0;
+    while(1) {
+        if (recv_info != NULL && recv_info->valid) {
+            if (recv_info->offset < recv_info->length) {
+                uint64_t min_len = min(recv_info->length - recv_info->offset, len - recv_bytes);
+                memcpy(buf + recv_bytes, recv_info->payload + recv_info->offset, min_len);
+                recv_info->offset += min_len;
+    
+                recv_bytes += min_len;
+                // printf("recv %llu expect %llu\n", min_len, len);
+                // fflush(stdout);
+    
+                if (recv_info->offset == recv_info->length) {
+                    RecvList *tmp = recv_list;
+                    recv_list = recv_list->next;
+    
+                    RecvBuffer* p = (RecvBuffer*)tmp->data;
+                    if (recv_list != NULL) {
+                        RecvBuffer* q = (RecvBuffer*)recv_list->data;
+                        if (p->id + 1 == q->id) {
+                            recv_info->id = q->id;
+                            recv_info->length = q->length;
+                            recv_info->payload = q->payload;
+                            recv_info->offset = 0;
+                        }
+                        else {
+                            recv_info->prev_id = p->id;
+                            recv_info->valid = false;
+                        }
+                    }
+                    else {
+                        recv_info->prev_id = p->id;
+                        recv_info->valid = false;
+                    }
+    
+                    free(tmp);
+                }
+            }
+            if (recv_bytes == len)
+                return len;
+        }
+    
+        char headerData[sizeof(WebSocketMessageHeader) + 8 + 4];
+        int ret = fread(headerData, 1, 2, stream);
+        if (ret != 2) {
+            // printf("ret:%d expect:2\n", ret);
+            // fflush(stdout);
+            assert(false);
+            return -1;
+        }
+        WebSocketMessageHeader* header = (WebSocketMessageHeader*)headerData;
+        bool mask = header->mask? true: false;
+        uint8_t payload_length = header->payloadLength;
+        uint64_t mask_length = mask? 4: 0;
+    
+        uint64_t length_size;
+        switch (payload_length) {
+            case 126:
+                length_size = 2;
+                break;
+            case 127:
+                length_size = 8;
+                break;
+            default:
+                length_size = 0;
+        }
+    
+        uint32_t mask_data = 0;
+        int mask_offset = 2;
+        uint64_t data_len = payload_length;
+        if (length_size + mask_length > 0) {
+            if (fread(headerData + 2, 1, length_size + mask_length, stream) != length_size + mask_length) {
+                assert(false);
+                return -1;
+            }
+            switch (payload_length) {
+                case 126:
+                    data_len = ntohs(*(uint16_t*)(headerData + 2));
+                    mask_offset += 2; 
+                    break;
+                case 127:
+                    data_len = ntoh64(*(uint64_t*)(headerData + 2));
+                    mask_offset += 8;
+                    break;
+            }
+    
+            if (mask) {
+                mask_data = *(uint32_t*)(headerData + mask_offset);
+            }
+        }
+    
+    
+        RecvList* recv_chunk = (RecvList*)malloc(sizeof(RecvList) + data_len); 
+        ret = fread(recv_chunk->data, 1, data_len, stream);
+        if (ret != data_len) {
+        // printf("ret: %d expect: %llu\n", ret, data_len);
+        // fflush(stdout);
+            assert(false);
+            return -1;
+        }
+        recv_chunk->next = NULL;
+    
+        RecvBuffer* recv_buffer = (RecvBuffer*)recv_chunk->data;
+        // printf("recv id:%llu length:%llu\n", recv_buffer->id, recv_buffer->length);
+        // fflush(stdout);
+        if (recv_list == NULL) {
+            recv_list = recv_chunk;
+        }
+        else {
+            RecvList *p_list = NULL;
+            RecvList *q_list = recv_list;
+            while (q_list != NULL) {
+                RecvBuffer* b = (RecvBuffer*)q_list->data;
+    
+                if (recv_buffer->id < b->id) {
+                    recv_chunk->next = q_list;
+    
+                    if (p_list == NULL) {
+                        recv_list = recv_chunk;
+                    }
+                    else {
+                        p_list->next = recv_chunk;
+                    }
+                    break;
+                }
+    
+                p_list = q_list;
+                q_list = q_list -> next;
+            }
+    
+            if (q_list == NULL) {
+                p_list->next = recv_chunk;
+            }
+        }
+    
+        if (recv_info == NULL) {
+            recv_info = (RecvInfo*)malloc(sizeof(RecvInfo));
+            recv_info->valid = false;
+            recv_info->prev_id = 0;
+        }
+        if (!recv_info->valid) {
+            RecvBuffer* b = (RecvBuffer*)recv_list->data;
+            if (recv_info->prev_id + 1 == b->id) {
+                recv_info->id = b->id;
+                recv_info->length = b->length;
+                recv_info->payload = b->payload;
+                recv_info->offset = 0;
+                recv_info->valid = true;
+            }
+        }
+    }
+    return 0;
+
+}
+
