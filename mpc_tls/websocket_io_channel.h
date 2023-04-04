@@ -345,24 +345,20 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
             fflush(debug_file);
         }
 #endif
-        //string websocket_data = GenWebSocketMessage(data, len, send_id, true);
-        //d = &websocket_data[0];
-        //len = websocket_data.size();
 #endif
 
-        while(sent < len || (sent == 0 && len == 0)) {
 #ifndef __EMSCRIPTEN__
-            //size_t res = fwrite(sent + (char*)d, 1, len - sent, stream);
-            size_t res = SendMessage(sent + (char*)data, len - sent, send_id, stream);
+        size_t res = SendMessage(sent + (char*)data, len - sent, send_id, stream);
 #else
+
+        while(sent < len) {
             size_t res = send2(0, sent + (char*)data, len - sent, 0, send_id);
-#endif
             if (res > 0)
                 sent+=res;
             else
                 error("net_send_data\n");
-            if (len == 0) break;
         }
+#endif
         has_sent = true;
     }
 
@@ -372,24 +368,21 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
         has_sent = false;
         size_t sent = 0;
         recv_id++;
-        while(sent < len) {
 #ifndef __EMSCRIPTEN__
 #if RECORD_MSG_INFO
-            fprintf(debug_file, "recv data id: %llu len:%llu\n", (uint64_t)recv_id, (uint64_t)len);
-            fflush(debug_file);
+        fprintf(debug_file, "recv data id: %llu len:%llu\n", (uint64_t)recv_id, (uint64_t)len);
+        fflush(debug_file);
 #endif
-            //string d = GetMessage(stream, len - sent, recv_id, true);
-            //size_t res = d.size();
-            //memcpy(sent + (char*)data, d.data(), res);
-            size_t res = RecvMessage(sent + (char*)data, len - sent, recv_id, stream);
+        size_t res = RecvMessage(sent + (char*)data, len - sent, recv_id, stream);
 #else
+        while(sent < len) {
             size_t res = recv2(0, sent + (char*)data, len - sent, 0, recv_id);
-#endif
             if (res > 0)
                 sent += res;
             else
                 error("net_recv_data\n");
         }
+#endif
     }
 };
 
