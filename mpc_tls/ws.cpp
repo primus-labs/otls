@@ -786,47 +786,111 @@ void UnMaskData(char* buf, uint64_t len, uint32_t mask) {
     }
 }
 
+void PutToRecvCtx(RecvCtx* ctx, RecvList* recv_chunk) {
+    RecvList* &recv_list = ctx->list;
+    RecvInfo* &recv_info = ctx->info;
+
+    RecvBuffer* recv_buffer = (RecvBuffer*)recv_chunk->data;
+    // printf("recv id:%llu length:%llu\n", recv_buffer->id, recv_buffer->length);
+    // fflush(stdout);
+    if (recv_list == NULL) {
+        recv_list = recv_chunk;
+    }
+    else {
+        RecvList *p_list = NULL;
+        RecvList *q_list = recv_list;
+        while (q_list != NULL) {
+            RecvBuffer* b = (RecvBuffer*)q_list->data;
+
+            if (recv_buffer->id < b->id) {
+                recv_chunk->next = q_list;
+
+                if (p_list == NULL) {
+                    recv_list = recv_chunk;
+                }
+                else {
+                    p_list->next = recv_chunk;
+                }
+                break;
+            }
+
+            p_list = q_list;
+            q_list = q_list -> next;
+        }
+
+        if (q_list == NULL) {
+            p_list->next = recv_chunk;
+        }
+    }
+
+    if (recv_info == NULL) {
+        recv_info = (RecvInfo*)malloc(sizeof(RecvInfo));
+        recv_info->valid = false;
+        recv_info->prev_id = 0;
+    }
+    if (!recv_info->valid) {
+        RecvBuffer* b = (RecvBuffer*)recv_list->data;
+        if (recv_info->prev_id + 1 == b->id) {
+            recv_info->id = b->id;
+            recv_info->length = b->length;
+            recv_info->payload = b->payload;
+            recv_info->offset = 0;
+            recv_info->valid = true;
+        }
+    }
+}
+
+size_t RecvFromRecvCtx(RecvCtx* ctx, char* buf, size_t len) {
+    RecvInfo* &recv_info = ctx->info;
+    RecvList* &recv_list = ctx->list;
+
+    size_t recv_bytes = 0;
+    if (recv_info->offset < recv_info->length) {
+        uint64_t min_len = min(recv_info->length - recv_info->offset, len - recv_bytes);
+        memcpy(buf + recv_bytes, recv_info->payload + recv_info->offset, min_len);
+        recv_info->offset += min_len;
+
+        recv_bytes += min_len;
+        // printf("recv %llu expect %llu\n", min_len, len);
+        // fflush(stdout);
+
+        if (recv_info->offset == recv_info->length) {
+            RecvList *tmp = recv_list;
+            recv_list = recv_list->next;
+
+            RecvBuffer* p = (RecvBuffer*)tmp->data;
+            if (recv_list != NULL) {
+                RecvBuffer* q = (RecvBuffer*)recv_list->data;
+                if (p->id + 1 == q->id) {
+                    recv_info->id = q->id;
+                    recv_info->length = q->length;
+                    recv_info->payload = q->payload;
+                    recv_info->offset = 0;
+                }
+                else {
+                    recv_info->prev_id = p->id;
+                    recv_info->valid = false;
+                }
+            }
+            else {
+                recv_info->prev_id = p->id;
+                recv_info->valid = false;
+            }
+
+            free(tmp);
+        }
+    }
+    return recv_bytes;
+}
 ssize_t RecvMessage(RecvCtx* ctx, char* buf, size_t len, uint64_t id, FILE* stream) {
     RecvList* &recv_list = ctx->list;
     RecvInfo* &recv_info = ctx->info;
     uint64_t recv_bytes = 0;
     while(1) {
         if (recv_info != NULL && recv_info->valid) {
-            if (recv_info->offset < recv_info->length) {
-                uint64_t min_len = min(recv_info->length - recv_info->offset, len - recv_bytes);
-                memcpy(buf + recv_bytes, recv_info->payload + recv_info->offset, min_len);
-                recv_info->offset += min_len;
-    
-                recv_bytes += min_len;
-                // printf("recv %llu expect %llu\n", min_len, len);
-                // fflush(stdout);
-    
-                if (recv_info->offset == recv_info->length) {
-                    RecvList *tmp = recv_list;
-                    recv_list = recv_list->next;
-    
-                    RecvBuffer* p = (RecvBuffer*)tmp->data;
-                    if (recv_list != NULL) {
-                        RecvBuffer* q = (RecvBuffer*)recv_list->data;
-                        if (p->id + 1 == q->id) {
-                            recv_info->id = q->id;
-                            recv_info->length = q->length;
-                            recv_info->payload = q->payload;
-                            recv_info->offset = 0;
-                        }
-                        else {
-                            recv_info->prev_id = p->id;
-                            recv_info->valid = false;
-                        }
-                    }
-                    else {
-                        recv_info->prev_id = p->id;
-                        recv_info->valid = false;
-                    }
-    
-                    free(tmp);
-                }
-            }
+            size_t ret = RecvFromRecvCtx(ctx, buf + recv_bytes, len - recv_bytes);
+
+            recv_bytes += ret;
             if (recv_bytes == len)
                 return len;
         }
@@ -897,55 +961,9 @@ ssize_t RecvMessage(RecvCtx* ctx, char* buf, size_t len, uint64_t id, FILE* stre
             return -1;
         }
         recv_chunk->next = NULL;
+
+        PutToRecvCtx(ctx, recv_chunk);
     
-        RecvBuffer* recv_buffer = (RecvBuffer*)recv_chunk->data;
-        // printf("recv id:%llu length:%llu\n", recv_buffer->id, recv_buffer->length);
-        // fflush(stdout);
-        if (recv_list == NULL) {
-            recv_list = recv_chunk;
-        }
-        else {
-            RecvList *p_list = NULL;
-            RecvList *q_list = recv_list;
-            while (q_list != NULL) {
-                RecvBuffer* b = (RecvBuffer*)q_list->data;
-    
-                if (recv_buffer->id < b->id) {
-                    recv_chunk->next = q_list;
-    
-                    if (p_list == NULL) {
-                        recv_list = recv_chunk;
-                    }
-                    else {
-                        p_list->next = recv_chunk;
-                    }
-                    break;
-                }
-    
-                p_list = q_list;
-                q_list = q_list -> next;
-            }
-    
-            if (q_list == NULL) {
-                p_list->next = recv_chunk;
-            }
-        }
-    
-        if (recv_info == NULL) {
-            recv_info = (RecvInfo*)malloc(sizeof(RecvInfo));
-            recv_info->valid = false;
-            recv_info->prev_id = 0;
-        }
-        if (!recv_info->valid) {
-            RecvBuffer* b = (RecvBuffer*)recv_list->data;
-            if (recv_info->prev_id + 1 == b->id) {
-                recv_info->id = b->id;
-                recv_info->length = b->length;
-                recv_info->payload = b->payload;
-                recv_info->offset = 0;
-                recv_info->valid = true;
-            }
-        }
     }
     return 0;
 
