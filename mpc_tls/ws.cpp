@@ -665,62 +665,27 @@ static std::vector<uint8_t> fragmentData;
     return result;
 }
 
-struct SendBuffer {
-private:
-    char buffer[NETWORK_BUFFER_SIZE];
-    uint64_t offset;
-    uint64_t send_id;
-public:
-    SendBuffer() {
-        offset = 0;
-        send_id = 0;
-        memset(buffer, 0, sizeof(buffer));
-        offset += 2 * sizeof(uint64_t);    
-    }
+void dprint(const char* msg, const char* buf, int len) {
+    printf("%s[%d] ", msg, len);
+    for (int i = 0; i < len; i++)
+        printf("%02x ", (unsigned char)buf[i]);
+    printf("\n");
+}
 
-    void pack() {
-        set_send_id();
-        set_length();
-    }
+SendCtx* NewSendCtx(bool websocket) {
+    SendCtx* ctx = new SendCtx();
+    SendBuffer *buffer = new SendBuffer();
+    
+    ctx->buffer = buffer;
+    ctx->websocket = websocket;
+    return ctx;
+}
 
-    void set_send_id() {
-        send_id++;
-        *(uint64_t*)buffer = send_id;
-    }
-
-    void set_length() {
-        uint64_t payloadLength = offset - 2 * sizeof(uint64_t);
-        *((uint64_t*)buffer + 1) = payloadLength;
-        // printf("send id:%llu length:%llu\n", send_id, payloadLength);
-        // fflush(stdout);
-    }
-
-    bool can_put(uint64_t numBytes) {
-        return offset + numBytes < NETWORK_BUFFER_SIZE;
-    }
-
-    void put(const char *buf, uint64_t len) {
-        memcpy(buffer + offset, buf, len);
-        offset += len;
-    }
-
-    bool empty() {
-        return offset <= 2 * sizeof(uint64_t);
-    }
-
-    size_t size() {
-        return offset;
-    }
-    const char* data() {
-        return buffer;
-    }
-
-    void reset() {
-        offset = 2 * sizeof(uint64_t);
-    }
-
-};
-
+void FreeSendCtx(SendCtx* ctx) {
+    delete ctx->buffer;
+    delete ctx;
+}
+    
 size_t GenWebSocketHeader(uint8_t* headerData, size_t numBytes) {
     WebSocketMessageHeader *header = (WebSocketMessageHeader *)headerData;
     header->opcode = 0x02;
@@ -741,16 +706,18 @@ size_t GenWebSocketHeader(uint8_t* headerData, size_t numBytes) {
     return headerBytes;
 }
 
-ssize_t DoSendMessage(const char* buf, size_t len, FILE* stream) {
-    uint8_t headerData[sizeof(WebSocketMessageHeader) + 8/*possible extended length*/] = {};
-    memset(headerData, 0, sizeof(headerData));
-    size_t headerBytes = GenWebSocketHeader(headerData, len);
-    int ret = fwrite(headerData, 1, headerBytes, stream);
-    if (ret != headerBytes) {
-        printf("ret:%d errno:%d %s\n", ret, errno, strerror(errno));
-        fflush(stdout);
-        assert(false);
-        return -1;
+ssize_t DoSendMessage(SendCtx* ctx, const char* buf, size_t len, FILE* stream) {
+    if (ctx->websocket) {
+        uint8_t headerData[sizeof(WebSocketMessageHeader) + 8/*possible extended length*/] = {};
+        memset(headerData, 0, sizeof(headerData));
+        size_t headerBytes = GenWebSocketHeader(headerData, len);
+        int ret = fwrite(headerData, 1, headerBytes, stream);
+        if (ret != headerBytes) {
+            printf("ret:%d errno:%d %s\n", ret, errno, strerror(errno));
+            fflush(stdout);
+            assert(false);
+            return -1;
+        }
     }
     if (fwrite(buf, 1, len, stream) != len) {
         assert(false);
@@ -762,9 +729,9 @@ ssize_t DoSendMessage(const char* buf, size_t len, FILE* stream) {
 }
 
 
-ssize_t SendMessage(const char* buf, size_t len, uint64_t id, FILE* stream) {
-     static SendBuffer* send_buffer = new SendBuffer();
-    static uint64_t send_id = 0;
+ssize_t SendMessage(SendCtx* ctx, const char* buf, size_t len, uint64_t id, FILE* stream) {
+    SendBuffer* &send_buffer = ctx->buffer;
+
     if (len > 0 && send_buffer->can_put(len)) {
         send_buffer->put(buf, len);
         return len;
@@ -772,7 +739,7 @@ ssize_t SendMessage(const char* buf, size_t len, uint64_t id, FILE* stream) {
 
     if (!send_buffer->empty()) {
         send_buffer->pack();
-        if (DoSendMessage(send_buffer->data(), send_buffer->size(), stream) < 0) {
+        if (DoSendMessage(ctx, send_buffer->data(), send_buffer->size(), stream) < 0) {
             return -1;
         }
 
@@ -790,26 +757,38 @@ ssize_t SendMessage(const char* buf, size_t len, uint64_t id, FILE* stream) {
 
 }
 
-struct RecvList {
-    RecvList *next;
-    char data[];
-};
-struct RecvBuffer {
-    uint64_t id;
-    uint64_t length;
-    char payload[];
-};
-struct RecvInfo {
-    uint64_t id;
-    char *payload;
-    uint64_t offset;
-    uint64_t length;
-    uint64_t prev_id;
-    bool valid;
-};
-ssize_t RecvMessage(char* buf, size_t len, uint64_t id, FILE* stream) {
-    static RecvList *recv_list = NULL;
-    static RecvInfo *recv_info = NULL;
+RecvCtx* NewRecvCtx(bool websocket) {
+    RecvCtx *ctx = new RecvCtx();
+    ctx->info = NULL;
+    ctx->list = NULL;
+    ctx->websocket = websocket;
+    return ctx;
+}
+
+void FreeRecvCtx(RecvCtx* ctx) {
+    delete ctx->info;
+    delete ctx->list;
+    delete ctx;
+}
+
+void UnMaskData(char* buf, uint64_t len, uint32_t mask) {
+    uint32_t *begin32 = (uint32_t*)buf;
+    uint32_t *end32 = begin32 + len / sizeof(uint32_t);
+    while (begin32 != end32) {
+        *begin32++ ^= mask;
+    }
+
+    uint8_t *begin8 = (uint8_t*)end32;
+    uint8_t *end8 = (uint8_t*)(buf + len);
+    uint8_t *mask8 = (uint8_t*)&mask;
+    while (begin8 != end8) {
+        *begin8++ ^= *mask8++;
+    }
+}
+
+ssize_t RecvMessage(RecvCtx* ctx, char* buf, size_t len, uint64_t id, FILE* stream) {
+    RecvList* &recv_list = ctx->list;
+    RecvInfo* &recv_info = ctx->info;
     uint64_t recv_bytes = 0;
     while(1) {
         if (recv_info != NULL && recv_info->valid) {
@@ -855,11 +834,12 @@ ssize_t RecvMessage(char* buf, size_t len, uint64_t id, FILE* stream) {
         char headerData[sizeof(WebSocketMessageHeader) + 8 + 4];
         int ret = fread(headerData, 1, 2, stream);
         if (ret != 2) {
-            // printf("ret:%d expect:2\n", ret);
-            // fflush(stdout);
+            printf("ret:%d expect:2\n", ret);
+            fflush(stdout);
             assert(false);
             return -1;
         }
+        // dprint("header2", headerData, 2);
         WebSocketMessageHeader* header = (WebSocketMessageHeader*)headerData;
         bool mask = header->mask? true: false;
         uint8_t payload_length = header->payloadLength;
@@ -899,14 +879,20 @@ ssize_t RecvMessage(char* buf, size_t len, uint64_t id, FILE* stream) {
             if (mask) {
                 mask_data = *(uint32_t*)(headerData + mask_offset);
             }
+            // dprint("headerextra", headerData + 2, length_size + mask_length);
         }
     
     
         RecvList* recv_chunk = (RecvList*)malloc(sizeof(RecvList) + data_len); 
+        // printf("data len:%llu\n", data_len);
         ret = fread(recv_chunk->data, 1, data_len, stream);
+        if (mask) {
+            UnMaskData(recv_chunk->data, data_len, mask_data);
+        }
+        // dprint("fread data", recv_chunk->data, data_len);
         if (ret != data_len) {
-        // printf("ret: %d expect: %llu\n", ret, data_len);
-        // fflush(stdout);
+        printf("ret: %d expect: %llu\n", ret, data_len);
+        fflush(stdout);
             assert(false);
             return -1;
         }

@@ -11,6 +11,8 @@ using std::string;
 
 #include <vector>
 #include <map>
+#include <mutex>
+#include <condition_variable>
 using namespace std;
 
 #include <unistd.h>
@@ -27,7 +29,7 @@ using namespace std;
 #include <emscripten/threading.h>
 #include <emscripten/posix_socket.h>
 
-static pthread_mutex_t bridgeLock = PTHREAD_MUTEX_INITIALIZER;
+static mutex bridgeLock;
 static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
 #endif
 
@@ -43,16 +45,19 @@ static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
 static std::map<uint64_t, vector<uint8_t>> recv_map;
 static std::vector<uint8_t> recv_buffer;
 static uint64_t recv_id = 0;
-static pthread_mutex_t recvLock = PTHREAD_MUTEX_INITIALIZER;
+//static pthread_mutex_t recvLock = PTHREAD_MUTEX_INITIALIZER;
+static mutex recvLock;
+static condition_variable recvCond;
 static int recvBufferFlag = 0;
 static EM_BOOL
 bridge_socket_on_message2(int eventType,
                          const EmscriptenWebSocketMessageEvent* websocketEvent,
                          void* userData) {
-  pthread_mutex_lock(&recvLock);
+  std::unique_lock<mutex> lck(recvLock);
   uint64_t *id = (uint64_t*)websocketEvent->data;
-  uint64_t data_len = websocketEvent->numBytes - sizeof(uint64_t);
-  uint8_t *data = (uint8_t*)(id + 1);
+  uint64_t data_len = websocketEvent->numBytes - 2 * sizeof(uint64_t);
+  assert(data_len == *(id + 1));
+  uint8_t *data = (uint8_t*)(id + 2);
   // printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *id);
   if (recv_id + 1 == *id) {
     // printf("recv buffer init: %llu\n", (uint64_t)recv_buffer.size());
@@ -67,15 +72,16 @@ bridge_socket_on_message2(int eventType,
       recv_id++;
       iter = recv_map.find(recv_id + 1);
     }
-    recvBufferFlag = 1;
+    recvCond.notify_one();
+    // recvBufferFlag = 1;
     // printf("put to recv buffer: %llu data len: %llu\n", (uint64_t)recv_buffer.size(), data_len);
   }
   else {
     vector<uint8_t> tmp(data, data + data_len);
     recv_map.insert(std::pair<uint64_t, std::vector<uint8_t>>(*id, tmp));
   }
-  pthread_mutex_unlock(&recvLock);
-  emscripten_futex_wake(&recvBufferFlag, INT_MAX);
+  //pthread_mutex_unlock(&recvLock);
+  //emscripten_futex_wake(&recvBufferFlag, INT_MAX);
 
   return EM_TRUE;
 }
@@ -84,7 +90,7 @@ EMSCRIPTEN_WEBSOCKET_T emscripten_init_websocket_to_posix_socket_bridge2(const c
 #ifdef POSIX_SOCKET_DEBUG
   emscripten_log(EM_LOG_NO_PATHS | EM_LOG_CONSOLE | EM_LOG_JS_STACK, "emscripten_init_websocket_to_posix_socket_bridge(bridgeUrl=\"%s\")\n", bridgeUrl);
 #endif
-  pthread_mutex_lock(&bridgeLock); // Guard multithreaded access to 'bridgeSocket'
+  // pthread_mutex_lock(&bridgeLock); // Guard multithreaded access to 'bridgeSocket'
   if (bridgeSocket) {
 #ifdef POSIX_SOCKET_DEBUG
     emscripten_log(EM_LOG_NO_PATHS | EM_LOG_CONSOLE | EM_LOG_WARN | EM_LOG_JS_STACK, "emscripten_init_websocket_to_posix_socket_bridge(bridgeUrl=\"%s\"): A previous bridge socket connection handle existed! Forcibly tearing old connection down.\n", bridgeUrl);
@@ -101,10 +107,16 @@ EMSCRIPTEN_WEBSOCKET_T emscripten_init_websocket_to_posix_socket_bridge2(const c
   // printf("bridgeSocket\n");
   emscripten_websocket_set_onmessage_callback_on_thread(bridgeSocket, 0, bridge_socket_on_message2, EM_CALLBACK_THREAD_CONTEXT_MAIN_BROWSER_THREAD);
   // printf("set onmessage\n");
-  pthread_mutex_unlock(&bridgeLock);
+  // pthread_mutex_unlock(&bridgeLock);
   return bridgeSocket;
 }
 
+inline void bprint(const char* msg, const void* buf, int len) {
+    printf("%s[%d] ", msg, len);
+    for (int i = 0; i < len; i++)
+        printf("%02x ", ((unsigned char*)buf)[i]);
+    printf("\n");
+}
 static std::vector<uint8_t> send_buffer;
 static uint64_t send_id = 0;
 static uint64_t origin_id = 0;
@@ -125,14 +137,18 @@ ssize_t send2(int socket, const void *message, size_t length, int flags, uint64_
 
   // printf("send info id:%llu len:%d\n", id, length);
   
-  if (send_buffer.size() > sizeof(uint64_t)) {
+  if (send_buffer.size() > 2 * sizeof(uint64_t)) {
     send_id++;
+    uint64_t length = send_buffer.size() - 2 * sizeof(uint64_t);
     *(uint64_t*)&send_buffer[0] = send_id;
+    *((uint64_t*)&send_buffer[0] + 1) = length;
     emscripten_websocket_send_binary(bridgeSocket, (void *)send_buffer.data(), send_buffer.size());
+    // printf("send id:%llu len:%llu\n", send_id, length);
+    // bprint("send data", send_buffer.data(), send_buffer.size());
     // printf("send buffer info id:%llu len:%llu origin id:%llu\n", send_id, (uint64_t)send_buffer.size(), length > 0? origin_id - 1: origin_id);
 
     send_buffer.reserve(NETWORK_BUFFER_SIZE);
-    send_buffer.resize(sizeof(uint64_t));
+    send_buffer.resize(2 * sizeof(uint64_t));
   }
   if (length > 0) {
 #if DEBUG_MSG_INFO
@@ -153,12 +169,15 @@ ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
   size_t len = 0;
   // printf("begin recv2 id:%lu size:%lu\n", id, length);
   while (len == 0) {
-    while (!recvBufferFlag)
-        emscripten_futex_wait(&recvBufferFlag, 0, 1e9);
+    std::unique_lock<mutex> lck(recvLock);
+    // while (!recvBufferFlag)
+    //    emscripten_futex_wait(&recvBufferFlag, 0, 1e9);
   
-    pthread_mutex_lock(&recvLock);
+    // pthread_mutex_lock(&recvLock);
     // printf("need: %lu recv buffer size:%lu\n", length, recv_buffer.size());
   #if DEBUG_MSG_INFO
+    while (recv_buffer.size() < length + 2 * sizeof(uint64_t))
+        recvCond.wait(lck);
     if (recv_buffer.size() >= length + 2 * sizeof(uint64_t)) {
       uint64_t *actual_id = (uint64_t*)recv_buffer.data();
       uint64_t *actual_len = actual_id + 1;
@@ -174,6 +193,8 @@ ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
       recvBufferFlag = recv_buffer.empty() ? 0: 1;
     }
   #else
+    while (recv_buffer.size() < length)
+        recvCond.wait(lck);
     if (recv_buffer.size() >= length) {
       memcpy(buffer, recv_buffer.data(), length);
       recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + length);
@@ -181,10 +202,7 @@ ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
       recvBufferFlag = recv_buffer.empty() ? 0: 1;
     }
   #endif
-    else {
-      recvBufferFlag = 0;
-    }
-    pthread_mutex_unlock(&recvLock);
+    // pthread_mutex_unlock(&recvLock);
   }
 
   return len;
@@ -205,6 +223,8 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
     int port;
     uint64_t send_id = 0;
     uint64_t recv_id = 0;
+    SendCtx* send_ctx = nullptr;
+    RecvCtx* recv_ctx = nullptr;
 #if RECORD_MSG_INFO
     FILE* debug_file = nullptr;
 #endif
@@ -280,7 +300,7 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
             } while (readyState == 0);
             // printf("end readystate\n");
             send_buffer.reserve(NETWORK_BUFFER_SIZE);
-            send_buffer.resize(sizeof(uint64_t));
+            send_buffer.resize(2 * sizeof(uint64_t));
 #endif
         }
 #ifndef __EMSCRIPTEN__
@@ -289,6 +309,9 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
         buffer = new char[NETWORK_BUFFER_SIZE];
         memset(buffer, 0, NETWORK_BUFFER_SIZE);
         setvbuf(stream, buffer, _IOFBF, NETWORK_BUFFER_SIZE);
+
+        send_ctx = NewSendCtx(true);
+        recv_ctx = NewRecvCtx(true);
 #endif
         if(!quiet)
             std::cout << "websocketio connected\n";
@@ -348,7 +371,7 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
 #endif
 
 #ifndef __EMSCRIPTEN__
-        size_t res = SendMessage(sent + (char*)data, len - sent, send_id, stream);
+        size_t res = SendMessage(send_ctx, sent + (char*)data, len - sent, send_id, stream);
 #else
 
         while(sent < len) {
@@ -373,7 +396,7 @@ class WebSocketIO: public IOChannel<WebSocketIO> { public:
         fprintf(debug_file, "recv data id: %llu len:%llu\n", (uint64_t)recv_id, (uint64_t)len);
         fflush(debug_file);
 #endif
-        size_t res = RecvMessage(sent + (char*)data, len - sent, recv_id, stream);
+        size_t res = RecvMessage(recv_ctx, sent + (char*)data, len - sent, recv_id, stream);
 #else
         while(sent < len) {
             size_t res = recv2(0, sent + (char*)data, len - sent, 0, recv_id);
