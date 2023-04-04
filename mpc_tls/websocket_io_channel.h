@@ -45,10 +45,8 @@ static EMSCRIPTEN_WEBSOCKET_T bridgeSocket = 0;
 static std::map<uint64_t, vector<uint8_t>> recv_map;
 static std::vector<uint8_t> recv_buffer;
 static uint64_t recv_id = 0;
-//static pthread_mutex_t recvLock = PTHREAD_MUTEX_INITIALIZER;
 static mutex recvLock;
 static condition_variable recvCond;
-static int recvBufferFlag = 0;
 static EM_BOOL
 bridge_socket_on_message2(int eventType,
                          const EmscriptenWebSocketMessageEvent* websocketEvent,
@@ -58,30 +56,23 @@ bridge_socket_on_message2(int eventType,
   uint64_t data_len = websocketEvent->numBytes - 2 * sizeof(uint64_t);
   assert(data_len == *(id + 1));
   uint8_t *data = (uint8_t*)(id + 2);
-  // printf("%s %d recv id: %llu current id: %llu\n", __FILE__, __LINE__, recv_id, *id);
   if (recv_id + 1 == *id) {
-    // printf("recv buffer init: %llu\n", (uint64_t)recv_buffer.size());
     recv_buffer.insert(recv_buffer.end(), data, data + data_len);
     recv_id++;
     auto iter = recv_map.find(recv_id + 1);
     while (iter != recv_map.end()) {
       recv_buffer.insert(recv_buffer.end(), iter->second.begin(), iter->second.end());
-      // printf("add buffer: %llu\n", iter->second.size());
       recv_map.erase(iter);
 
       recv_id++;
       iter = recv_map.find(recv_id + 1);
     }
     recvCond.notify_one();
-    // recvBufferFlag = 1;
-    // printf("put to recv buffer: %llu data len: %llu\n", (uint64_t)recv_buffer.size(), data_len);
   }
   else {
     vector<uint8_t> tmp(data, data + data_len);
     recv_map.insert(std::pair<uint64_t, std::vector<uint8_t>>(*id, tmp));
   }
-  //pthread_mutex_unlock(&recvLock);
-  //emscripten_futex_wake(&recvBufferFlag, INT_MAX);
 
   return EM_TRUE;
 }
@@ -104,10 +95,7 @@ EMSCRIPTEN_WEBSOCKET_T emscripten_init_websocket_to_posix_socket_bridge2(const c
   attr.url = bridgeUrl;
   printf("bridgeUrl:%s\n", bridgeUrl);
   bridgeSocket = emscripten_websocket_new(&attr);
-  // printf("bridgeSocket\n");
   emscripten_websocket_set_onmessage_callback_on_thread(bridgeSocket, 0, bridge_socket_on_message2, EM_CALLBACK_THREAD_CONTEXT_MAIN_BROWSER_THREAD);
-  // printf("set onmessage\n");
-  // pthread_mutex_unlock(&bridgeLock);
   return bridgeSocket;
 }
 
@@ -135,7 +123,6 @@ ssize_t send2(int socket, const void *message, size_t length, int flags, uint64_
     return length;
   }
 
-  // printf("send info id:%llu len:%d\n", id, length);
   
   if (send_buffer.size() > 2 * sizeof(uint64_t)) {
     send_id++;
@@ -143,9 +130,6 @@ ssize_t send2(int socket, const void *message, size_t length, int flags, uint64_
     *(uint64_t*)&send_buffer[0] = send_id;
     *((uint64_t*)&send_buffer[0] + 1) = length;
     emscripten_websocket_send_binary(bridgeSocket, (void *)send_buffer.data(), send_buffer.size());
-    // printf("send id:%llu len:%llu\n", send_id, length);
-    // bprint("send data", send_buffer.data(), send_buffer.size());
-    // printf("send buffer info id:%llu len:%llu origin id:%llu\n", send_id, (uint64_t)send_buffer.size(), length > 0? origin_id - 1: origin_id);
 
     send_buffer.reserve(NETWORK_BUFFER_SIZE);
     send_buffer.resize(2 * sizeof(uint64_t));
@@ -167,21 +151,14 @@ ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
   emscripten_log(EM_LOG_NO_PATHS | EM_LOG_CONSOLE | EM_LOG_ERROR | EM_LOG_JS_STACK, "recv(socket=%d,buffer=%p,length=%zd,flags=%d)\n", socket, buffer, length, flags);
 #endif
   size_t len = 0;
-  // printf("begin recv2 id:%lu size:%lu\n", id, length);
   while (len == 0) {
     std::unique_lock<mutex> lck(recvLock);
-    // while (!recvBufferFlag)
-    //    emscripten_futex_wait(&recvBufferFlag, 0, 1e9);
-  
-    // pthread_mutex_lock(&recvLock);
-    // printf("need: %lu recv buffer size:%lu\n", length, recv_buffer.size());
   #if DEBUG_MSG_INFO
     while (recv_buffer.size() < length + 2 * sizeof(uint64_t))
         recvCond.wait(lck);
     if (recv_buffer.size() >= length + 2 * sizeof(uint64_t)) {
       uint64_t *actual_id = (uint64_t*)recv_buffer.data();
       uint64_t *actual_len = actual_id + 1;
-      // printf("debug id actual:%llu expect:%llu  length: actual:%llu expect:%llu\n", *actual_id, id, *actual_len, (uint64_t)length);
       if (*actual_id != id || *actual_len != length) {
         printf("id actual:%llu expect:%llu  length: actual:%llu expect:%llu\n", *actual_id, id, *actual_len, (uint64_t)length);
         assert(false);
@@ -190,7 +167,6 @@ ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
       memcpy(buffer, recv_buffer.data() + 2 * sizeof(uint64_t), length);
       recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + 2 * sizeof(uint64_t) + length);
       len = length;
-      recvBufferFlag = recv_buffer.empty() ? 0: 1;
     }
   #else
     while (recv_buffer.size() < length)
@@ -199,10 +175,8 @@ ssize_t recv2(int socket, void *buffer, size_t length, int flags, uint64_t id) {
       memcpy(buffer, recv_buffer.data(), length);
       recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + length);
       len = length;
-      recvBufferFlag = recv_buffer.empty() ? 0: 1;
     }
   #endif
-    // pthread_mutex_unlock(&recvLock);
   }
 
   return len;
