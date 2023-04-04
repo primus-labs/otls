@@ -13,21 +13,23 @@ using namespace emp;
 using namespace std;
 
 static unsigned char master_key_label[] = {"master key"};
+static unsigned char extended_master_key_label[] = {"extended master secret"};
 static unsigned char key_expansion_label[] = {"key expansion"};
 static unsigned char client_finished_label[] = {"client finished"};
 static unsigned char server_finished_label[] = {"server finished"};
 
-static size_t master_key_label_length = sizeof(master_key_label) - 1;
-static size_t key_expansion_label_length = sizeof(key_expansion_label) - 1;
-static size_t client_finished_label_length = sizeof(client_finished_label) - 1;
-static size_t server_finished_label_length = sizeof(server_finished_label) - 1;
+static uint64_t master_key_label_length = sizeof(master_key_label) - 1;
+static uint64_t extended_master_key_label_length = sizeof(extended_master_key_label) - 1;
+static uint64_t key_expansion_label_length = sizeof(key_expansion_label) - 1;
+static uint64_t client_finished_label_length = sizeof(client_finished_label) - 1;
+static uint64_t server_finished_label_length = sizeof(server_finished_label) - 1;
 
-static size_t master_key_length = 384 / 8;
-static size_t expansion_key_length = 448 / 8;
-static const size_t finished_msg_length = 96 / 8;
-static const size_t tag_length = 16;
-static const size_t iv_length = 12;
-static const size_t key_length = 128 / 8;
+static uint64_t master_key_length = 384 / 8;
+static uint64_t expansion_key_length = 448 / 8;
+static const uint64_t finished_msg_length = 96 / 8;
+static const uint64_t tag_length = 16;
+static const uint64_t iv_length = 4;
+static const uint64_t key_length = 128 / 8;
 
 template <typename IO>
 class HandShake {
@@ -55,6 +57,8 @@ class HandShake {
     unsigned char client_ufin[finished_msg_length];
     unsigned char server_ufin[finished_msg_length];
     unsigned char iv_oct[iv_length * 2];
+    unsigned char client_iv_oct[iv_length];
+    unsigned char server_iv_oct[iv_length];
 
     HandShake(IO* io, COT<IO>* ot, EC_GROUP* group) : io(io) {
         ctx = BN_CTX_new();
@@ -174,10 +178,10 @@ class HandShake {
 
     inline void compute_master_key(const BIGNUM* pms,
                                    const unsigned char* rc,
-                                   size_t rc_len,
+                                   uint64_t rc_len,
                                    const unsigned char* rs,
-                                   size_t rs_len) {
-        size_t len = BN_num_bytes(pms);
+                                   uint64_t rs_len) {
+        uint64_t len = BN_num_bytes(pms);
         unsigned char* buf = new unsigned char[len];
         BN_bn2bin(pms, buf);
         reverse(buf, buf + len);
@@ -195,7 +199,7 @@ class HandShake {
         Integer pmsbits;
         addmod(pmsbits, pmsa, pmsb, q);
 
-        size_t seed_len = rc_len + rs_len;
+        uint64_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
         memcpy(seed, rc, rc_len);
         memcpy(seed + rc_len, rs, rs_len);
@@ -208,11 +212,39 @@ class HandShake {
         delete[] buf;
     }
 
+    inline void compute_extended_master_key(const BIGNUM* pms,
+                                            const unsigned char* hash,
+                                            uint64_t hash_len) {
+        uint64_t len = BN_num_bytes(pms);
+        unsigned char* buf = new unsigned char[len];
+        BN_bn2bin(pms, buf);
+        reverse(buf, buf + len);
+        Integer pmsa, pmsb;
+
+        // commit the IT-MAC of zk_2 in addmod.
+        switch_to_zk();
+        zk_pms = Integer(len * 8, buf, ALICE);
+        sync_zk_gc<IO>();
+        switch_to_gc();
+
+        pmsa = Integer(len * 8, buf, ALICE);
+        pmsb = Integer(len * 8, buf, BOB);
+
+        Integer pmsbits;
+        addmod(pmsbits, pmsa, pmsb, q);
+
+        prf.init(hmac, pmsbits);
+        prf.opt_compute(hmac, master_key, master_key_length * 8, pmsbits, extended_master_key_label,
+                        extended_master_key_label_length, hash, hash_len, true, true);
+
+        delete[] buf;
+    }
+
     inline void compute_expansion_keys(const unsigned char* rc,
-                                       size_t rc_len,
+                                       uint64_t rc_len,
                                        const unsigned char* rs,
-                                       size_t rs_len) {
-        size_t seed_len = rc_len + rs_len;
+                                       uint64_t rs_len) {
+        uint64_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
         memcpy(seed, rs, rs_len);
         memcpy(seed + rs_len, rc, rc_len);
@@ -221,17 +253,23 @@ class HandShake {
         prf.init(hmac, master_key);
         prf.opt_compute(hmac, key, expansion_key_length * 8, master_key, key_expansion_label,
                         key_expansion_label_length, seed, seed_len, true, true);
+        uint64_t unused_bit_length = 16 * 8;
         Integer iv;
-        iv.bits.insert(iv.bits.begin(), key.bits.begin(),
-                       key.bits.begin() + iv_length * 8 * 2);
+        iv.bits.insert(iv.bits.begin(), key.bits.begin() + unused_bit_length,
+                       key.bits.begin() + unused_bit_length + iv_length * 8 * 2);
         server_write_key.bits.insert(server_write_key.bits.begin(),
-                                     key.bits.begin() + 2 * iv_length * 8,
-                                     key.bits.begin() + 2 * iv_length * 8 + key_length * 8);
+                                     key.bits.begin() + unused_bit_length + 2 * iv_length * 8,
+                                     key.bits.begin() + unused_bit_length + 2 * iv_length * 8 + key_length * 8);
         client_write_key.bits.insert(client_write_key.bits.begin(),
-                                     key.bits.begin() + 2 * iv_length * 8 + key_length * 8,
-                                     key.bits.begin() + 2 * (iv_length * 8 + key_length * 8));
+                                     key.bits.begin() + unused_bit_length + 2 * iv_length * 8 + key_length * 8,
+                                     key.bits.begin() + unused_bit_length + 2 * (iv_length * 8 + key_length * 8));
 
         iv.reveal<unsigned char>((unsigned char*)iv_oct, PUBLIC);
+        memcpy(server_iv_oct, iv_oct, 4);
+        reverse(server_iv_oct, server_iv_oct + 4);
+
+        memcpy(client_iv_oct, iv_oct + 4, 4);
+        reverse(client_iv_oct, client_iv_oct + 4);
         delete[] seed;
     }
 
@@ -239,11 +277,11 @@ class HandShake {
                                                   Integer& key,
                                                   const BIGNUM* pms,
                                                   const unsigned char* rc,
-                                                  size_t rc_len,
+                                                  uint64_t rc_len,
                                                   const unsigned char* rs,
-                                                  size_t rs_len,
+                                                  uint64_t rs_len,
                                                   int party) {
-        size_t len = BN_num_bytes(pms);
+        uint64_t len = BN_num_bytes(pms);
         unsigned char* buf = new unsigned char[len];
         BN_bn2bin(pms, buf);
         reverse(buf, buf + len);
@@ -269,7 +307,7 @@ class HandShake {
         Integer pmsbits;
         addmod(pmsbits, pmsa, pmsb, q);
 
-        size_t seed_len = rc_len + rs_len;
+        uint64_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
         memcpy(seed, rc, rc_len);
         memcpy(seed + rc_len, rs, rs_len);
@@ -292,40 +330,44 @@ class HandShake {
     inline void compute_finished_msg(unsigned char* ufin,
                                      const Integer& ms,
                                      const unsigned char* label,
-                                     size_t label_len,
+                                     uint64_t label_len,
                                      const unsigned char* tau,
-                                     size_t tau_len) {
+                                     uint64_t tau_len) {
         Integer ufin_int;
         prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, ms, label, label_len, tau,
                         tau_len, true, true);
         ufin_int.reveal<unsigned char>((unsigned char*)ufin, PUBLIC);
     }
 
-    inline void compute_client_finished_msg(const unsigned char* label,
-                                            size_t label_len,
+    inline void compute_client_finished_msg(unsigned char* ufin,
+                                            const unsigned char* label,
+                                            uint64_t label_len,
                                             const unsigned char* tau,
-                                            size_t tau_len) {
+                                            uint64_t tau_len) {
         Integer ufin_int;
         prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, master_key, label, label_len,
                         tau, tau_len, true, true);
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
+        memcpy(ufin, client_ufin, finished_msg_length);
     }
 
-    inline void compute_server_finished_msg(const unsigned char* label,
-                                            size_t label_len,
+    inline void compute_server_finished_msg(unsigned char* ufin,
+                                            const unsigned char* label,
+                                            uint64_t label_len,
                                             const unsigned char* tau,
-                                            size_t tau_len) {
+                                            uint64_t tau_len) {
         Integer ufin_int;
         prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, master_key, label, label_len,
                         tau, tau_len, true, true);
         ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
+        memcpy(ufin, server_ufin, finished_msg_length);
     }
 
     inline void encrypt_client_finished_msg(AEAD<IO>* aead_c,
                                             unsigned char* ctxt,
                                             unsigned char* tag,
                                             const unsigned char* aad,
-                                            size_t aad_len,
+                                            uint64_t aad_len,
                                             int party) {
         aead_c->encrypt(io, ctxt, tag, client_ufin, finished_msg_length, aad, aad_len, party);
     }
@@ -334,10 +376,11 @@ class HandShake {
                                             unsigned char* ctxt,
                                             unsigned char* tag,
                                             const unsigned char* ufinc,
+                                            uint64_t ufinc_len,
                                             const unsigned char* aad,
-                                            size_t aad_len,
+                                            uint64_t aad_len,
                                             int party) {
-        aead_c.enc_finished_msg(io, ctxt, tag, ufinc, finished_msg_length, aad, aad_len,
+        aead_c.encrypt(io, ctxt, tag, ufinc, ufinc_len, aad, aad_len,
                                 party);
     }
 
@@ -346,7 +389,7 @@ class HandShake {
                                                       const unsigned char* ctxt,
                                                       const unsigned char* tag,
                                                       const unsigned char* aad,
-                                                      size_t aad_len,
+                                                      uint64_t aad_len,
                                                       int party) {
         unsigned char* msg = new unsigned char[finished_msg_length];
         bool res1 =
@@ -358,31 +401,29 @@ class HandShake {
     }
 
     inline bool decrypt_and_check_server_finished_msg(AEAD<IO>& aead_s,
-                                                      const unsigned char* ufins,
+                                                      unsigned char* msg,
                                                       const unsigned char* ctxt,
+                                                      uint64_t ctxt_len,
                                                       const unsigned char* tag,
                                                       const unsigned char* aad,
-                                                      size_t aad_len,
+                                                      uint64_t aad_len,
                                                       int party) {
-        unsigned char* msg = new unsigned char[finished_msg_length];
-        bool res1 = aead_s.dec_finished_msg(io, msg, ctxt, finished_msg_length, tag, aad,
+        bool res1 = aead_s.decrypt(io, msg, ctxt, ctxt_len, tag, aad,
                                             aad_len, party);
 
-        bool res2 = (memcmp(msg, ufins, finished_msg_length) == 0);
-        delete[] msg;
 
-        return res1 & res2;
+        return res1;
     }
 
     // ALICE knows pms, which is the entire value, not a share.
     inline void prove_master_key(Integer& ms,
                                  const BIGNUM* pms,
                                  const unsigned char* rc,
-                                 size_t rc_len,
+                                 uint64_t rc_len,
                                  const unsigned char* rs,
-                                 size_t rs_len,
+                                 uint64_t rs_len,
                                  int party) {
-        size_t len = BN_num_bytes(q);
+        uint64_t len = BN_num_bytes(q);
         unsigned char* buf = new unsigned char[len];
 
         if (party == ALICE)
@@ -395,7 +436,7 @@ class HandShake {
         Integer pmsbits;
         addmod(pmsbits, z1, zk_pms, q);
 
-        size_t seed_len = rc_len + rs_len;
+        uint64_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
         memcpy(seed, rc, rc_len);
         memcpy(seed + rc_len, rs, rs_len);
@@ -412,11 +453,11 @@ class HandShake {
                                      Integer& key_s,
                                      const Integer& ms,
                                      const unsigned char* rc,
-                                     size_t rc_len,
+                                     uint64_t rc_len,
                                      const unsigned char* rs,
-                                     size_t rs_len,
+                                     uint64_t rs_len,
                                      int party) {
-        size_t seed_len = rc_len + rs_len;
+        uint64_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
         memcpy(seed, rs, rs_len);
         memcpy(seed + rs_len, rc, rc_len);
@@ -446,9 +487,9 @@ class HandShake {
 
     inline void prove_client_finished_msg(const Integer& ms,
                                           const unsigned char* label,
-                                          size_t label_len,
+                                          uint64_t label_len,
                                           const unsigned char* tau,
-                                          size_t tau_len,
+                                          uint64_t tau_len,
                                           int party) {
         Integer ufin;
         prf.opt_compute(hmac, ufin, finished_msg_length * 8, ms, label, label_len, tau,
@@ -458,9 +499,9 @@ class HandShake {
 
     inline void prove_server_finished_msg(const Integer& ms,
                                           const unsigned char* label,
-                                          size_t label_len,
+                                          uint64_t label_len,
                                           const unsigned char* tau,
-                                          size_t tau_len,
+                                          uint64_t tau_len,
                                           int party) {
         Integer ufin;
         prf.opt_compute(hmac, ufin, finished_msg_length * 8, ms, label, label_len, tau,

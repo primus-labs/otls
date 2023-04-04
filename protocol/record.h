@@ -15,9 +15,9 @@ class Record {
                         unsigned char* ctxt,
                         unsigned char* tag,
                         const unsigned char* msg,
-                        size_t msg_len,
+                        uint64_t msg_len,
                         const unsigned char* aad,
-                        size_t aad_len,
+                        uint64_t aad_len,
                         int party) {
         aead_c->encrypt(io, ctxt, tag, msg, msg_len, aad, aad_len, party, true);
     }
@@ -28,10 +28,10 @@ class Record {
                         IO* io,
                         unsigned char* msg,
                         const unsigned char* ctxt,
-                        size_t ctxt_len,
+                        uint64_t ctxt_len,
                         const unsigned char* tag,
                         const unsigned char* aad,
-                        size_t aad_len,
+                        uint64_t aad_len,
                         int party) {
         return aead_s->decrypt(io, msg, ctxt, ctxt_len, tag, aad, aad_len, party, true);
     }

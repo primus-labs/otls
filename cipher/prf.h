@@ -18,12 +18,12 @@ class PRF {
         }
         pub_M.clear();
     };
-    size_t hmac_calls_num = 0;
+    uint64_t hmac_calls_num = 0;
 
     // should check consistency of zk_sec_M and pub_M;
     vector<Integer> zk_sec_M;
     vector<uint32_t*> pub_M;
-    size_t zk_pos = 0;
+    uint64_t zk_pos = 0;
 
     inline void init(HMAC_SHA256& hmac, const Integer secret) {
         hmac.init(secret);
@@ -32,10 +32,10 @@ class PRF {
 
     inline void phash(HMAC_SHA256& hmac,
                       Integer& res,
-                      size_t bitlen,
+                      uint64_t bitlen,
                       const Integer secret,
                       const Integer seed) {
-        size_t blks = bitlen / (hmac.DIGLEN * hmac.WORDLEN) + 1;
+        uint64_t blks = bitlen / (hmac.DIGLEN * hmac.WORDLEN) + 1;
         Integer* A = new Integer[blks + 1];
         Integer* tmp = new Integer[hmac.DIGLEN];
 
@@ -63,16 +63,16 @@ class PRF {
 
     inline void opt_phash(HMAC_SHA256& hmac,
                           Integer& res,
-                          size_t bitlen,
+                          uint64_t bitlen,
                           const Integer secret,
                           const unsigned char* seed,
-                          size_t seedlen,
+                          uint64_t seedlen,
                           bool reuse_in_hash_flag = false,
                           bool reuse_out_hash_flag = false,
                           bool zk_flag = false) {
-        size_t blks = bitlen / (hmac.DIGLEN * hmac.WORDLEN) + 1;
+        uint64_t blks = bitlen / (hmac.DIGLEN * hmac.WORDLEN) + 1;
         vector<unsigned char*> A;
-        vector<size_t> hashlen;
+        vector<uint64_t> hashlen;
         A.resize(blks + 1);
         A[0] = new unsigned char[seedlen];
         memcpy(A[0], seed, seedlen);
@@ -137,7 +137,7 @@ class PRF {
 
     inline void compute(HMAC_SHA256& hmac,
                         Integer& res,
-                        size_t bitlen,
+                        uint64_t bitlen,
                         const Integer secret,
                         const Integer label,
                         const Integer seed) {
@@ -149,12 +149,12 @@ class PRF {
 
     inline void opt_compute(HMAC_SHA256& hmac,
                             Integer& res,
-                            size_t bitlen,
+                            uint64_t bitlen,
                             const Integer secret,
                             const unsigned char* label,
-                            size_t labellen,
+                            uint64_t labellen,
                             const unsigned char* seed,
-                            size_t seedlen,
+                            uint64_t seedlen,
                             bool reuse_in_hash_flag = false,
                             bool reuse_out_hash_flag = false,
                             bool zk_flag = false) {
@@ -167,7 +167,7 @@ class PRF {
         delete[] label_seed;
     }
 
-    inline size_t hmac_calls() { return hmac_calls_num; }
+    inline uint64_t hmac_calls() { return hmac_calls_num; }
 
     template <typename IO>
     inline void prf_check(int party) {

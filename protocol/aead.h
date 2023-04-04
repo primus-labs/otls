@@ -27,17 +27,17 @@ class AEAD {
     // xor and zk share of z, for izk to check consistency
     deque<unsigned char*> gc_z;
     deque<Integer> zk_z;
-    deque<size_t> z_len;
+    deque<uint64_t> z_len;
 
     // opened z values and related length. Only for the case sec_type == false
     deque<unsigned char*> open_z;
-    deque<size_t> open_len;
+    deque<uint64_t> open_len;
 
     // These are the multiplicative shares h^n for h = AES(key,0)
     vector<block> mul_hs;
 
     OLEF2K<IO>* ole = nullptr;
-    AEAD(IO* io, COT<IO>* ot, Integer& key, const unsigned char* iv, size_t iv_len) {
+    AEAD(IO* io, COT<IO>* ot, Integer& key, const unsigned char* iv, uint64_t iv_len) {
         ole = new OLEF2K<IO>(io, ot);
         assert(iv_len == 12);
 
@@ -103,7 +103,7 @@ class AEAD {
         return computeAES_KS(expanded_key, in);
     }
 
-    inline Integer inc(Integer& counter, size_t s) {
+    inline Integer inc(Integer& counter, uint64_t s) {
         if (counter.size() < s) {
             error("invalid length s!");
         }
@@ -116,7 +116,7 @@ class AEAD {
         return msb;
     }
 
-    inline void gctr(Integer& res, size_t m) {
+    inline void gctr(Integer& res, uint64_t m) {
         Integer tmp(128, 0, PUBLIC);
         for (int i = 0; i < m; i++) {
             Integer content = nonce;
@@ -128,7 +128,7 @@ class AEAD {
     }
 
     // The in blocks are known to one or two parties.
-    inline void obv_ghash(block& out, const block* in, size_t len, int party) {
+    inline void obv_ghash(block& out, const block* in, uint64_t len, int party) {
         block h = mul_hs[0];
         while (mul_hs.size() < len)
             mul_hs.push_back(mulBlock(h, mul_hs.back()));
@@ -157,15 +157,15 @@ class AEAD {
                         unsigned char* ctxt,
                         unsigned char* tag,
                         const unsigned char* msg,
-                        size_t msg_len,
+                        uint64_t msg_len,
                         const unsigned char* aad,
-                        size_t aad_len,
+                        uint64_t aad_len,
                         int party,
                         bool sec_type = false) {
         // u = 128 * ceil(msg_len/128) - 8*msg_len
-        size_t u = 128 * ((msg_len * 8 + 128 - 1) / 128) - msg_len * 8;
+        uint64_t u = 128 * ((msg_len * 8 + 128 - 1) / 128) - msg_len * 8;
 
-        size_t ctr_len = (msg_len * 8 + 128 - 1) / 128;
+        uint64_t ctr_len = (msg_len * 8 + 128 - 1) / 128;
 
         Integer Z;
         gctr(Z, 1 + ctr_len);
@@ -242,8 +242,8 @@ class AEAD {
 
         // Now compute the tag.
 
-        size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
-        size_t len = u / 8 + msg_len + v / 8 + aad_len + 16;
+        uint64_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
+        uint64_t len = u / 8 + msg_len + v / 8 + aad_len + 16;
 
         unsigned char* x = new unsigned char[len];
 
@@ -293,16 +293,16 @@ class AEAD {
     inline bool decrypt(IO* io,
                         unsigned char* msg,
                         const unsigned char* ctxt,
-                        size_t ctxt_len,
+                        uint64_t ctxt_len,
                         const unsigned char* tag,
                         const unsigned char* aad,
-                        size_t aad_len,
+                        uint64_t aad_len,
                         int party,
                         bool sec_type = false) {
         // u = 128 * ceil(ctxt_len/128) - 8*ctxt_len
-        size_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
+        uint64_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
 
-        size_t ctr_len = (ctxt_len * 8 + 128 - 1) / 128;
+        uint64_t ctr_len = (ctxt_len * 8 + 128 - 1) / 128;
 
         bool res = false;
 
@@ -375,8 +375,8 @@ class AEAD {
 
         // Now compute the tag.
 
-        size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
-        size_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
+        uint64_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
+        uint64_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
 
         unsigned char* x = new unsigned char[len];
 
@@ -473,12 +473,12 @@ inline void compute_tag(unsigned char* tag,
                         const block h,
                         const block z0,
                         const unsigned char* ctxt,
-                        size_t ctxt_len,
+                        uint64_t ctxt_len,
                         const unsigned char* aad,
-                        size_t aad_len) {
-    size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
-    size_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
-    size_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
+                        uint64_t aad_len) {
+    uint64_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
+    uint64_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
+    uint64_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
 
     unsigned char* x = new unsigned char[len];
     unsigned char ilen[8], mlen[8];
@@ -510,9 +510,9 @@ inline bool compare_tag(const unsigned char* tag,
                         const block h,
                         const block z0,
                         const unsigned char* ctxt,
-                        size_t ctxt_len,
+                        uint64_t ctxt_len,
                         const unsigned char* aad,
-                        size_t aad_len) {
+                        uint64_t aad_len) {
     unsigned char* ctag = new unsigned char[16];
     compute_tag(ctag, h, z0, ctxt, ctxt_len, aad, aad_len);
     bool res = (memcmp(tag, ctag, 16) == 0);

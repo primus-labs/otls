@@ -11,8 +11,7 @@ using namespace emp;
 using std::string;
 using std::vector;
 
-static string circuit_file_location =
-  macro_xstr(EMP_CIRCUIT_PATH) + string("bristol_fashion/");
+static string circuit_file_location = string("bristol_fashion/");
 static BristolFashion aes = BristolFashion((circuit_file_location + "aes_128.txt").c_str());
 
 static string aes_ks_file = "cipher/circuit_files/aes128_ks.txt";
@@ -47,7 +46,7 @@ inline Integer str_to_int(string str, int party) {
     return res;
 }
 
-inline void char_to_uint32(uint32_t* res, const char* in, size_t len) {
+inline void char_to_uint32(uint32_t* res, const char* in, uint64_t len) {
     for (int i = 0; i < len / 4; i++) {
     }
 }
@@ -106,8 +105,8 @@ inline void print_hex_32(Integer* s, int len) {
     cout << int_to_hex(outhex) << endl;
 }
 
-inline void intvec_to_int(Integer& out, Integer* in, size_t len) {
-    size_t s = in[0].size();
+inline void intvec_to_int(Integer& out, Integer* in, uint64_t len) {
+    uint64_t s = in[0].size();
     out = Integer(s * len, 0, PUBLIC);
     Integer tmp = Integer(s * len, 0, PUBLIC);
     for (int i = 0; i < len; i++) {
@@ -116,17 +115,17 @@ inline void intvec_to_int(Integer& out, Integer* in, size_t len) {
     }
 }
 
-inline void concat(Integer& res, const Integer* in, size_t len) {
+inline void concat(Integer& res, const Integer* in, uint64_t len) {
     for (int i = 0; i < len; i++)
         res.bits.insert(res.bits.begin(), in[i].bits.begin(), in[i].bits.end());
 }
 
-inline void reverse_concat(Integer& res, const Integer* in, size_t len) {
+inline void reverse_concat(Integer& res, const Integer* in, uint64_t len) {
     for (int i = 0; i < len; i++)
         res.bits.insert(res.bits.end(), in[i].bits.begin(), in[i].bits.end());
 }
 
-inline void move_concat(Integer& res, const Integer* in, size_t len) {
+inline void move_concat(Integer& res, const Integer* in, uint64_t len) {
     for (int i = 0; i < len; i++)
         res.bits.insert(res.bits.begin(), make_move_iterator(in[i].bits.begin()),
                         make_move_iterator(in[i].bits.end()));
@@ -176,9 +175,10 @@ inline block mulBlock(block a, block b) {
     return _mm_xor_si128(tmp6, tmp3);
 }
 
-inline block powBlock(block a, size_t len) {
-    size_t leading_zeros = 0;
-    for (int i = sizeof(size_t) * 8 - 1; i >= 0; i--) {
+inline block powBlock(block a, uint64_t len) {
+    printf("powBlock risk! 1\n");
+    uint64_t leading_zeros = 0;
+    for (int i = sizeof(uint64_t) * 8 - 1; i >= 0; i--) {
         if ((len >> i) & 1)
             break;
         leading_zeros++;
@@ -186,7 +186,7 @@ inline block powBlock(block a, size_t len) {
     block h = a;
     block res = (len & 1) ? a : set_bit(zero_block, 127);
 
-    for (int i = 1; i < sizeof(size_t) * 8 - leading_zeros; i++) {
+    for (int i = 1; i < sizeof(uint64_t) * 8 - leading_zeros; i++) {
         h = mulBlock(h, h);
         if ((len >> i) & 1)
             res = mulBlock(h, res);
@@ -207,7 +207,7 @@ inline block invBlock(block a) {
     return res;
 }
 
-inline block ghash(block h, block* x, size_t m) {
+inline block ghash(block h, block* x, uint64_t m) {
     block y = zero_block;
     for (int i = 0; i < m; i++) {
         y = mulBlock((y ^ x[i]), h);
@@ -242,7 +242,7 @@ inline block integer_to_block(Integer& in) {
         error("the length of input should be 128!\n");
 
     block b = zero_block;
-    size_t one = 1;
+    uint64_t one = 1;
     for (int i = 0; i < 64; i++) {
         if (getLSB(in[i].bit))
             b = b ^ makeBlock(0, one << i);
@@ -254,7 +254,7 @@ inline block integer_to_block(Integer& in) {
 }
 
 // Transfer gc share into xor share.
-inline void integer_to_block(block* out, Integer* in, size_t len) {
+inline void integer_to_block(block* out, Integer* in, uint64_t len) {
     for (int i = 0; i < len; i++)
         out[i] = integer_to_block(in[i]);
 }
@@ -275,7 +275,7 @@ inline void integer_to_chars(unsigned char* out, Integer& in) {
     Integer ins(in);
     reverse(ins.bits.begin(), ins.bits.end());
     for (int i = 0; i < in.size(); i += 8) {
-        size_t tmp = 0;
+        uint64_t tmp = 0;
         for (int j = 0; j < 8; j++) {
             if (getLSB(ins.bits[i + j].bit)) {
                 tmp ^= (1 << (7 - j));
@@ -285,7 +285,7 @@ inline void integer_to_chars(unsigned char* out, Integer& in) {
     }
 }
 
-inline void block_to_hex(unsigned char* out, const block* in, size_t len) {
+inline void block_to_hex(unsigned char* out, const block* in, uint64_t len) {
     block* ins = new block[len];
     memcpy(ins, in, len * 16);
 
@@ -297,7 +297,7 @@ inline void block_to_hex(unsigned char* out, const block* in, size_t len) {
     delete[] ins;
 }
 
-inline void hex_to_block(block* out, const unsigned char* in, size_t len) {
+inline void hex_to_block(block* out, const unsigned char* in, uint64_t len) {
     if (len % 16 != 0)
         error("the length of the bytes is incorrect!\n");
     unsigned char* ins = new unsigned char[len];

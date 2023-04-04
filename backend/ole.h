@@ -11,9 +11,9 @@ class OLE {
     BN_CTX* ctx = nullptr;
     vector<BIGNUM*> exp;
     CCRH ccrh;
-    size_t bit_length;
+    uint64_t bit_length;
     BIGNUM* q;
-    OLE(IO* io, COT<IO>* ot, BIGNUM* q2, size_t bit_length)
+    OLE(IO* io, COT<IO>* ot, BIGNUM* q2, uint64_t bit_length)
         : io(io), ot(ot), bit_length(bit_length) {
         ctx = BN_CTX_new();
         q = BN_new();

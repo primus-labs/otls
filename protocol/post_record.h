@@ -73,13 +73,13 @@ class PostRecord {
     inline void prove_and_check_handshake(const unsigned char* finc_ctxt,
                                           const unsigned char* fins_ctxt,
                                           const unsigned char* rc,
-                                          size_t rc_len,
+                                          uint64_t rc_len,
                                           const unsigned char* rs,
-                                          size_t rs_len,
+                                          uint64_t rs_len,
                                           const unsigned char* tau_c,
-                                          size_t tau_c_len,
+                                          uint64_t tau_c_len,
                                           const unsigned char* tau_s,
-                                          size_t tau_s_len) {
+                                          uint64_t tau_s_len) {
         hs->prove_master_key(master_key, pms, rc, rc_len, rs, rs_len, party);
         hs->prove_expansion_keys(client_write_key, server_write_key, master_key, rc, rc_len,
                                  rs, rs_len, party);
@@ -101,7 +101,7 @@ class PostRecord {
     inline void prove_record_client(Integer& msg,
                                     Integer& z0,
                                     const unsigned char* ctxt,
-                                    size_t ctxt_len) {
+                                    uint64_t ctxt_len) {
         aead_proof_c->prove_aead(msg, z0, ctxt, ctxt_len, true);
     }
 
@@ -109,7 +109,7 @@ class PostRecord {
     inline void prove_record_server(Integer& msg,
                                     Integer& z0,
                                     const unsigned char* ctxt,
-                                    size_t ctxt_len) {
+                                    uint64_t ctxt_len) {
         aead_proof_s->prove_aead(msg, z0, ctxt, ctxt_len, true);
     }
 
@@ -117,7 +117,7 @@ class PostRecord {
     inline void prove_record_server_last(Integer& msg,
                                          Integer& z0,
                                          const unsigned char* ctxt,
-                                         size_t ctxt_len) {
+                                         uint64_t ctxt_len) {
         aead_proof_s->prove_aead_last(msg, z0, ctxt, ctxt_len);
     }
 
@@ -134,16 +134,16 @@ class PostRecord {
                                const vector<Integer> enc_z0s,
                                const vector<unsigned char*> enc_ctxts,
                                const vector<unsigned char*> enc_tags,
-                               const vector<size_t> enc_ctxts_len,
+                               const vector<uint64_t> enc_ctxts_len,
                                const vector<unsigned char*> enc_aads,
-                               size_t enc_num,
+                               uint64_t enc_num,
                                const vector<Integer> dec_z0s,
                                const vector<unsigned char*> dec_ctxts,
                                const vector<unsigned char*> dec_tags,
-                               const vector<size_t> dec_ctxts_len,
+                               const vector<uint64_t> dec_ctxts_len,
                                const vector<unsigned char*> dec_aads,
-                               size_t dec_num,
-                               size_t aad_len) {
+                               uint64_t dec_num,
+                               uint64_t aad_len) {
         Integer h;
         reverse_concat(h, &(aead_proof_c->H), 1);
         reverse_concat(h, &(aead_proof_s->H), 1);

@@ -6,7 +6,7 @@
 using namespace emp;
 
 template <typename IO>
-inline void check_zero(const block* blk, size_t length, int party) {
+inline void check_zero(const block* blk, uint64_t length, int party) {
     if (party == ALICE) {
         (((ZKProver<IO>*)(ProtocolExecution::prot_exec))->ostriple->auth_helper->hash)
           .put_block(blk, length);
@@ -33,7 +33,7 @@ inline void check_zero(const Integer& input, int party) {
 
 // data should be the same for ALICE and BOB.
 template <typename IO, typename T>
-inline void check_zero(const Integer& input, const T* data, size_t len, int party) {
+inline void check_zero(const Integer& input, const T* data, uint64_t len, int party) {
     if (input.size() != len * sizeof(T) * 8)
         error("inconsistent length!\n");
     bool* tmp = new bool[input.size()];

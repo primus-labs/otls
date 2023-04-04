@@ -55,7 +55,7 @@ class AEAD_Proof {
     int party;
 
     AEAD_Proof(
-      AEAD<IO>* aead, Integer& key, const unsigned char* iv, size_t iv_len, int party) {
+      AEAD<IO>* aead, Integer& key, const unsigned char* iv, uint64_t iv_len, int party) {
         this->aead = aead;
         this->party = party;
 
@@ -82,7 +82,7 @@ class AEAD_Proof {
         return computeAES_KS(expanded_key, in);
     }
 
-    inline Integer inc(Integer& counter, size_t s) {
+    inline Integer inc(Integer& counter, uint64_t s) {
         if (counter.size() < s) {
             error("invalid length s!");
         }
@@ -95,7 +95,7 @@ class AEAD_Proof {
         return msb;
     }
 
-    inline void gctr(Integer& res, size_t m) {
+    inline void gctr(Integer& res, uint64_t m) {
         Integer tmp(128, 0, PUBLIC);
         for (int i = 0; i < m; i++) {
             Integer content = nonce;
@@ -109,12 +109,12 @@ class AEAD_Proof {
     void prove_aead(Integer& msg,
                     Integer& tag_z0,
                     const unsigned char* ctxt,
-                    size_t ctxt_len,
+                    uint64_t ctxt_len,
                     bool sec_type = false) {
         // u = 128 * ceil(ctxt_len/128) - 8*ctxt_len
-        size_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
+        uint64_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
 
-        size_t ctr_len = (ctxt_len * 8 + 128 - 1) / 128;
+        uint64_t ctr_len = (ctxt_len * 8 + 128 - 1) / 128;
 
         Integer Z;
         gctr(Z, 1 + ctr_len);
@@ -171,11 +171,11 @@ class AEAD_Proof {
     inline void prove_aead_last(Integer& msg,
                                 Integer& tag_z0,
                                 const unsigned char* ctxt,
-                                size_t ctxt_len) {
+                                uint64_t ctxt_len) {
         // u = 128 * ceil(ctxt_len/128) - 8*ctxt_len
-        size_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
+        uint64_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
 
-        size_t ctr_len = (ctxt_len * 8 + 128 - 1) / 128;
+        uint64_t ctr_len = (ctxt_len * 8 + 128 - 1) / 128;
 
         Integer Z;
         gctr(Z, 1 + ctr_len);
