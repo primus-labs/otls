@@ -723,8 +723,6 @@ ssize_t DoSendMessage(SendCtx* ctx, const char* buf, size_t len, FILE* stream) {
         assert(false);
         return -1;
     }
-    // printf("do send message:%d\n", len);
-    // fflush(stdout);
     return len;
 }
 
@@ -753,7 +751,7 @@ ssize_t SendMessage(SendCtx* ctx, const char* buf, size_t len, uint64_t id, FILE
     else if (len > 0) {
         assert(false);
     }
-    return len == 0? 1: len;
+    return len;
 
 }
 
@@ -786,19 +784,27 @@ void UnMaskData(char* buf, uint64_t len, uint32_t mask) {
     }
 }
 
+void PrintRecvCtx(RecvCtx* ctx) {
+    RecvList* p = ctx->list;
+    printf("recv ctx list: ");
+    while (p != NULL) {
+        RecvBuffer* b = (RecvBuffer*)p->data;
+        printf("%llu:%llu-> ", b->id, b->length);
+        p = p->next;
+    }
+    printf("\n");
+}
+
 void PutToRecvCtx(RecvCtx* ctx, RecvList* recv_chunk) {
-    RecvList* &recv_list = ctx->list;
-    RecvInfo* &recv_info = ctx->info;
 
     RecvBuffer* recv_buffer = (RecvBuffer*)recv_chunk->data;
-    // printf("recv id:%llu length:%llu\n", recv_buffer->id, recv_buffer->length);
-    // fflush(stdout);
-    if (recv_list == NULL) {
-        recv_list = recv_chunk;
+    //printf("recv id:%llu length:%llu\n", recv_buffer->id, recv_buffer->length);
+    if (ctx->list == NULL) {
+        ctx->list = recv_chunk;
     }
     else {
         RecvList *p_list = NULL;
-        RecvList *q_list = recv_list;
+        RecvList *q_list = ctx->list;
         while (q_list != NULL) {
             RecvBuffer* b = (RecvBuffer*)q_list->data;
 
@@ -806,7 +812,8 @@ void PutToRecvCtx(RecvCtx* ctx, RecvList* recv_chunk) {
                 recv_chunk->next = q_list;
 
                 if (p_list == NULL) {
-                    recv_list = recv_chunk;
+                    ctx->list = recv_chunk;
+                    printf("unorder recv==================\n");
                 }
                 else {
                     p_list->next = recv_chunk;
@@ -822,62 +829,58 @@ void PutToRecvCtx(RecvCtx* ctx, RecvList* recv_chunk) {
             p_list->next = recv_chunk;
         }
     }
+    //PrintRecvCtx(ctx);
 
-    if (recv_info == NULL) {
-        recv_info = (RecvInfo*)malloc(sizeof(RecvInfo));
-        recv_info->valid = false;
-        recv_info->prev_id = 0;
+    if (ctx->info == NULL) {
+        ctx->info = (RecvInfo*)malloc(sizeof(RecvInfo));
+        ctx->info->valid = false;
+        ctx->info->prev_id = 0;
     }
-    if (!recv_info->valid) {
-        RecvBuffer* b = (RecvBuffer*)recv_list->data;
-        if (recv_info->prev_id + 1 == b->id) {
-            recv_info->id = b->id;
-            recv_info->length = b->length;
-            recv_info->payload = b->payload;
-            recv_info->offset = 0;
-            recv_info->valid = true;
+    if (!ctx->info->valid && ctx->list != NULL) {
+        RecvBuffer* b = (RecvBuffer*)ctx->list->data;
+        if (ctx->info->prev_id + 1 == b->id) {
+            ctx->info->id = b->id;
+            ctx->info->length = b->length;
+            ctx->info->payload = b->payload;
+            ctx->info->offset = 0;
+            ctx->info->valid = true;
+            //printf("set recv info in put to id:%llu\n", b->id);
         }
     }
+    //printf("end recv id:%llu\n", recv_buffer->id);
 }
 
 size_t RecvFromRecvCtx(RecvCtx* ctx, char* buf, size_t len) {
-    RecvInfo* &recv_info = ctx->info;
-    RecvList* &recv_list = ctx->list;
-
     size_t recv_bytes = 0;
-    if (recv_info->offset < recv_info->length) {
-        uint64_t min_len = min(recv_info->length - recv_info->offset, len - recv_bytes);
-        memcpy(buf + recv_bytes, recv_info->payload + recv_info->offset, min_len);
-        recv_info->offset += min_len;
+    if (ctx->info->offset < ctx->info->length) {
+        uint64_t min_len = min(ctx->info->length - ctx->info->offset, (uint64_t)(len - recv_bytes));
+        memcpy(buf + recv_bytes, ctx->info->payload + ctx->info->offset, min_len);
+        ctx->info->offset += min_len;
 
         recv_bytes += min_len;
-        // printf("recv %llu expect %llu\n", min_len, len);
-        // fflush(stdout);
 
-        if (recv_info->offset == recv_info->length) {
-            RecvList *tmp = recv_list;
-            recv_list = recv_list->next;
+        if (ctx->info->offset == ctx->info->length) {
+            RecvList *tmp = ctx->list;
+            ctx->list = ctx->list->next;
 
             RecvBuffer* p = (RecvBuffer*)tmp->data;
-            if (recv_list != NULL) {
-                RecvBuffer* q = (RecvBuffer*)recv_list->data;
-                if (p->id + 1 == q->id) {
-                    recv_info->id = q->id;
-                    recv_info->length = q->length;
-                    recv_info->payload = q->payload;
-                    recv_info->offset = 0;
-                }
-                else {
-                    recv_info->prev_id = p->id;
-                    recv_info->valid = false;
-                }
-            }
-            else {
-                recv_info->prev_id = p->id;
-                recv_info->valid = false;
-            }
+
+            ctx->info->prev_id = p->id;
+            ctx->info->valid = false;
+            //printf("free list id:%llu %llu\n", p->id, p->length);
 
             free(tmp);
+        }
+    }
+    if (!ctx->info->valid && ctx->list != NULL) {
+        RecvBuffer* b = (RecvBuffer*)ctx->list->data;
+        if (ctx->info->prev_id + 1 == b->id) {
+            ctx->info->id = b->id;
+            ctx->info->length = b->length;
+            ctx->info->payload = b->payload;
+            ctx->info->offset = 0;
+            ctx->info->valid = true;
+            //printf("set recv info in recv from id:%llu\n", b->id);
         }
     }
     return recv_bytes;
@@ -903,7 +906,6 @@ ssize_t RecvMessage(RecvCtx* ctx, char* buf, size_t len, uint64_t id, FILE* stre
             assert(false);
             return -1;
         }
-        // dprint("header2", headerData, 2);
         WebSocketMessageHeader* header = (WebSocketMessageHeader*)headerData;
         bool mask = header->mask? true: false;
         uint8_t payload_length = header->payloadLength;
@@ -943,20 +945,17 @@ ssize_t RecvMessage(RecvCtx* ctx, char* buf, size_t len, uint64_t id, FILE* stre
             if (mask) {
                 mask_data = *(uint32_t*)(headerData + mask_offset);
             }
-            // dprint("headerextra", headerData + 2, length_size + mask_length);
         }
     
     
         RecvList* recv_chunk = (RecvList*)malloc(sizeof(RecvList) + data_len); 
-        // printf("data len:%llu\n", data_len);
         ret = fread(recv_chunk->data, 1, data_len, stream);
         if (mask) {
             UnMaskData(recv_chunk->data, data_len, mask_data);
         }
-        // dprint("fread data", recv_chunk->data, data_len);
         if (ret != data_len) {
-        printf("ret: %d expect: %llu\n", ret, data_len);
-        fflush(stdout);
+            printf("ret: %d expect: %llu\n", ret, data_len);
+            fflush(stdout);
             assert(false);
             return -1;
         }

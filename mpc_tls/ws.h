@@ -17,13 +17,13 @@ string GenWebSocketMessageProxy(const void *buf, uint64_t numBytes, uint64_t id,
 
 string GetMessageProxy(int fd, int len, uint64_t id, bool enable_id);
 
-#ifndef NETWORK_BUFFER_SIZE
-#define NETWORK_BUFFER_SIZE 1024 * 1024
+#ifndef SEND_BUFFER_SIZE
+#define SEND_BUFFER_SIZE 1024 * 1024
 #endif
 
 struct SendBuffer {
 private:
-    char buffer[NETWORK_BUFFER_SIZE];
+    char buffer[SEND_BUFFER_SIZE];
     uint64_t offset;
     uint64_t send_id;
 public:
@@ -37,6 +37,7 @@ public:
     void pack() {
         set_send_id();
         set_length();
+        //printf("send id:%llu len:%llu\n", send_id, offset);
     }
 
     void set_send_id() {
@@ -47,12 +48,10 @@ public:
     void set_length() {
         uint64_t payloadLength = offset - 2 * sizeof(uint64_t);
         *((uint64_t*)buffer + 1) = payloadLength;
-        // printf("send id:%llu length:%llu\n", send_id, payloadLength);
-        // fflush(stdout);
     }
 
     bool can_put(uint64_t numBytes) {
-        return offset + numBytes < NETWORK_BUFFER_SIZE;
+        return offset + numBytes < SEND_BUFFER_SIZE;
     }
 
     void put(const char *buf, uint64_t len) {
@@ -114,6 +113,10 @@ struct RecvCtx {
 RecvCtx* NewRecvCtx(bool websocket);
 
 void FreeRecvCtx(RecvCtx* ctx);
+
+void PutToRecvCtx(RecvCtx* ctx, RecvList* recv_chunk);
+
+size_t RecvFromRecvCtx(RecvCtx* ctx, char* buf, size_t len);
 
 ssize_t RecvMessage(RecvCtx *ctx, char* buf, size_t len, uint64_t id, FILE* stream);
 
