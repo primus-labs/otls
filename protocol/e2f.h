@@ -9,7 +9,7 @@ class E2F {
    public:
     IO* io;
     OLE<IO>* ole = nullptr;
-    uint64_t bit_length;
+    size_t bit_length;
 
     BIGNUM* a;
     BIGNUM* b;
@@ -19,7 +19,7 @@ class E2F {
     BIGNUM* r;
     BIGNUM* r2;
 
-    E2F(IO* io, COT<IO>* ot, BIGNUM* q2, uint64_t bit_length) : io(io), bit_length(bit_length) {
+    E2F(IO* io, COT<IO>* ot, BIGNUM* q2, size_t bit_length) : io(io), bit_length(bit_length) {
         ole = new OLE<IO>(io, ot, q2, bit_length);
         a = BN_new();
         b = BN_new();

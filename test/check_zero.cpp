@@ -26,6 +26,7 @@ void gc_zk_check_test(int party) {
     Integer z = A + A;
     uint32_t pz;
     pz = z.reveal<uint32_t>(PUBLIC);
+    cout << pz << endl;
 
     switch_to_zk();
     A = Integer(128, 2, ALICE);

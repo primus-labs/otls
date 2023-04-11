@@ -37,7 +37,7 @@ class AEAD {
     vector<block> mul_hs;
 
     OLEF2K<IO>* ole = nullptr;
-    AEAD(IO* io, COT<IO>* ot, Integer& key, const unsigned char* iv, uint64_t iv_len) {
+    AEAD(IO* io, COT<IO>* ot, Integer& key, const unsigned char* iv, size_t iv_len) {
         ole = new OLEF2K<IO>(io, ot);
         assert(iv_len == 12);
 
@@ -103,7 +103,7 @@ class AEAD {
         return computeAES_KS(expanded_key, in);
     }
 
-    inline Integer inc(Integer& counter, uint64_t s) {
+    inline Integer inc(Integer& counter, size_t s) {
         if (counter.size() < s) {
             error("invalid length s!");
         }
@@ -116,7 +116,7 @@ class AEAD {
         return msb;
     }
 
-    inline void gctr(Integer& res, uint64_t m) {
+    inline void gctr(Integer& res, size_t m) {
         Integer tmp(128, 0, PUBLIC);
         for (int i = 0; i < m; i++) {
             Integer content = nonce;
@@ -128,7 +128,7 @@ class AEAD {
     }
 
     // The in blocks are known to one or two parties.
-    inline void obv_ghash(block& out, const block* in, uint64_t len, int party) {
+    inline void obv_ghash(block& out, const block* in, size_t len, int party) {
         block h = mul_hs[0];
         while (mul_hs.size() < len)
             mul_hs.push_back(mulBlock(h, mul_hs.back()));
@@ -163,9 +163,9 @@ class AEAD {
                         int party,
                         bool sec_type = false) {
         // u = 128 * ceil(msg_len/128) - 8*msg_len
-        uint64_t u = 128 * ((msg_len * 8 + 128 - 1) / 128) - msg_len * 8;
+        size_t u = 128 * ((msg_len * 8 + 128 - 1) / 128) - msg_len * 8;
 
-        uint64_t ctr_len = (msg_len * 8 + 128 - 1) / 128;
+        size_t ctr_len = (msg_len * 8 + 128 - 1) / 128;
 
         Integer Z;
         gctr(Z, 1 + ctr_len);
@@ -242,8 +242,8 @@ class AEAD {
 
         // Now compute the tag.
 
-        uint64_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
-        uint64_t len = u / 8 + msg_len + v / 8 + aad_len + 16;
+        size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
+        size_t len = u / 8 + msg_len + v / 8 + aad_len + 16;
 
         unsigned char* x = new unsigned char[len];
 
@@ -301,9 +301,9 @@ class AEAD {
                         int party,
                         bool sec_type = false) {
         // u = 128 * ceil(ctxt_len/128) - 8*ctxt_len
-        uint64_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
+        size_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
 
-        uint64_t ctr_len = (ctxt_len * 8 + 128 - 1) / 128;
+        size_t ctr_len = (ctxt_len * 8 + 128 - 1) / 128;
 
         bool res = false;
 
@@ -376,8 +376,8 @@ class AEAD {
 
         // Now compute the tag.
 
-        uint64_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
-        uint64_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
+        size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
+        size_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
 
         unsigned char* x = new unsigned char[len];
 

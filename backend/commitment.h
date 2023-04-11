@@ -16,7 +16,7 @@ class Commitment {
     inline void commit(unsigned char* com,
                        unsigned char* rnd,
                        unsigned char* data,
-                       uint64_t length) {
+                       size_t length) {
         prg.random_data(rnd, rand_length);
         hash.put(data, length);
         hash.put(rnd, rand_length);
@@ -25,7 +25,7 @@ class Commitment {
     inline bool open(unsigned char* com,
                      unsigned char* rnd,
                      unsigned char* data,
-                     uint64_t length) {
+                     size_t length) {
         hash.put(data, length);
         hash.put(rnd, rand_length);
 

@@ -12,6 +12,7 @@ class PADOEva : public PADOParty<IO> {
         this->gc = gc;
         if (in_ot == nullptr) {
             this->ot->setup_recv();
+            this->ot->Delta = zero_block;
         }
         refill();
         block seed;

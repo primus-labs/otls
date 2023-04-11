@@ -305,7 +305,7 @@ class ComConv {
         }
         convert_send(aKEYs, bKEYs);
         //  separate input bits into chunks with batch_size bits each.
-        uint64_t chunk_len = (bKEYs.size() + batch_size - 1) / batch_size;
+        size_t chunk_len = (bKEYs.size() + batch_size - 1) / batch_size;
         BIGNUM* tmp = BN_new();
         vector<BIGNUM*> batch_aKEYs(chunk_len);
         for (int i = 0; i < chunk_len; i++) {
@@ -460,7 +460,7 @@ class ComConv {
         }
         convert_recv(aMACs, bMACs);
         //  separate input bits into chunks with batch_size bits each.
-        uint64_t chunk_len = (bMACs.size() + batch_size - 1) / batch_size;
+        size_t chunk_len = (bMACs.size() + batch_size - 1) / batch_size;
 
         // compute commitment and randomness of chunks.
         vector<BIGNUM*> msg(chunk_len);

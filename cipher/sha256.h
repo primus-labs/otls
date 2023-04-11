@@ -44,8 +44,8 @@ class SHA256 {
 
     vector<Integer> zk_iv_in_hashes;
 
-    uint64_t pos = -1;
-    uint64_t zpos = -1;
+    size_t pos = -1;
+    size_t zpos = -1;
 
     Integer sha256_h[VALLEN] = {
       Integer(WORDLEN, 0x6a09e667UL, PUBLIC), Integer(WORDLEN, 0xbb67ae85UL, PUBLIC),
@@ -258,7 +258,7 @@ class SHA256 {
     void opt_update(uint32_t* plain_dig,
                     const Integer sec_input,
                     unsigned char* pub_input,
-                    uint64_t pub_len,
+                    size_t pub_len,
                     bool reuse_in_hash_flag = false,
                     bool zk_flag = false) {
         uint64_t len = sec_input.size();
@@ -345,7 +345,7 @@ class SHA256 {
         unsigned char* data = new unsigned char[KLEN];
         uint64_t datalen = 0, bitlen = 512;
 
-        for (uint64_t i = 0; i < pub_len; i++) {
+        for (size_t i = 0; i < pub_len; i++) {
             data[datalen] = pub_input[i];
             datalen++;
             if (datalen == 64) {
@@ -355,7 +355,7 @@ class SHA256 {
             }
         }
 
-        uint64_t i = datalen;
+        size_t i = datalen;
 
         if (datalen < 56) {
             data[i++] = 0x80;
@@ -492,13 +492,13 @@ class SHA256 {
     inline void opt_digest(uint32_t* res,
                            const Integer sec_input,
                            unsigned char* pub_input,
-                           uint64_t pub_len,
+                           size_t pub_len,
                            bool reuse_in_hash_flag = false,
                            bool zk_flag = false) {
         opt_update(res, sec_input, pub_input, pub_len, reuse_in_hash_flag, zk_flag);
     }
 
-    inline uint64_t compression_calls() { return compression_calls_num; }
+    inline size_t compression_calls() { return compression_calls_num; }
 
     template <typename IO>
     inline void sha256_check(int party) {

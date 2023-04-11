@@ -75,7 +75,7 @@ class HMAC_SHA256 : public SHA256 {
 
     void opt_hmac_sha256(Integer* res,
                          unsigned char* msg,
-                         uint64_t len,
+                         size_t len,
                          bool reuse_in_hash_flag = false,
                          bool reuse_out_hash_flag = false,
                          bool zk_flag = false) {
