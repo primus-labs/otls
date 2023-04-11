@@ -10,6 +10,16 @@ class OLEF2K {
     GaloisFieldPacking pack;
     OLEF2K(IO* io, COT<IO>* ot) : io(io), ot(ot) {}
 
+    void inner_prod(block* res, const block* a, const block* b, int sz) {
+        block r = zero_block;
+        block r1;
+        for (int i = 0; i < sz; i++) {
+            gfmul_reflect(a[i], b[i], &r1);
+            r = r ^ r1;
+        }
+        *res = r;
+    }
+
     void compute(block* out, const block* in, int length) {
         block* raw0 = new block[length * 128];
         if (!cmpBlock(&ot->Delta, &zero_block, 1)) {
@@ -20,7 +30,7 @@ class OLEF2K {
                     block msg = raw0[i * 128 + j] ^ raw1[i * 128 + j] ^ in[i];
                     io->send_block(&msg, 1);
                 }
-                pack.packing(out + i, raw0 + i * 128);
+                inner_prod(out + i, raw0 + i * 128, pack.base, 128);
             }
             delete[] raw1;
         } else {
@@ -37,7 +47,8 @@ class OLEF2K {
                     if (bits[i * 128 + j])
                         raw0[i * 128 + j] ^= tmp[j];
                 }
-                pack.packing(out + i, raw0 + i * 128);
+                // pack.packing(out + i, raw0 + i * 128);
+                inner_prod(out + i, raw0 + i * 128, pack.base, 128);
             }
             delete[] bits;
         }

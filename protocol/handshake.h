@@ -18,18 +18,18 @@ static unsigned char key_expansion_label[] = {"key expansion"};
 static unsigned char client_finished_label[] = {"client finished"};
 static unsigned char server_finished_label[] = {"server finished"};
 
-static uint64_t master_key_label_length = sizeof(master_key_label) - 1;
-static uint64_t extended_master_key_label_length = sizeof(extended_master_key_label) - 1;
-static uint64_t key_expansion_label_length = sizeof(key_expansion_label) - 1;
-static uint64_t client_finished_label_length = sizeof(client_finished_label) - 1;
-static uint64_t server_finished_label_length = sizeof(server_finished_label) - 1;
+static size_t master_key_label_length = sizeof(master_key_label) - 1;
+static size_t extended_master_key_label_length = sizeof(extended_master_key_label) - 1;
+static size_t key_expansion_label_length = sizeof(key_expansion_label) - 1;
+static size_t client_finished_label_length = sizeof(client_finished_label) - 1;
+static size_t server_finished_label_length = sizeof(server_finished_label) - 1;
 
-static uint64_t master_key_length = 384 / 8;
-static uint64_t expansion_key_length = 448 / 8;
-static const uint64_t finished_msg_length = 96 / 8;
-static const uint64_t tag_length = 16;
-static const uint64_t iv_length = 4;
-static const uint64_t key_length = 128 / 8;
+static size_t master_key_length = 384 / 8;
+static size_t expansion_key_length = 448 / 8;
+static const size_t finished_msg_length = 96 / 8;
+static const size_t tag_length = 16;
+static const size_t iv_length = 4;
+static const size_t key_length = 128 / 8;
 
 template <typename IO>
 class HandShake {
@@ -214,8 +214,8 @@ class HandShake {
 
     inline void compute_extended_master_key(const BIGNUM* pms,
                                             const unsigned char* hash,
-                                            uint64_t hash_len) {
-        uint64_t len = BN_num_bytes(pms);
+                                            size_t hash_len) {
+        size_t len = BN_num_bytes(pms);
         unsigned char* buf = new unsigned char[len];
         BN_bn2bin(pms, buf);
         reverse(buf, buf + len);
@@ -253,7 +253,7 @@ class HandShake {
         prf.init(hmac, master_key);
         prf.opt_compute(hmac, key, expansion_key_length * 8, master_key, key_expansion_label,
                         key_expansion_label_length, seed, seed_len, true, true);
-        uint64_t unused_bit_length = 16 * 8;
+        size_t unused_bit_length = 16 * 8;
         Integer iv;
         iv.bits.insert(iv.bits.begin(), key.bits.begin() + unused_bit_length,
                        key.bits.begin() + unused_bit_length + iv_length * 8 * 2);
@@ -341,7 +341,7 @@ class HandShake {
 
     inline void compute_client_finished_msg(unsigned char* ufin,
                                             const unsigned char* label,
-                                            uint64_t label_len,
+                                            size_t label_len,
                                             const unsigned char* tau,
                                             uint64_t tau_len) {
         Integer ufin_int;
@@ -353,7 +353,7 @@ class HandShake {
 
     inline void compute_server_finished_msg(unsigned char* ufin,
                                             const unsigned char* label,
-                                            uint64_t label_len,
+                                            size_t label_len,
                                             const unsigned char* tau,
                                             uint64_t tau_len) {
         Integer ufin_int;
@@ -376,7 +376,7 @@ class HandShake {
                                             unsigned char* ctxt,
                                             unsigned char* tag,
                                             const unsigned char* ufinc,
-                                            uint64_t ufinc_len,
+                                            size_t ufinc_len,
                                             const unsigned char* aad,
                                             uint64_t aad_len,
                                             int party) {
@@ -403,7 +403,7 @@ class HandShake {
     inline bool decrypt_and_check_server_finished_msg(AEAD<IO>& aead_s,
                                                       unsigned char* msg,
                                                       const unsigned char* ctxt,
-                                                      uint64_t ctxt_len,
+                                                      size_t ctxt_len,
                                                       const unsigned char* tag,
                                                       const unsigned char* aad,
                                                       uint64_t aad_len,

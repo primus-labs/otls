@@ -23,14 +23,21 @@ void backup_zk_ptr() {
 
 template <typename IO>
 void setup_protocol(IO* io, BoolIO<IO>** ios, int threads, int party) {
+    printf("setup protocol 1\n");
     setup_zk_bool<BoolIO<IO>>(ios, threads, party);
+    printf("setup protocol 2\n");
     backup_zk_ptr();
 
+    printf("setup protocol 3\n");
     setup_backend<IO>(io, party);
+    printf("setup protocol 4\n");
     backup_gc_ptr();
 }
 
 void switch_to_zk() {
+    gc_circ_buf = CircuitExecution::circ_exec;
+    gc_prot_buf = ProtocolExecution::prot_exec;
+
     CircuitExecution::circ_exec = zk_circ_buf;
     ProtocolExecution::prot_exec = zk_prot_buf;
 }
@@ -41,6 +48,9 @@ void sync_zk_gc() {
 }
 
 void switch_to_gc() {
+    zk_circ_buf = CircuitExecution::circ_exec;
+    zk_prot_buf = ProtocolExecution::prot_exec;
+
     CircuitExecution::circ_exec = gc_circ_buf;
     ProtocolExecution::prot_exec = gc_prot_buf;
 }

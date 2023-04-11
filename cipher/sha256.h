@@ -369,7 +369,7 @@ class SHA256 {
             memset(data, 0, 56);
         }
 
-        bitlen += datalen * 8;
+        bitlen += datalen * 8; /*ujnss typefix: must be 64 bit */
         data[63] = bitlen;
         data[62] = bitlen >> 8;
         data[61] = bitlen >> 16;

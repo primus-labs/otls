@@ -249,6 +249,7 @@ class AEAD {
 
         unsigned char ilen[8], mlen[8];
         for (int i = 0; i < 8; i++) {
+            /*ujnss typefix: must be 64 bit*/
             ilen[i] = (8 * aad_len) >> (7 - i) * 8;
             mlen[i] = (8 * msg_len) >> (7 - i) * 8;
         }
@@ -382,6 +383,7 @@ class AEAD {
 
         unsigned char ilen[8], mlen[8];
         for (int i = 0; i < 8; i++) {
+            /*ujnss typefix: must be 64 bit*/
             ilen[i] = (8 * aad_len) >> (7 - i) * 8;
             mlen[i] = (8 * ctxt_len) >> (7 - i) * 8;
         }
@@ -476,13 +478,14 @@ inline void compute_tag(unsigned char* tag,
                         uint64_t ctxt_len,
                         const unsigned char* aad,
                         uint64_t aad_len) {
-    uint64_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
-    uint64_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
-    uint64_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
+    size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
+    size_t u = 128 * ((ctxt_len * 8 + 128 - 1) / 128) - ctxt_len * 8;
+    size_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
 
     unsigned char* x = new unsigned char[len];
     unsigned char ilen[8], mlen[8];
     for (int i = 0; i < 8; i++) {
+        /*ujnss typefix: must be 64 bit*/
         ilen[i] = (8 * aad_len) >> (7 - i) * 8;
         mlen[i] = (8 * ctxt_len) >> (7 - i) * 8;
     }

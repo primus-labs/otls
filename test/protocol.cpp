@@ -79,9 +79,9 @@ void full_protocol(IO* io, COT<IO>* cot, int party) {
 
     hs->compute_expansion_keys(rc, 32, rs, 32);
 
-    hs->compute_client_finished_msg(client_finished_label, client_finished_label_length, tau_c,
+    hs->compute_client_finished_msg(ufinc, client_finished_label, client_finished_label_length, tau_c,
                                     32);
-    hs->compute_server_finished_msg(server_finished_label, server_finished_label_length, tau_s,
+    hs->compute_server_finished_msg(ufins, server_finished_label, server_finished_label_length, tau_s,
                                     32);
     AEAD<IO>* aead_c = new AEAD<IO>(io, cot, hs->client_write_key, hs->iv_oct + 12, 12);
     AEAD<IO>* aead_s = new AEAD<IO>(io, cot, hs->server_write_key, hs->iv_oct, 12);
