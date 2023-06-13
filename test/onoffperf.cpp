@@ -20,8 +20,8 @@
 using namespace std;
 using namespace emp;
 
-const size_t QUERY_BYTE_LEN = 2 * 1024;
-const size_t RESPONSE_BYTE_LEN = 2 * 1024;
+const size_t QUERY_BYTE_LEN = 587;
+const size_t RESPONSE_BYTE_LEN = 894;
 
 void full_protocol_offline(bool ENABLE_ROUNDS_OPT = false) {
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
