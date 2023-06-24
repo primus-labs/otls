@@ -15,11 +15,11 @@ using std::vector;
 //   macro_xstr(EMP_CIRCUIT_PATH) + string("bristol_fashion/");
 // static BristolFashion aes = BristolFashion((circuit_file_location + "aes_128.txt").c_str());
 #ifndef THREADING
-extern BristolFormat *aes_ks;
-extern BristolFormat *aes_enc_ks;
+extern BristolFormat* aes_ks;
+extern BristolFormat* aes_enc_ks;
 #else
-extern __thread BristolFormat *aes_ks;
-extern __thread BristolFormat *aes_enc_ks;
+extern __thread BristolFormat* aes_ks;
+extern __thread BristolFormat* aes_enc_ks;
 #endif
 
 inline Integer rrot(const Integer& rhs, int sht) {
@@ -183,7 +183,7 @@ inline block mulBlock(block a, block b) {
 inline block powBlock(block a, uint64_t len) {
     size_t leading_zeros = 0;
 
-     /*ujnss typefix: must be 64 bit */
+    /*ujnss typefix: must be 64 bit */
     for (int i = sizeof(uint64_t) * 8 - 1; i >= 0; i--) {
         /*ujnss typefix: must be 64 bit */
         if ((len >> i) & 1)
@@ -193,7 +193,7 @@ inline block powBlock(block a, uint64_t len) {
     block h = a;
     block res = (len & 1) ? a : set_bit(zero_block, 127);
 
-     /*ujnss typefix: must be 64 bit */
+    /*ujnss typefix: must be 64 bit */
     for (int i = 1; i < sizeof(uint64_t) * 8 - leading_zeros; i++) {
         h = mulBlock(h, h);
         if ((len >> i) & 1)
