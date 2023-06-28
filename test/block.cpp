@@ -107,7 +107,16 @@ void clmul_test() {
     cout << "enc many blocks time: " << emp::time_from(start) << " ns" << endl;
 }
 
+void aes_test() {
+    AES_KEY key;
+    block blk = zero_block;
+    AES_set_encrypt_key(zero_block, &key);
+    AES_ecb_encrypt_blks<1>(&blk, &key);
+    cout << blk << endl;
+}
+
 int main() {
-    clmul_test();
+    // clmul_test();
+    aes_test();
     return 0;
 }
