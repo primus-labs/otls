@@ -8,7 +8,11 @@ class OnlinePADOEva : public PADOParty<IO> {
     OnlineHalfGateEva<IO>* gc;
     PRG prg;
     vector<bool> pub_values;
+    vector<bool> pub_values2;
+    vector<bool>* p_pub_values = nullptr;
     uint64_t reveal_counter = 0;
+    uint64_t reveal_counter2 = 0;
+    uint64_t* p_reveal_counter = nullptr;
     Hash hash;
     OnlinePADOEva(IO* io, OnlineHalfGateEva<IO>* gc, IKNP<IO>* in_ot = nullptr)
         : PADOParty<IO>(io, BOB, in_ot) {
@@ -17,6 +21,8 @@ class OnlinePADOEva : public PADOParty<IO> {
             this->ot->setup_recv();
             this->ot->Delta = zero_block;
         }
+        p_pub_values = &pub_values;
+        p_reveal_counter = &reveal_counter;
     }
 
     void feed(block* label, int party, const bool* b, int length) {
@@ -37,7 +43,7 @@ class OnlinePADOEva : public PADOParty<IO> {
                 this->io->send_data(&lsb, 1);
                 b[i] = false;
             } else if (party == PUBLIC) {
-                b[i] = (pub_values[reveal_counter++] != lsb);
+                b[i] = ((*p_pub_values)[(*p_reveal_counter)++] != lsb);
             }
         }
         if (party == PUBLIC) {
@@ -45,6 +51,18 @@ class OnlinePADOEva : public PADOParty<IO> {
             unsigned char tmp[Hash::DIGEST_SIZE];
             hash.hash_once(tmp, label, length * sizeof(block));
             this->io->send_data(tmp, Hash::DIGEST_SIZE);
+        }
+    }
+
+    void switch_status() {
+        gc->switch_status();
+        if (gc->server_finish) {
+            p_pub_values = &pub_values2;
+            p_reveal_counter = &reveal_counter2;
+        }
+        else {
+            p_pub_values = &pub_values;
+            p_reveal_counter = &reveal_counter;
         }
     }
 };

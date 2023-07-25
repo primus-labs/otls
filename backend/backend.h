@@ -34,14 +34,17 @@ inline void sync_offline_online(OfflinePADOParty* offline, PADOParty<IO>* online
     if (party == ALICE) {
         OfflinePADOGen<IO>* off_gen = (OfflinePADOGen<IO>*)offline;
         OnlinePADOGen<IO>* on_gen = (OnlinePADOGen<IO>*)online;
-        on_gen->set_seed(off_gen->seed);
+        on_gen->set_seed(off_gen->seed, off_gen->seed2);
         on_gen->gc->set_delta(off_gen->gc->delta);
         on_gen->gc->out_labels = off_gen->gc->out_labels;
+        on_gen->gc->out_labels2 = off_gen->gc->out_labels2;
     } else {
         OfflinePADOEva<IO>* off_eva = (OfflinePADOEva<IO>*)offline;
         OnlinePADOEva<IO>* on_eva = (OnlinePADOEva<IO>*)online;
         on_eva->gc->GC = off_eva->gc->GC;
+        on_eva->gc->GC2 = off_eva->gc->GC2;
         on_eva->pub_values = off_eva->pub_values;
+        on_eva->pub_values2 = off_eva->pub_values2;
     }
     delete offline;
 }
@@ -89,34 +92,34 @@ inline void finalize_backend() {
 
 /*template<typename IO>
 inline PADOParty<IO>* swap_role(int party) {
-	PADOParty<IO>* p = (PADOParty<IO>*)ProtocolExecution::prot_exec;
-	if(p->cur_party == party) {
-		error("party misaligned!");
-	}
-	IKNP<IO> * old_ot = p->ot;
-	IKNP<IO> * new_ot = new IKNP<IO>(old_ot->io, true);
-	block k0[128], k1[128];
-	bool s[128];
-	if(party == ALICE) {
-		auto t = new HalfGateGen<IO>(p->io);
-		block_to_bool(s, t->delta);
-		old_ot->recv_rot(k0, s, 128);
-		new_ot->setup_send(s, k0);
+    PADOParty<IO>* p = (PADOParty<IO>*)ProtocolExecution::prot_exec;
+    if(p->cur_party == party) {
+        error("party misaligned!");
+    }
+    IKNP<IO> * old_ot = p->ot;
+    IKNP<IO> * new_ot = new IKNP<IO>(old_ot->io, true);
+    block k0[128], k1[128];
+    bool s[128];
+    if(party == ALICE) {
+        auto t = new HalfGateGen<IO>(p->io);
+        block_to_bool(s, t->delta);
+        old_ot->recv_rot(k0, s, 128);
+        new_ot->setup_send(s, k0);
 
-		auto pro = new PADOGen<IO>(p->io, t, new_ot);
-		finalize_backend();
-		CircuitExecution::circ_exec = t;
-		ProtocolExecution::prot_exec = pro;
-	} else {
-		auto t = new HalfGateEva<IO>(p->io);
+        auto pro = new PADOGen<IO>(p->io, t, new_ot);
+        finalize_backend();
+        CircuitExecution::circ_exec = t;
+        ProtocolExecution::prot_exec = pro;
+    } else {
+        auto t = new HalfGateEva<IO>(p->io);
 
-		old_ot->send_rot(k0, k1, 128);
-		new_ot->setup_recv(k0, k1);
-		auto pro = new PADOEva<IO>(p->io, t, new_ot);
-		finalize_backend();
-		CircuitExecution::circ_exec = t;
-		ProtocolExecution::prot_exec = pro;
-	}
-	return (PADOParty<IO>*)ProtocolExecution::prot_exec;
+        old_ot->send_rot(k0, k1, 128);
+        new_ot->setup_recv(k0, k1);
+        auto pro = new PADOEva<IO>(p->io, t, new_ot);
+        finalize_backend();
+        CircuitExecution::circ_exec = t;
+        ProtocolExecution::prot_exec = pro;
+    }
+    return (PADOParty<IO>*)ProtocolExecution::prot_exec;
 }*/
 #endif

@@ -84,6 +84,29 @@ void switch_to_online(int party) {
     switch_to_gc();
 }
 
+template <typename IO>
+void switch_offline_status(int party) {
+    if (party == ALICE) {
+        OfflinePADOGen<IO>* gen = (OfflinePADOGen<IO>*)offline_gc_prot_buf;
+        gen->switch_status();
+    }
+    else if (party == BOB) {
+        OfflinePADOEva<IO>* eva = (OfflinePADOEva<IO>*)offline_gc_prot_buf;
+        eva->switch_status();
+    }
+}
+
+template <typename IO>
+void switch_online_status(int party) {
+    if (party == ALICE) {
+        OnlinePADOGen<IO>* gen = (OnlinePADOGen<IO>*)gc_prot_buf;
+        gen->switch_status();
+    }
+    else if (party == BOB) {
+        OnlinePADOEva<IO>* eva = (OnlinePADOEva<IO>*)gc_prot_buf;
+        eva->switch_status();
+    }
+}
 inline void finalize_protocol() {
     delete gc_circ_buf;
     delete gc_prot_buf;

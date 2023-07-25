@@ -7,6 +7,10 @@ class OnlinePADOGen : public PADOParty<IO> {
    public:
     OnlineHalfGateGen<IO>* gc;
     PRG prg;
+    PRG prg2;
+    block seed;
+    block seed2;
+    PRG* p_prg = nullptr;
     Hash hash;
     OnlinePADOGen(IO* io, OnlineHalfGateGen<IO>* gc, IKNP<IO>* in_ot = nullptr)
         : PADOParty<IO>(io, ALICE, in_ot) {
@@ -17,11 +21,17 @@ class OnlinePADOGen : public PADOParty<IO> {
             this->ot->setup_send(delta_bool);
         }
     }
-    void set_seed(block seed) { prg = PRG(&seed); }
+    void set_seed(block seed, block seed2) {
+        this->seed = seed;
+        this->seed2 = seed2;
+        prg = PRG(&this->seed);
+        prg2 = PRG(&this->seed2);
+        p_prg = &prg;
+    }
 
     void feed(block* label, int party, const bool* b, int length) {
         block* label2 = new block[length];
-        prg.random_block(label, length);
+        p_prg->random_block(label, length);
         for (int i = 0; i < length; ++i)
             label2[i] = label[i] ^ gc->delta;
 
@@ -66,6 +76,16 @@ class OnlinePADOGen : public PADOParty<IO> {
             hash.digest(tmp);
             if (memcmp(tmp, recv_hash, Hash::DIGEST_SIZE) != 0)
                 error("Evaluator cheated in revealing msgs!\n");
+        }
+    }
+
+    void switch_status() {
+        gc->switch_status();
+        if (gc->server_finish) {
+            p_prg = &prg2;
+        }
+        else {
+            p_prg = &prg;
         }
     }
 };

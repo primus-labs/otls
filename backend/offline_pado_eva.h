@@ -9,9 +9,13 @@ class OfflinePADOEva : public OfflinePADOParty {
     IO* io;
     OfflineHalfGateEva<IO>* gc;
     vector<bool> pub_values;
+    vector<bool> pub_values2;
+    vector<bool> *p_pub_values = nullptr;
     OfflinePADOEva(IO* io, OfflineHalfGateEva<IO>* gc) : OfflinePADOParty(BOB) {
         this->io = io;
         this->gc = gc;
+
+        p_pub_values = &pub_values;
     }
 
     void feed(block* label, int party, const bool* b, int length) {}
@@ -21,8 +25,18 @@ class OfflinePADOEva : public OfflinePADOParty {
             for (int i = 0; i < length; ++i) {
                 bool tmp = false;
                 this->io->recv_data(&tmp, 1);
-                pub_values.push_back(tmp);
+                p_pub_values->push_back(tmp);
             }
+        }
+    }
+
+    void switch_status() {
+        gc->switch_status();
+        if (gc->server_finish) {
+            p_pub_values = &pub_values2;
+        }
+        else {
+            p_pub_values = &pub_values;
         }
     }
 };
