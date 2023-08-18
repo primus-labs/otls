@@ -1,4 +1,5 @@
 #include "emp-tool/emp-tool.h"
+#include "emp-ot/emp-ot.h"
 #include <iostream>
 #include "cipher/utils.h"
 
@@ -108,15 +109,85 @@ void clmul_test() {
 }
 
 void aes_test() {
-    AES_KEY key;
-    block blk = zero_block;
-    AES_set_encrypt_key(zero_block, &key);
-    AES_ecb_encrypt_blks<1>(&blk, &key);
-    cout << blk << endl;
+    AES_KEY key[2];
+    block blks[4];
+    blks[0] = zero_block;
+    blks[1] = all_one_block;
+    blks[2] = zero_block;
+    blks[3] = all_one_block;
+
+    AES_set_encrypt_key(zero_block, &key[0]);
+    AES_set_encrypt_key(all_one_block, &key[1]);
+
+    ParaEnc<2, 2>(blks, key);
+
+    // AES_ecb_encrypt_blks<1>(&msg, &key);
+    // cout << msg << endl;
+    for (int i = 0; i < 4; i++) {
+        cout << blks[i] << endl;
+    }
 }
 
-int main() {
-    // clmul_test();
-    aes_test();
-    return 0;
+void hash_test() {
+    CRH crh;
+    cout << crh.H(all_one_block) << endl;
+    CCRH ccrh;
+    cout << ccrh.H(all_one_block) << endl;
+    TCCRH tccrh;
+    cout << tccrh.H(all_one_block, 1) << endl;
+
+    cout << "sigma(ones): " << sigma(all_one_block) << endl;
 }
+
+template <typename IO>
+void ggm_test(IO* io) {
+    size_t depth = 1 << 25;
+    SPCOT_Sender<IO> sps(io, depth);
+    block* k0 = new block[depth - 1];
+    block* k1 = new block[depth - 1];
+    block* ggm_tree_mem = new block[1 << (depth - 1)];
+
+    auto start = emp::clock_start();
+    sps.ggm_tree_gen(k0, k1, ggm_tree_mem);
+    cout << "time: " << emp::time_from(start) << " us" << endl;
+
+    delete[] k0;
+    delete[] k1;
+    delete[] ggm_tree_mem;
+}
+
+template <typename IO>
+void lpn_test(IO* io, int party, int threads) {
+    int64_t n = 10000000;
+    int64_t k = 588160;
+    ThreadPool* pool = new ThreadPool(threads);
+    LpnF2<IO, 10> lpn(party, n, k, pool, io, threads);
+
+    block* nn = new block[n];
+    block* kk = new block[k];
+    PRG prg;
+    prg.random_block(nn, n);
+    prg.random_block(kk, k);
+
+    auto start = emp::clock_start();
+    lpn.compute(nn, kk);
+    cout << "time: " << emp::time_from(start) << " us" << endl;
+
+    delete[] nn;
+    delete[] kk;
+    delete pool;
+}
+
+int main(int argc, char** argv) {
+    int port, party;
+    parse_party_and_port(argv, &party, &port);
+    NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
+    lpn_test<NetIO>(io, party, 8);
+    //ggm_test<NetIO>(io);
+}
+// int main() {
+//     // clmul_test();
+//     aes_test();
+//     // hash_test();
+//     return 0;
+// }
