@@ -137,6 +137,7 @@ void hash_test() {
     cout << tccrh.H(all_one_block, 1) << endl;
 
     cout << "sigma(ones): " << sigma(all_one_block) << endl;
+    cout << "sigma: " << sigma(makeBlock(0xd857e24982ab861c, 0x929633d5d36f0451)) << endl;
 }
 
 template <typename IO>
@@ -158,7 +159,7 @@ void ggm_test(IO* io) {
 
 template <typename IO>
 void lpn_test(IO* io, int party, int threads) {
-    int64_t n = 10000000;
+    int64_t n = 10616092;
     int64_t k = 588160;
     ThreadPool* pool = new ThreadPool(threads);
     LpnF2<IO, 10> lpn(party, n, k, pool, io, threads);
@@ -186,8 +187,9 @@ int main(int argc, char** argv) {
     //ggm_test<NetIO>(io);
 }
 // int main() {
-//     // clmul_test();
-//     aes_test();
-//     // hash_test();
-//     return 0;
+//     // // clmul_test();
+//     // aes_test();
+//     // // hash_test();
+//     // return 0;
+//     hash_test();
 // }
