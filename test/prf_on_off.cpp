@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
 
     //rounds = io->rounds;
     zk_gc_prf_test_offline(party);
-    cout << "offline rounds: " << io->rounds - rounds << endl;
+    //cout << "offline rounds: " << io->rounds - rounds << endl;
 
     //rounds = io->rounds;
     cout << "offline time: " << emp::time_from(start) << " us" << endl;
