@@ -105,15 +105,15 @@ int main(int argc, char** argv) {
         ios[i] = new BoolIO<NetIO>(io, party == ALICE);
 
     auto start = emp::clock_start();
-    auto rounds = io->rounds;
+    //auto rounds = io->rounds;
     setup_protocol(io, ios, threads, party, true);
-    cout << "setup rounds: " << io->rounds << endl;
+    //cout << "setup rounds: " << io->rounds << endl;
 
-    rounds = io->rounds;
+    //rounds = io->rounds;
     zk_gc_prf_test_offline(party);
     cout << "offline rounds: " << io->rounds - rounds << endl;
 
-    rounds = io->rounds;
+    //rounds = io->rounds;
     cout << "offline time: " << emp::time_from(start) << " us" << endl;
     auto comm = io->counter;
     cout << "offline comm: " << comm << endl;
@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
 
     start = emp::clock_start();
     zk_gc_prf_test(party, true);
-    cout << "online rounds: " << io->rounds - rounds << endl;
+    //cout << "online rounds: " << io->rounds - rounds << endl;
     cout << "online time: " << emp::time_from(start) << " us" << endl;
     if (party == ALICE)
         cout << "ALICE online comm: " << io->counter - comm << endl;

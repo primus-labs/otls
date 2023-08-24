@@ -91,36 +91,36 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
 
     // hs->compute_pms_offline(party);
 
-    auto rounds = io->rounds;
+    //auto rounds = io->rounds;
     auto start = emp::clock_start();
     if (party == BOB) {
         hs->compute_pado_VA(V, Ts);
     } else {
         hs->compute_client_VB(Tc, V, Ts);
     }
-    cout << "VA/VB rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "VA/VB rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     hs->compute_pms_online(pms, V, party);
-    cout << "pms rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "pms rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     //hs->compute_master_key(pms, rc, 32, rs, 32);
 
     // Use session_hash instead of rc!
     hs->compute_extended_master_key(pms, rc, 32);
-    cout << "master key rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    // cout << "master key rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     hs->compute_expansion_keys(rc, 32, rs, 32);
-    cout << "expansion key rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "expansion key rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
 
     hs->compute_client_finished_msg(client_finished_label, client_finished_label_length, tau_c,
                                     32);
-    cout << "client finished rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "client finished rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     hs->compute_server_finished_msg(server_finished_label, server_finished_label_length, tau_s,
                                     32);
-    cout << "server finished rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "server finished rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
 
     // padding the last 8 bytes of iv_c and iv_s according to TLS!
     memcpy(iv_c, hs->client_write_iv, iv_length);
@@ -131,8 +131,8 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     AEAD<IO>* aead_s = new AEAD<IO>(io, io_opt, cot, hs->server_write_key);
 
     Record<IO>* rd = new Record<IO>;
-    cout << "constructors rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "constructors rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     unsigned char* finc_ctxt = new unsigned char[finished_msg_length];
     unsigned char* finc_tag = new unsigned char[tag_length];
     unsigned char* msg = new unsigned char[finished_msg_length];
@@ -141,12 +141,12 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     hs->encrypt_client_finished_msg(aead_c, finc_ctxt, finc_tag, hs->client_ufin, 12, aad,
                                     aad_len, iv_c, 12, party);
 
-    cout << "enc client finished rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "enc client finished rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     // Use correct ciphertext instead of finc_ctxt!
     hs->decrypt_server_finished_msg(aead_s, msg, finc_ctxt, finished_msg_length, finc_tag, aad,
                                     aad_len, iv_s, 12, party);
-    cout << "dec server finished rounds: " << io->rounds - rounds << endl;
+    //cout << "dec server finished rounds: " << io->rounds - rounds << endl;
     // cout << "handshake time: " << emp::time_from(start) << " us" << endl;
 
     unsigned char* cctxt = new unsigned char[QUERY_BYTE_LEN];
@@ -222,17 +222,17 @@ int main(int argc, char** argv) {
 
     auto start = emp::clock_start();
     auto comm = io->counter;
-    auto rounds = io->rounds;
+    //auto rounds = io->rounds;
     // setup_protocol<NetIO>(io, ios, threads, party, true);
     setup_protocol<NetIO>(io, ios, threads, party);
 
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
     cout << "setup comm: " << io->counter << endl;
-    cout << "setup rounds: " << io->rounds << endl;
+    //cout << "setup rounds: " << io->rounds << endl;
 
     start = clock_start();
     comm = io->counter;
-    rounds = io->rounds;
+    //rounds = io->rounds;
 
     auto prot = (PADOParty<NetIO>*)(gc_prot_buf);
     IKNP<NetIO>* cot = prot->ot;
@@ -244,15 +244,15 @@ int main(int argc, char** argv) {
     //switch_to_online<NetIO>(party);
     cout << "offline time: " << emp::time_from(start) << " us" << endl;
     cout << "offline comm: " << io->counter - comm << endl;
-    cout << "offline rounds: " << io->rounds - rounds << endl;
+    //cout << "offline rounds: " << io->rounds - rounds << endl;
 
     start = emp::clock_start();
     comm = io->counter;
-    rounds = io->rounds;
+    //rounds = io->rounds;
     full_protocol<NetIO>(hs, io, io_opt, cot, party);
     cout << "online time: " << emp::time_from(start) << " us" << endl;
     cout << "online comm: " << io->counter - comm << endl;
-    cout << "onlie rounds: " << io->rounds - rounds << endl;
+    //cout << "onlie rounds: " << io->rounds - rounds << endl;
 
     cout << "gc AND gates: " << dec << gc_circ_buf->num_and() << endl;
     cout << "zk AND gates: " << dec << zk_circ_buf->num_and() << endl;

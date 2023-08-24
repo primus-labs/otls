@@ -89,37 +89,37 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
 
     // hs->compute_pms_offline(party);
 
-    auto rounds = io->rounds;
+    //auto rounds = io->rounds;
     auto start = emp::clock_start();
     if (party == BOB) {
         hs->compute_pado_VA(V, Ts);
     } else {
         hs->compute_client_VB(Tc, V, Ts);
     }
-    cout << "VA/VB rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "VA/VB rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     hs->compute_pms_online(pms, V, party);
-    cout << "pms rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "pms rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
 
     //hs->compute_master_key(pms, rc, 32, rs, 32);
 
     // Use session_hash instead of rc!
     hs->compute_extended_master_key(pms, rc, 32);
-    cout << "master key rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "master key rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     hs->compute_expansion_keys(rc, 32, rs, 32);
-    cout << "expansion key rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "expansion key rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
 
     hs->compute_client_finished_msg(client_finished_label, client_finished_label_length, tau_c,
                                     32);
-    cout << "client finished rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "client finished rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     hs->compute_server_finished_msg(server_finished_label, server_finished_label_length, tau_s,
                                     32);
-    cout << "server finished rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "server finished rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
 
     // padding the last 8 bytes of iv_c and iv_s according to TLS!
     memcpy(iv_c, hs->client_write_iv, iv_length);
@@ -130,8 +130,8 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     AEAD<IO>* aead_s = new AEAD<IO>(io, io_opt, cot, hs->server_write_key);
 
     Record<IO>* rd = new Record<IO>;
-    cout << "constructors rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "constructors rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     unsigned char* finc_ctxt = new unsigned char[finished_msg_length];
     unsigned char* finc_tag = new unsigned char[tag_length];
     unsigned char* msg = new unsigned char[finished_msg_length];
@@ -140,13 +140,13 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     hs->encrypt_client_finished_msg(aead_c, finc_ctxt, finc_tag, hs->client_ufin, 12, aad,
                                     aad_len, iv_c, 12, party);
 
-    cout << "enc client finished rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "enc client finished rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     // Use correct ciphertext instead of finc_ctxt!
     hs->decrypt_server_finished_msg(aead_s, msg, finc_ctxt, finished_msg_length, finc_tag, aad,
                                     aad_len, iv_s, 12, party);
-    cout << "dec server finished rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "dec server finished rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     cout << "online handshake time: " << emp::time_from(start) << " us" << endl;
 
     unsigned char* cctxt = new unsigned char[QUERY_BYTE_LEN];
@@ -156,38 +156,38 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     unsigned char* stag = new unsigned char[tag_length];
     start = emp::clock_start();
 
-    rounds = io->rounds;
+    //rounds = io->rounds;
     // the client encrypts the first message, and sends to the server.
     rd->encrypt(aead_c, io, cctxt, ctag, cmsg, QUERY_BYTE_LEN, aad, aad_len, iv_c, 12, party);
-    cout << "rd enc rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "rd enc rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     cout << "online record time: " << emp::time_from(start) << " us" << endl;
     // prove handshake in post-record phase.
     start = emp::clock_start();
     switch_to_zk();
     PostRecord<IO>* prd = new PostRecord<IO>(io, hs, aead_c, aead_s, rd, party);
     prd->reveal_pms(Ts);
-    cout << "reveal pms rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "reveal pms rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     // Use correct finc_ctxt, fins_ctxt, iv_c, iv_s according to TLS!
     prd->prove_and_check_handshake(finc_ctxt, finished_msg_length, finc_ctxt,
                                    finished_msg_length, rc, 32, rs, 32, tau_c, 32, tau_s, 32,
                                    iv_c, 12, iv_s, 12, rc, 32);
-    cout << "prove handshake rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "prove handshake rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     Integer prd_cmsg, prd_cmsg2, prd_smsg, prd_smsg2, prd_cz0, prd_c2z0, prd_sz0, prd_s2z0;
     prd->prove_record_client(prd_cmsg, prd_cz0, cctxt, QUERY_BYTE_LEN, iv_c, 12);
-    cout << "prove record client rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "prove record client rounds: " << io->rounds - rounds << endl;
+    // rounds = io->rounds;
     prd->prove_record_server_last(prd_smsg2, prd_s2z0, cctxt, RESPONSE_BYTE_LEN, iv_s, 12);
-    cout << "prove record server rounds: " << io->rounds - rounds << endl;
-    rounds = io->rounds;
+    //cout << "prove record server rounds: " << io->rounds - rounds << endl;
+    //rounds = io->rounds;
     // Use correct finc_ctxt and fins_ctxt!
     prd->finalize_check(finc_ctxt, finc_tag, 12, aad, finc_ctxt, finc_tag, 12, aad, {prd_cz0},
                         {cctxt}, {ctag}, {QUERY_BYTE_LEN}, {aad}, 1, {prd_sz0}, {sctxt},
                         {stag}, {RESPONSE_BYTE_LEN}, {aad}, 1, aad_len);
 
-    cout << "finalize check rounds: " << io->rounds - rounds << endl;
+    //cout << "finalize check rounds: " << io->rounds - rounds << endl;
 
     sync_zk_gc<IO>();
     switch_to_gc();
