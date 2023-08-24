@@ -239,17 +239,17 @@ int main(int argc, char** argv) {
 
     auto start = emp::clock_start();
     auto comm = io[0]->counter;
-    auto rounds = io[0]->rounds;
+    //auto rounds = io[0]->rounds;
     setup_protocol<NetIO>(io[0], ios, threads, party, true);
     // setup_protocol<NetIO>(io[0], ios, threads, party);
 
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
     cout << "setup comm: " << io[0]->counter << endl;
-    cout << "setup rounds: " << io[0]->rounds << endl;
+    //cout << "setup rounds: " << io[0]->rounds << endl;
 
     start = clock_start();
     comm = io[0]->counter;
-    rounds = io[0]->rounds;
+    //rounds = io[0]->rounds;
     bool ENABLE_ROUNDS_OPT = false;
     auto prot = (PADOParty<NetIO>*)(gc_prot_buf);
     IKNP<NetIO>* cot = prot->ot;
@@ -261,11 +261,11 @@ int main(int argc, char** argv) {
     switch_to_online<NetIO>(party);
     cout << "offline time: " << emp::time_from(start) << " us" << endl;
     cout << "offline comm: " << io[0]->counter - comm << endl;
-    cout << "offline rounds: " << io[0]->rounds - rounds << endl;
+    //cout << "offline rounds: " << io[0]->rounds - rounds << endl;
 
     start = emp::clock_start();
     comm = io[0]->counter;
-    rounds = io[0]->rounds;
+    //rounds = io[0]->rounds;
     full_protocol<NetIO>(hs, io[0], io[1], cot, party);
     cout << "gc AND gates: " << dec << gc_circ_buf->num_and() << endl;
     cout << "zk AND gates: " << dec << zk_circ_buf->num_and() << endl;
@@ -273,8 +273,8 @@ int main(int argc, char** argv) {
     finalize_protocol();
     cout << "online time: " << emp::time_from(start) << " us" << endl;
     cout << "online comm: " << io[0]->counter - comm << endl;
-    cout << "online rounds: " << io[0]->rounds - rounds << endl;
-    cout << "io[1] rounds: " << io[1]->rounds << endl;
+    //cout << "online rounds: " << io[0]->rounds - rounds << endl;
+    //cout << "io[1] rounds: " << io[1]->rounds << endl;
 
     bool cheat = CheatRecord::cheated();
     if (cheat)
