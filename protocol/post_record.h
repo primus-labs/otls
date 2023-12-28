@@ -87,9 +87,14 @@ class PostRecord {
                                           const unsigned char* server_iv,
                                           size_t server_iv_len,
                                           const unsigned char* session_hash,
-                                          size_t hash_len) {
-        //hs->prove_master_key(master_key, pms, rc, rc_len, rs, rs_len, party);
-        hs->prove_extended_master_key(master_key, pms, session_hash, hash_len, party);
+                                          size_t hash_len,
+                                          bool is_extended_master_key = true) {
+        if (is_extended_master_key) {
+            hs->prove_extended_master_key(master_key, pms, session_hash, hash_len, party);
+        }
+        else {
+            hs->prove_master_key(master_key, pms, rc, rc_len, rs, rs_len, party);
+        }
         hs->prove_expansion_keys(client_write_key, server_write_key, master_key, rc, rc_len,
                                  rs, rs_len, party);
 
