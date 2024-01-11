@@ -588,6 +588,9 @@ class SHA256Offline {
     // iv_out_hash stores the outer secret value (shares).
     Integer iv_out_hash[DIGLEN];
 
+    // This is optimized to reduce rounds
+    Integer iv_in_hash[DIGLEN];
+
     Integer sha256_h[VALLEN] = {
       Integer(WORDLEN, 0x6a09e667UL, PUBLIC), Integer(WORDLEN, 0xbb67ae85UL, PUBLIC),
       Integer(WORDLEN, 0x3c6ef372UL, PUBLIC), Integer(WORDLEN, 0xa54ff53aUL, PUBLIC),
@@ -748,6 +751,53 @@ class SHA256Offline {
         }
     }
 
+    void opt_rounds_update(Integer* dig,
+                           const Integer padded_input,
+                           bool reuse_in_hash_flag = false) {
+        uint64_t padded_len = padded_input.size();
+        assert(padded_len % CHUNKLEN == 0);
+        Integer tmp = Integer(WORDLEN, (int)0, PUBLIC);
+        vector<Integer> input_data;
+        for (int i = padded_input.size() - 1; i >= 0; --i) {
+            tmp.bits[i % WORDLEN] = padded_input[i];
+
+            if (i % WORDLEN == 0) {
+                input_data.push_back(tmp);
+            }
+        }
+        uint64_t num_chunk = padded_len / CHUNKLEN;
+        for (int i = 0; i < VALLEN; i++)
+            dig[i] = sha256_h[i];
+
+        Integer* tmp_block = new Integer[CHUNKLEN / WORDLEN]; //CHUNKLEN/WORDLEN=16
+        for (int j = 0; j < CHUNKLEN / WORDLEN; j++) {
+            tmp_block[j] = input_data[j];
+        }
+
+        if (reuse_in_hash_flag == true) {
+            if (gc_in_open_flag == false) {
+                chunk_compress(dig, tmp_block);
+
+                for (int i = 0; i < DIGLEN; i++)
+                   iv_in_hash[i] = dig[i];
+                gc_in_open_flag = true;
+            } else {
+                for (int i = 0; i < DIGLEN; i++)
+                   dig[i] = iv_in_hash[i];
+            }
+        } else {
+            chunk_compress(dig, tmp_block);
+        }
+
+        for (uint64_t i = 1; i < num_chunk; i++) {
+            for (int j = 0; j < CHUNKLEN / WORDLEN; j++) {
+                tmp_block[j] = input_data[j + i * CHUNKLEN / WORDLEN];
+            }
+            chunk_compress(dig, tmp_block);
+        }
+        delete[] tmp_block;
+    }
+
     void chunk_compress(Integer* input_h, Integer* chunk) {
         compression_calls_num++;
         Integer* w = new Integer[KLEN];
@@ -809,6 +859,13 @@ class SHA256Offline {
 
     inline void opt_digest(const Integer sec_input, bool reuse_in_hash_flag = false) {
         opt_update(sec_input, reuse_in_hash_flag);
+    }
+    inline void opt_rounds_digest(Integer* res,
+                                  Integer input,
+                                  bool reuse_in_hash_flag = false) {
+        Integer padded_input;
+        padding(padded_input, input);
+        opt_rounds_update(res, padded_input, reuse_in_hash_flag);
     }
 };
 

@@ -188,5 +188,24 @@ class HMAC_SHA256_Offline : public SHA256Offline {
         delete[] dig;
         delete[] o_msg;
     }
+    void opt_rounds_hmac_sha256(Integer* res,
+                                const Integer msg,
+                                bool reuse_in_hash_flag = false,
+                                bool reuse_out_hash_flag = false) {
+        Integer i_msg = i_key_pad;
+        concat(i_msg, &msg, 1);
+
+        Integer* tmp_dig = new Integer[DIGLEN];
+        opt_rounds_digest(tmp_dig, i_msg, reuse_in_hash_flag);
+        SHA256_call++;
+
+        Integer o_msg = o_key_pad;
+        concat(o_msg, tmp_dig, DIGLEN);
+
+        digest(res, o_msg, reuse_out_hash_flag);
+        SHA256_call++;
+
+        delete[] tmp_dig;
+    }
 };
 #endif
