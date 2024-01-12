@@ -178,15 +178,10 @@ class PRF {
                 memcpy(tmpd, pub_M[zk_pos++], hmac.DIGLEN * sizeof(uint32_t));
             }
 
-            for (int j = 0, k = 0; j < hmac.DIGLEN; j++, k += 4) {
-                A_tmp[k] = (tmpd[j] >> 24);
-                A_tmp[k + 1] = (tmpd[j] >> 16);
-                A_tmp[k + 2] = (tmpd[j] >> 8);
-                A_tmp[k + 3] = tmpd[j];
-            }
-            reverse(A_tmp, A_tmp + 32);
-            // A[i] = Integer(32 * 8, A_tmp, PUBLIC);
-            A[i] = Integer(32 * 8, A_tmp, ALICE);
+            Integer tmpInt2;
+            for (int i = 0; i < hmac.VALLEN; ++i)
+                tmpInt2.bits.insert(tmpInt2.bits.begin(), tmp[i].bits.begin(), tmp[i].bits.end());
+            A[i] = tmpInt2;
 
             Integer As;
             concat(As, &A[i], 1);
@@ -340,14 +335,10 @@ class PRFOffline {
             // in the gc setting, store the revealed M values.
             tmpInt.reveal<uint32_t>((uint32_t*)tmpd, PUBLIC);
 
-            for (int j = 0, k = 0; j < hmac.DIGLEN; j++, k += 4) {
-                A_tmp[k] = (tmpd[j] >> 24);
-                A_tmp[k + 1] = (tmpd[j] >> 16);
-                A_tmp[k + 2] = (tmpd[j] >> 8);
-                A_tmp[k + 3] = tmpd[j];
-            }
-            reverse(A_tmp, A_tmp + 32);
-            A[i] = Integer(32 * 8, A_tmp, ALICE);
+            Integer tmpInt2;
+            for (int i = 0; i < hmac.VALLEN; ++i)
+                tmpInt2.bits.insert(tmpInt2.bits.begin(), tmp[i].bits.begin(), tmp[i].bits.end());
+            A[i] = tmpInt2;
 
             Integer As;
             concat(As, &A[i], 1);
