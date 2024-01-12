@@ -642,6 +642,10 @@ class HandShake {
         hmac.sha256_check<IO>(party);
         //  }
     }
+
+    inline void reveal_for_opt_rounds() {
+        prf.opt_rounds_reveal(hmac);
+    }
 };
 
 class HandShakeOffline {
@@ -779,6 +783,10 @@ class HandShakeOffline {
 
     inline void decrypt_server_finished_msg(AEADOffline* aead_s_offline, size_t ufins_len) {
         aead_s_offline->decrypt(ufins_len);
+    }
+
+    inline void reveal_for_opt_rounds() {
+        prf.opt_rounds_reveal(hmac);
     }
 };
 
