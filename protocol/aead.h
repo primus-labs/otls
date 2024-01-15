@@ -48,12 +48,6 @@ class AEAD {
         block h = integer_to_block(H);
         gc_h = h;
 
-        // commit ALICE's share of h using izk.
-        switch_to_zk();
-        zk_h = Integer(8 * sizeof(block), &gc_h, ALICE);
-        sync_zk_gc<IO>();
-        switch_to_gc();
-
         // compute A2M;
         if (!cmpBlock(&ot->Delta, &zero_block, 1)) {
             PRG prg;
@@ -75,6 +69,12 @@ class AEAD {
 
             mul_hs.push_back(rh ^ mh);
         }
+        // commit ALICE's share of h using izk.
+        switch_to_zk();
+        zk_h = Integer(8 * sizeof(block), &gc_h, ALICE);
+        sync_zk_gc<IO>();
+        switch_to_gc();
+
     }
     ~AEAD() {
         if (ole != nullptr)

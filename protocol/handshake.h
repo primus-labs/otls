@@ -58,6 +58,7 @@ class HandShake {
     Integer master_key;
     Integer client_write_key;
     Integer server_write_key;
+    Integer iv;
 
     unsigned char client_ufin[finished_msg_length];
     unsigned char server_ufin[finished_msg_length];
@@ -285,7 +286,7 @@ class HandShake {
                                    key_expansion_label, key_expansion_label_length, seed,
                                    seed_len, true, true);
         }
-        Integer iv;
+        iv.bits.clear();
         iv.bits.insert(iv.bits.begin(), key.bits.begin(),
                        key.bits.begin() + iv_length * 8 * 2);
         server_write_key.bits.insert(server_write_key.bits.begin(),
@@ -294,11 +295,6 @@ class HandShake {
         client_write_key.bits.insert(client_write_key.bits.begin(),
                                      key.bits.begin() + 2 * iv_length * 8 + key_length * 8,
                                      key.bits.begin() + 2 * (iv_length * 8 + key_length * 8));
-        unsigned char iv_oct[iv_length * 2];
-        iv.reveal<unsigned char>((unsigned char*)iv_oct, PUBLIC);
-        reverse(iv_oct, iv_oct + iv_length * 2);
-        memcpy(client_write_iv, iv_oct, iv_length);
-        memcpy(server_write_iv, iv_oct + iv_length, iv_length);
         delete[] seed;
     }
 
@@ -381,6 +377,12 @@ class HandShake {
                                    label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
+
+        unsigned char iv_oct[iv_length * 2];
+        iv.reveal<unsigned char>((unsigned char*)iv_oct, PUBLIC);
+        reverse(iv_oct, iv_oct + iv_length * 2);
+        memcpy(client_write_iv, iv_oct, iv_length);
+        memcpy(server_write_iv, iv_oct + iv_length, iv_length);
     }
 
     inline void compute_server_finished_msg(const unsigned char* label,
@@ -396,6 +398,8 @@ class HandShake {
                                    label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
+
+        reveal_for_opt_rounds();
     }
 
     // inline void encrypt_client_finished_msg(AEAD<IO>* aead_c,
@@ -658,6 +662,7 @@ class HandShakeOffline {
     Integer master_key;
     Integer client_write_key;
     Integer server_write_key;
+    Integer iv;
 
     unsigned char client_ufin[finished_msg_length];
     unsigned char server_ufin[finished_msg_length];
@@ -736,7 +741,7 @@ class HandShakeOffline {
             //                        key_expansion_label, key_expansion_label_length, seed,
             //                        seed_len, true, true);
         }
-        Integer iv;
+        iv.bits.clear();
         iv.bits.insert(iv.bits.begin(), key.bits.begin(),
                        key.bits.begin() + iv_length * 8 * 2);
         server_write_key.bits.insert(server_write_key.bits.begin(),
@@ -745,11 +750,6 @@ class HandShakeOffline {
         client_write_key.bits.insert(client_write_key.bits.begin(),
                                      key.bits.begin() + 2 * iv_length * 8 + key_length * 8,
                                      key.bits.begin() + 2 * (iv_length * 8 + key_length * 8));
-        unsigned char iv_oct[iv_length * 2];
-        iv.reveal<unsigned char>((unsigned char*)iv_oct, PUBLIC);
-        // reverse(iv_oct, iv_oct + iv_length * 2);
-        // memcpy(client_write_iv, iv_oct, iv_length);
-        // memcpy(server_write_iv, iv_oct + iv_length, iv_length);
     }
 
     inline void compute_client_finished_msg() {
@@ -763,6 +763,9 @@ class HandShakeOffline {
             //                        label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
+
+        unsigned char iv_oct[iv_length * 2];
+        iv.reveal<unsigned char>((unsigned char*)iv_oct, PUBLIC);
     }
 
     inline void compute_server_finished_msg() {
@@ -775,6 +778,8 @@ class HandShakeOffline {
             //                        label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
+
+        reveal_for_opt_rounds();
     }
 
     inline void encrypt_client_finished_msg(AEADOffline* aead_c_offline, size_t ufinc_len) {
