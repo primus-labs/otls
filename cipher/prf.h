@@ -22,7 +22,6 @@ class PRF {
 
     // should check consistency of zk_sec_M and pub_M;
     vector<Integer> zk_sec_M;
-    vector<Integer> gc_sec_M;
     vector<uint32_t*> pub_M;
     size_t zk_pos = 0;
 
@@ -160,36 +159,10 @@ class PRF {
                                         reuse_out_hash_flag);
             hmac_calls_num++;
 
-            unsigned char A_tmp[32];
-
             Integer tmpInt;
             for (int i = 0; i < hmac.VALLEN; ++i)
-                tmpInt.bits.insert(tmpInt.bits.end(), std::begin(tmp[i].bits),
-                                   std::end(tmp[i].bits));
-
-            if (!zk_flag) {
-                gc_sec_M.push_back(tmpInt);
-
-                Integer tmpInt2;
-                for (int i = 0; i < hmac.VALLEN; ++i)
-                    tmpInt2.bits.insert(tmpInt2.bits.begin(), tmp[i].bits.begin(), tmp[i].bits.end());
-                A[i] = tmpInt2;
-
-            } else {
-                // in the zk setting, store the zk shares of M. Reuse the stored public M value.
-                zk_sec_M.push_back(tmpInt);
-                memcpy(tmpd, pub_M[zk_pos++], hmac.DIGLEN * sizeof(uint32_t));
-
-                for (int j = 0, k = 0; j < hmac.DIGLEN; j++, k += 4) {
-                    A_tmp[k] = (tmpd[j] >> 24);
-                    A_tmp[k + 1] = (tmpd[j] >> 16);
-                    A_tmp[k + 2] = (tmpd[j] >> 8);
-                    A_tmp[k + 3] = tmpd[j];
-                }
-                reverse(A_tmp, A_tmp + 32);
-                // A[i] = Integer(32 * 8, A_tmp, PUBLIC);
-                A[i] = Integer(32 * 8, A_tmp, PUBLIC);
-            }
+                tmpInt.bits.insert(tmpInt.bits.begin(), tmp[i].bits.begin(), tmp[i].bits.end());
+            A[i] = tmpInt;
 
             Integer As;
             concat(As, &A[i], 1);
@@ -204,20 +177,6 @@ class PRF {
 
         delete[] A;
         delete[] tmp;
-        delete[] tmpd;
-    }
-
-    inline void opt_rounds_reveal(HMAC_SHA256& hmac) {
-        uint32_t* tmpd = new uint32_t[hmac.DIGLEN];
-        for (size_t i = 0; i < gc_sec_M.size(); i++) {
-            // in the gc setting, store the revealed M values.
-            gc_sec_M[i].reveal<uint32_t>((uint32_t*)tmpd, PUBLIC);
-            pub_M.push_back(nullptr);
-            pub_M.back() = new uint32_t[hmac.DIGLEN];
-            memcpy(pub_M.back(), tmpd, hmac.DIGLEN * sizeof(uint32_t));
-        }
-        gc_sec_M.clear();
-
         delete[] tmpd;
     }
 
@@ -347,20 +306,11 @@ class PRFOffline {
         for (int i = 1; i < blks + 1; i++) {
             hmac.opt_rounds_hmac_sha256(tmp, A[i - 1], reuse_in_hash_flag, reuse_out_hash_flag);
             hmac_calls_num++;
-            unsigned char A_tmp[32];
 
             Integer tmpInt;
-
             for (int i = 0; i < hmac.VALLEN; ++i)
-                tmpInt.bits.insert(tmpInt.bits.end(), std::begin(tmp[i].bits),
-                                   std::end(tmp[i].bits));
-
-            gc_sec_M.push_back(tmpInt);
-
-            Integer tmpInt2;
-            for (int i = 0; i < hmac.VALLEN; ++i)
-                tmpInt2.bits.insert(tmpInt2.bits.begin(), tmp[i].bits.begin(), tmp[i].bits.end());
-            A[i] = tmpInt2;
+                tmpInt.bits.insert(tmpInt.bits.begin(), tmp[i].bits.begin(), tmp[i].bits.end());
+            A[i] = tmpInt;
 
             Integer As;
             concat(As, &A[i], 1);
@@ -374,17 +324,6 @@ class PRFOffline {
                        res.bits.begin() + blks * (hmac.DIGLEN * hmac.WORDLEN) - bitlen);
 
         delete[] tmp;
-        delete[] tmpd;
-    }
-
-    inline void opt_rounds_reveal(HMAC_SHA256_Offline& hmac) {
-        uint32_t* tmpd = new uint32_t[hmac.DIGLEN];
-        for (size_t i = 0; i < gc_sec_M.size(); i++) {
-            // in the gc setting, store the revealed M values.
-            gc_sec_M[i].reveal<uint32_t>((uint32_t*)tmpd, PUBLIC);
-        }
-        gc_sec_M.clear();
-
         delete[] tmpd;
     }
 

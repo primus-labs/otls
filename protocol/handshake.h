@@ -398,8 +398,6 @@ class HandShake {
                                    label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
-
-        reveal_for_opt_rounds();
     }
 
     // inline void encrypt_client_finished_msg(AEAD<IO>* aead_c,
@@ -647,9 +645,6 @@ class HandShake {
         //  }
     }
 
-    inline void reveal_for_opt_rounds() {
-        prf.opt_rounds_reveal(hmac);
-    }
 };
 
 class HandShakeOffline {
@@ -778,8 +773,6 @@ class HandShakeOffline {
             //                        label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
-
-        reveal_for_opt_rounds();
     }
 
     inline void encrypt_client_finished_msg(AEADOffline* aead_c_offline, size_t ufinc_len) {
@@ -790,9 +783,6 @@ class HandShakeOffline {
         aead_s_offline->decrypt(ufins_len);
     }
 
-    inline void reveal_for_opt_rounds() {
-        prf.opt_rounds_reveal(hmac);
-    }
 };
 
 #endif
