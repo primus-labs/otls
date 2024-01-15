@@ -246,7 +246,6 @@ class PRFOffline {
     PRFOffline(){};
     ~PRFOffline(){};
     size_t hmac_calls_num = 0;
-    vector<Integer> gc_sec_M;
 
     inline void init(HMAC_SHA256_Offline& hmac, const Integer secret) {
         hmac.init(secret);

@@ -692,9 +692,6 @@ class HandShakeOffline {
             prf.opt_compute(hmac, master_key, master_key_length * 8, pmsbits, true, true);
         } else {
             prf.opt_rounds_compute(hmac, master_key, master_key_length * 8, pmsbits, master_key_label_length + 2 * random_length, true, true);
-            // prf.opt_rounds_compute(hmac, master_key, master_key_length * 8, pmsbits,
-            //                        master_key_label, master_key_label_length, seed, seed_len,
-            //                        true, true);
         }
 
         delete[] buf;
@@ -718,9 +715,6 @@ class HandShakeOffline {
         } else {
             prf.opt_rounds_compute(hmac, master_key, extended_master_key_length * 8, pmsbits, extended_master_key_label_length + session_hash_length, true,
                                    true);
-            // prf.opt_rounds_compute(hmac, master_key, extended_master_key_length * 8, pmsbits,
-            //                        extended_master_key_label, extended_master_key_label_length,
-            //                        session_hash, hash_len, true, true);
         }
         delete[] buf;
     }
@@ -732,9 +726,6 @@ class HandShakeOffline {
             prf.opt_compute(hmac, key, expansion_key_length * 8, master_key, true, true);
         } else {
             prf.opt_rounds_compute(hmac, key, expansion_key_length * 8, master_key, key_expansion_label_length + 2 * random_length, true, true);
-            // prf.opt_rounds_compute(hmac, key, expansion_key_length * 8, master_key,
-            //                        key_expansion_label, key_expansion_label_length, seed,
-            //                        seed_len, true, true);
         }
         iv.bits.clear();
         iv.bits.insert(iv.bits.begin(), key.bits.begin(),
@@ -754,8 +745,6 @@ class HandShakeOffline {
 
         } else {
             prf.opt_rounds_compute(hmac, ufin_int, finished_msg_length * 8, master_key, client_finished_label_length + session_hash_length, true, true);
-            // prf.opt_rounds_compute(hmac, ufin_int, finished_msg_length * 8, master_key, label,
-            //                        label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
 
@@ -769,8 +758,6 @@ class HandShakeOffline {
             prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, master_key, true, true);
         } else {
             prf.opt_rounds_compute(hmac, ufin_int, finished_msg_length * 8, master_key, server_finished_label_length + session_hash_length, true, true);
-            // prf.opt_rounds_compute(hmac, ufin_int, finished_msg_length * 8, master_key, label,
-            //                        label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
     }
