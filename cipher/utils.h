@@ -318,4 +318,9 @@ inline void hex_to_block(block* out, const unsigned char* in, size_t len) {
     memcpy(out, outs, len);
     delete[] ins;
 }
+
+inline void extract_integer(Integer& dst, Integer& src, size_t offset, size_t size) {
+    dst.bits.clear();
+    dst.bits.insert(dst.bits.begin(), src.bits.end() - offset - size, src.bits.end() - offset);
+}
 #endif

@@ -58,13 +58,11 @@ class HandShake {
     Integer master_key;
     Integer client_write_key;
     Integer server_write_key;
-    Integer iv;
+    Integer client_write_iv;
+    Integer server_write_iv;
 
     unsigned char client_ufin[finished_msg_length];
     unsigned char server_ufin[finished_msg_length];
-    unsigned char client_write_iv[iv_length];
-    unsigned char server_write_iv[iv_length];
-    //unsigned char iv_oct[iv_length * 2];
     bool ENABLE_ROUNDS_OPT = false;
     HandShake(IO* io, IO* io_opt, COT<IO>* ot, EC_GROUP* group, bool ENABLE_ROUNDS_OPT = false)
         : io(io) {
@@ -286,15 +284,12 @@ class HandShake {
                                    key_expansion_label, key_expansion_label_length, seed,
                                    seed_len, true, true);
         }
-        iv.bits.clear();
-        iv.bits.insert(iv.bits.begin(), key.bits.begin(),
-                       key.bits.begin() + iv_length * 8 * 2);
-        server_write_key.bits.insert(server_write_key.bits.begin(),
-                                     key.bits.begin() + 2 * iv_length * 8,
-                                     key.bits.begin() + 2 * iv_length * 8 + key_length * 8);
-        client_write_key.bits.insert(client_write_key.bits.begin(),
-                                     key.bits.begin() + 2 * iv_length * 8 + key_length * 8,
-                                     key.bits.begin() + 2 * (iv_length * 8 + key_length * 8));
+
+        extract_integer(client_write_key, key, 0, key_length * 8);
+        extract_integer(server_write_key, key, key_length * 8, key_length * 8);
+
+        extract_integer(client_write_iv, key, key_length * 8 * 2, iv_length * 8);
+        extract_integer(server_write_iv, key, key_length * 8 * 2 + iv_length * 8, iv_length * 8);
         delete[] seed;
     }
 
@@ -377,12 +372,6 @@ class HandShake {
                                    label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
-
-        unsigned char iv_oct[iv_length * 2];
-        iv.reveal<unsigned char>((unsigned char*)iv_oct, PUBLIC);
-        reverse(iv_oct, iv_oct + iv_length * 2);
-        memcpy(client_write_iv, iv_oct, iv_length);
-        memcpy(server_write_iv, iv_oct + iv_length, iv_length);
     }
 
     inline void compute_server_finished_msg(const unsigned char* label,
@@ -548,6 +537,8 @@ class HandShake {
 
     inline void prove_expansion_keys(Integer& key_c,
                                      Integer& key_s,
+                                     Integer& iv_c,
+                                     Integer& iv_s,
                                      const Integer& ms,
                                      const unsigned char* rc,
                                      size_t rc_len,
@@ -569,26 +560,12 @@ class HandShake {
                                    key_expansion_label, key_expansion_label_length, seed,
                                    seed_len, true, true, true);
         }
-        Integer iv;
-        iv.bits.insert(iv.bits.begin(), key.bits.begin(),
-                       key.bits.begin() + iv_length * 8 * 2);
 
-        key_s.bits.insert(key_s.bits.begin(), key.bits.begin() + 2 * iv_length * 8,
-                          key.bits.begin() + 2 * iv_length * 8 + key_length * 8);
-        key_c.bits.insert(key_c.bits.begin(),
-                          key.bits.begin() + 2 * iv_length * 8 + key_length * 8,
-                          key.bits.begin() + 2 * (iv_length * 8 + key_length * 8));
+        extract_integer(key_c, key, 0, key_length * 8);
+        extract_integer(key_s, key, key_length * 8, key_length * 8);
 
-        unsigned char iv_oct[iv_length * 2];
-        memcpy(iv_oct, client_write_iv, iv_length);
-        memcpy(iv_oct + iv_length, server_write_iv, iv_length);
-        reverse(iv_oct, iv_oct + iv_length * 2);
-
-        check_zero<IO>(iv, iv_oct, iv_length * 2, party);
-
-        // Integer expected_iv(iv_length * 8 * 2, iv_oct, PUBLIC);
-        // Integer diff = iv ^ expected_iv;
-        // check_zero<IO>(diff, party);
+        extract_integer(iv_c, key, key_length * 8 * 2, iv_length * 8);
+        extract_integer(iv_s, key, key_length * 8 * 2 + iv_length * 8, iv_length * 8);
 
         delete[] seed;
     }
@@ -657,12 +634,11 @@ class HandShakeOffline {
     Integer master_key;
     Integer client_write_key;
     Integer server_write_key;
-    Integer iv;
+    Integer client_write_iv;
+    Integer server_write_iv;
 
     unsigned char client_ufin[finished_msg_length];
     unsigned char server_ufin[finished_msg_length];
-    unsigned char client_write_iv[iv_length];
-    unsigned char server_write_iv[iv_length];
 
     bool ENABLE_ROUNDS_OPT = false;
     HandShakeOffline(EC_GROUP* group, bool ENABLE_ROUNDS_OPT = false) {
@@ -727,15 +703,11 @@ class HandShakeOffline {
         } else {
             prf.opt_rounds_compute(hmac, key, expansion_key_length * 8, master_key, key_expansion_label_length + 2 * random_length, true, true);
         }
-        iv.bits.clear();
-        iv.bits.insert(iv.bits.begin(), key.bits.begin(),
-                       key.bits.begin() + iv_length * 8 * 2);
-        server_write_key.bits.insert(server_write_key.bits.begin(),
-                                     key.bits.begin() + 2 * iv_length * 8,
-                                     key.bits.begin() + 2 * iv_length * 8 + key_length * 8);
-        client_write_key.bits.insert(client_write_key.bits.begin(),
-                                     key.bits.begin() + 2 * iv_length * 8 + key_length * 8,
-                                     key.bits.begin() + 2 * (iv_length * 8 + key_length * 8));
+        extract_integer(client_write_key, key, 0, key_length * 8);
+        extract_integer(server_write_key, key, key_length * 8, key_length * 8);
+
+        extract_integer(client_write_iv, key, key_length * 8 * 2, iv_length * 8);
+        extract_integer(server_write_iv, key, key_length * 8 * 2 + iv_length * 8, iv_length * 8);
     }
 
     inline void compute_client_finished_msg() {
@@ -748,8 +720,6 @@ class HandShakeOffline {
         }
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
 
-        unsigned char iv_oct[iv_length * 2];
-        iv.reveal<unsigned char>((unsigned char*)iv_oct, PUBLIC);
     }
 
     inline void compute_server_finished_msg() {

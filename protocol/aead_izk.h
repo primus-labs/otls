@@ -52,11 +52,13 @@ class AEAD_Proof {
     Integer expanded_key;
     Integer nonce;
     Integer H;
+    Integer fixed_iv;
     int party;
 
-    AEAD_Proof(AEAD<IO>* aead, Integer& key, int party) {
+    AEAD_Proof(AEAD<IO>* aead, Integer& key, Integer& iv, int party) {
         this->aead = aead;
         this->party = party;
+        this->fixed_iv = iv;
 
         expanded_key = computeKS(key);
         H = computeH();
@@ -95,15 +97,18 @@ class AEAD_Proof {
     }
 
     inline void set_nonce(const unsigned char* iv, size_t iv_len) {
-        assert(iv_len == 12);
+        assert(iv_len == 8);
 
         unsigned char* riv = new unsigned char[iv_len];
         memcpy(riv, iv, iv_len);
         reverse(riv, riv + iv_len);
-        nonce = Integer(96, riv, PUBLIC);
+        Integer variable_iv(64, riv, PUBLIC);
         delete[] riv;
 
         Integer ONE = Integer(32, 1, PUBLIC);
+        
+        concat(nonce, &fixed_iv, 1);
+        concat(nonce, &variable_iv, 1);
         concat(nonce, &ONE, 1);
     }
 

@@ -16,6 +16,7 @@ class AEAD {
     IO* io_opt;
     Integer expanded_key;
     Integer nonce;
+    Integer fixed_iv;
 
     // xor and zk share of h, for izk to check consistency
     block gc_h;
@@ -38,9 +39,10 @@ class AEAD {
     vector<block> mul_hs;
 
     OLEF2K<IO>* ole = nullptr;
-    AEAD(IO* io, IO* io_opt, COT<IO>* ot, Integer& key) {
+    AEAD(IO* io, IO* io_opt, COT<IO>* ot, Integer& key, Integer& iv) {
         ole = new OLEF2K<IO>(io, ot);
         this->io_opt = io_opt;
+        this->fixed_iv = iv;
         expanded_key = computeKS(key);
         Integer H = computeH();
 
@@ -121,19 +123,23 @@ class AEAD {
     inline void set_nonce(const unsigned char* iv,
                           size_t iv_len,
                           bool ENABLE_ONLINE_OFFLINE = true) {
-        assert(iv_len == 12);
+        assert(iv_len == 8);
 
         unsigned char* riv = new unsigned char[iv_len];
         memcpy(riv, iv, iv_len);
         reverse(riv, riv + iv_len);
+        Integer variable_iv;
         if (ENABLE_ONLINE_OFFLINE)
-            nonce = Integer(96, riv, ALICE);
+            variable_iv = Integer(64, riv, ALICE);
         else
-            nonce = Integer(96, riv, PUBLIC);
+            variable_iv = Integer(64, riv, PUBLIC);
 
         delete[] riv;
 
         Integer ONE = Integer(32, 1, PUBLIC);
+
+        concat(nonce, &fixed_iv, 1);
+        concat(nonce, &variable_iv, 1);
         concat(nonce, &ONE, 1);
     }
 
@@ -546,10 +552,12 @@ class AEADOffline {
    public:
     Integer expanded_key;
     Integer nonce;
+    Integer fixed_iv;
 
-    AEADOffline(Integer& key) {
+    AEADOffline(Integer& key, Integer& iv) {
         expanded_key = computeKS(key);
         Integer H = computeH();
+        fixed_iv = iv;
     }
     ~AEADOffline() {}
 
@@ -583,11 +591,14 @@ class AEADOffline {
     }
 
     inline void set_nonce() {
-        unsigned char riv[12];
-        memset(riv, 0x00, 12);
-        nonce = Integer(96, riv, ALICE);
+        unsigned char riv[8];
+        memset(riv, 0x00, 8);
+        Integer variable_iv = Integer(64, riv, ALICE);
 
         Integer ONE = Integer(32, 1, PUBLIC);
+
+        concat(nonce, &fixed_iv, 1);
+        concat(nonce, &variable_iv, 1);
         concat(nonce, &ONE, 1);
     }
 

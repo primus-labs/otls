@@ -22,6 +22,8 @@ class PostRecord {
     Integer master_key;
     Integer client_write_key;
     Integer server_write_key;
+    Integer client_write_iv;
+    Integer server_write_iv;
     Integer client_finished_z0;
     Integer server_finished_z0;
     int party;
@@ -95,7 +97,9 @@ class PostRecord {
         else {
             hs->prove_master_key(master_key, pms, rc, rc_len, rs, rs_len, party);
         }
-        hs->prove_expansion_keys(client_write_key, server_write_key, master_key, rc, rc_len,
+        hs->prove_expansion_keys(client_write_key, server_write_key,
+                                 client_write_iv, server_write_iv,
+                                 master_key, rc, rc_len,
                                  rs, rs_len, party);
 
         hs->prove_client_finished_msg(master_key, client_finished_label,
@@ -104,8 +108,8 @@ class PostRecord {
         hs->prove_server_finished_msg(master_key, server_finished_label,
                                       server_finished_label_length, tau_s, tau_s_len, party);
 
-        aead_proof_c = new AEAD_Proof<IO>(aead_c, client_write_key, party);
-        aead_proof_s = new AEAD_Proof<IO>(aead_s, server_write_key, party);
+        aead_proof_c = new AEAD_Proof<IO>(aead_c, client_write_key, client_write_iv, party);
+        aead_proof_s = new AEAD_Proof<IO>(aead_s, server_write_key, server_write_iv, party);
 
         hs->prove_enc_dec_finished_msg(aead_proof_c, client_finished_z0, finc_ctxt,
                                        finc_ctxt_len, client_iv, client_iv_len);
