@@ -107,7 +107,7 @@ class AEAD_Proof {
 
         Integer ONE = Integer(32, 1, PUBLIC);
         
-        concat(nonce, &fixed_iv, 1);
+        nonce = fixed_iv;
         concat(nonce, &variable_iv, 1);
         concat(nonce, &ONE, 1);
     }
