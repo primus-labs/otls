@@ -46,20 +46,31 @@ class E2F {
         }
     }
 
-    inline void open(BIGNUM* value, int party) {
+    inline void open(BIGNUM* value[], int party) {
         BIGNUM* tmp = BN_new();
         if (party == ALICE) {
-            send_bn(io, value);
+            for (size_t i = 0; value[i] != nullptr; i++)
+                send_bn(io, value[i]);
             io->flush();
-            recv_bn(io_opt, tmp);
-            BN_mod_add(value, value, tmp, ole->q, ole->ctx);
+            for (size_t i = 0; value[i] != nullptr; i++) {
+                recv_bn(io_opt, tmp);
+                BN_mod_add(value[i], value[i], tmp, ole->q, ole->ctx);
+            }
         } else {
-            send_bn(io_opt, value);
+            for (size_t i = 0; value[i] != nullptr; i++)
+                send_bn(io_opt, value[i]);
             io_opt->flush();
-            recv_bn(io, tmp);
-            BN_mod_add(value, value, tmp, ole->q, ole->ctx);
+            for (size_t i = 0; value[i] != nullptr; i++) {
+                recv_bn(io, tmp);
+                BN_mod_add(value[i], value[i], tmp, ole->q, ole->ctx);
+            }
         }
         BN_free(tmp);
+    }
+
+    inline void open(BIGNUM* value, int party) {
+        BIGNUM* vec[] = {value, nullptr};
+        open(vec, party);
     }
 
     void compute_offline(int party) {
@@ -126,7 +137,13 @@ class E2F {
         }
         BIGNUM* w = BN_new();
         BN_mod_sub(w, xbma, b, ole->q, ole->ctx); //epsilon1 = open(xb-xa-b)
-        open(w, party);                           //open epsilon1
+
+        BIGNUM* eta = BN_new();
+        BN_mod_sub(eta, ybma, bp, ole->q, ole->ctx); //epsilon2 = open(yb-ya-bp)
+
+        BIGNUM* open_vec[] = {w, eta, nullptr};
+        open(open_vec, party);                            //open epsilon1, epsilon2
+
         BN_mod_mul(w, w, a, ole->q, ole->ctx);
         BN_mod_add(w, w, c, ole->q, ole->ctx);
 
@@ -134,10 +151,6 @@ class E2F {
 
         if (BN_is_zero(w))
             error("w is zero, invalid!\n");
-
-        BIGNUM* eta = BN_new();
-        BN_mod_sub(eta, ybma, bp, ole->q, ole->ctx); //epsilon2 = open(yb-ya-bp)
-        open(eta, party);                            //open epsilon2
 
         BN_mod_mul(eta, eta, a, ole->q, ole->ctx);
         BN_mod_add(eta, eta, cp, ole->q, ole->ctx);
