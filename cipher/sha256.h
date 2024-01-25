@@ -215,11 +215,10 @@ class SHA256 {
         assert(padded_len % CHUNKLEN == 0);
         vector<Integer> input_data;
         size_t input_data_size = padded_len / WORDLEN;
+        input_data.resize(input_data_size);
 
         for (size_t i = 0; i < input_data_size; i++) {
-            Integer tmp;
-            extract_integer(tmp, padded_input, i * WORDLEN, WORDLEN);
-            input_data.push_back(tmp);
+            extract_integer(input_data[i], padded_input, i * WORDLEN, WORDLEN);
         }
 
         uint64_t num_chunk = padded_len / CHUNKLEN;
@@ -266,10 +265,9 @@ class SHA256 {
         assert(len == CHUNKLEN);
         vector<Integer> input_data;
         size_t input_data_size = len / WORDLEN;
+        input_data.resize(input_data_size);
         for (size_t i = 0; i < input_data_size; i++) {
-            Integer tmp;
-            extract_integer(tmp, sec_input, i * WORDLEN, WORDLEN);
-            input_data.push_back(tmp);
+            extract_integer(input_data[i], sec_input, i * WORDLEN, WORDLEN);
         }
 
         // enable the reuse optimization, reuse opened value and store it in iv_in_hash.
@@ -385,10 +383,9 @@ class SHA256 {
         assert(padded_len % CHUNKLEN == 0);
         vector<Integer> input_data;
         size_t input_data_size = padded_len / WORDLEN;
+        input_data.resize(input_data_size);
         for (size_t i = 0; i < input_data_size; i++) {
-            Integer tmp;
-            extract_integer(tmp, padded_input, i * WORDLEN, WORDLEN);
-            input_data.push_back(tmp);
+            extract_integer(input_data[i], padded_input, i * WORDLEN, WORDLEN);
         }
 
         uint64_t num_chunk = padded_len / CHUNKLEN;
@@ -655,10 +652,9 @@ class SHA256Offline {
         assert(padded_len % CHUNKLEN == 0);
         vector<Integer> input_data;
         size_t input_data_size = padded_len / WORDLEN;
+        input_data.resize(input_data_size);
         for (size_t i = 0; i < input_data_size; i++) {
-            Integer tmp;
-            extract_integer(tmp, padded_input, i * WORDLEN, WORDLEN);
-            input_data.push_back(tmp);
+            extract_integer(input_data[i], padded_input, i * WORDLEN, WORDLEN);
         }
 
         uint64_t num_chunk = padded_len / CHUNKLEN;
@@ -700,10 +696,9 @@ class SHA256Offline {
         assert(len == CHUNKLEN);
         vector<Integer> input_data;
         size_t input_data_size = len / WORDLEN;
+        input_data.resize(input_data_size);
         for (size_t i = 0; i < input_data_size; i++) {
-            Integer tmp;
-            extract_integer(tmp, sec_input, i * WORDLEN, WORDLEN);
-            input_data.push_back(tmp);
+            extract_integer(input_data[i], sec_input, i * WORDLEN, WORDLEN);
         }
 
         // enable the reuse optimization, reuse opened value and store it in iv_in_hash.
@@ -744,10 +739,9 @@ class SHA256Offline {
         assert(padded_len % CHUNKLEN == 0);
         vector<Integer> input_data;
         size_t input_data_size = padded_len / WORDLEN;
+        input_data.resize(input_data_size);
         for (size_t i = 0; i < input_data_size; i++) {
-            Integer tmp;
-            extract_integer(tmp, padded_input, i * WORDLEN, WORDLEN);
-            input_data.push_back(tmp);
+            extract_integer(input_data[i], padded_input, i * WORDLEN, WORDLEN);
         }
 
         uint64_t num_chunk = padded_len / CHUNKLEN;
