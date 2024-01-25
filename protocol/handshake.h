@@ -372,6 +372,7 @@ class HandShake {
                                    label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
+
     }
 
     inline void compute_server_finished_msg(const unsigned char* label,
