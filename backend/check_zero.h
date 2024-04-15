@@ -19,12 +19,12 @@ inline void check_zero(const block* blk, size_t length, int party) {
 template <typename IO>
 inline void check_zero(const Integer& input, int party) {
     if (party == ALICE) {
-        for (int i = 0; i < input.size(); i++) {
+        for (size_t i = 0; i < input.size(); i++) {
             (((ZKProver<IO>*)(ProtocolExecution::prot_exec))->ostriple->auth_helper->hash)
               .put_block(&input[i].bit, 1);
         }
     } else {
-        for (int i = 0; i < input.size(); i++) {
+        for (size_t i = 0; i < input.size(); i++) {
             (((ZKVerifier<IO>*)(ProtocolExecution::prot_exec))->ostriple->auth_helper->hash)
               .put_block(&input[i].bit, 1);
         }
@@ -39,7 +39,7 @@ inline void check_zero(const Integer& input, const T* data, size_t len, int part
         error("inconsistent length!\n");
     bool* tmp = new bool[input.size()];
     if (party == ALICE) {
-        for (int i = 0; i < input.size(); i++)
+        for (size_t i = 0; i < input.size(); i++)
             tmp[i] = getLSB(input[i].bit);
 
         T* expected_data = new T[len];

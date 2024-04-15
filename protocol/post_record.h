@@ -191,10 +191,10 @@ class PostRecord {
           compare_tag(finc_tag, blks_h[0], blks_h[2], finc_ctxt, finc_len, finc_aad, aad_len);
         res &=
           compare_tag(fins_tag, blks_h[1], blks_h[3], fins_ctxt, fins_len, fins_aad, aad_len);
-        for (int i = 0; i < enc_num; i++)
+        for (size_t i = 0; i < enc_num; i++)
             res &= compare_tag(enc_tags[i], blks_h[0], blks_h[4 + i], enc_ctxts[i],
                                enc_ctxts_len[i], enc_aads[i], aad_len);
-        for (int i = 0; i < dec_num; i++)
+        for (size_t i = 0; i < dec_num; i++)
             res &= compare_tag(dec_tags[i], blks_h[1], blks_h[4 + enc_num + i], dec_ctxts[i],
                                dec_ctxts_len[i], dec_aads[i], aad_len);
 

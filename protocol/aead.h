@@ -81,11 +81,11 @@ class AEAD {
     ~AEAD() {
         if (ole != nullptr)
             delete ole;
-        for (int i = 0; i < gc_z.size(); i++) {
+        for (size_t i = 0; i < gc_z.size(); i++) {
             if (gc_z[i] != nullptr)
                 delete[] gc_z[i];
         }
-        for (int i = 0; i < open_z.size(); i++) {
+        for (size_t i = 0; i < open_z.size(); i++) {
             if (open_z[i] != nullptr)
                 delete[] open_z[i];
         }
@@ -111,7 +111,7 @@ class AEAD {
 
     inline void gctr(Integer& res, size_t m) {
         Integer tmp(128, 0, PUBLIC);
-        for (int i = 0; i < m; i++) {
+        for (size_t i = 0; i < m; i++) {
             Integer content = nonce;
             tmp = computeAES_KS(expanded_key, content);
 
@@ -151,10 +151,10 @@ class AEAD {
 
         vector<block> blks;
         if (party == ALICE) {
-            for (int i = 0; i < len; i++)
+            for (size_t i = 0; i < len; i++)
                 blks.push_back(mulBlock(in[i], mul_hs[i]));
         } else {
-            for (int i = 0; i < len; i++)
+            for (size_t i = 0; i < len; i++)
                 blks.push_back(mul_hs[i]);
         }
 
@@ -163,7 +163,7 @@ class AEAD {
         ole->compute(outs.data(), blks.data(), len);
 
         out = zero_block;
-        for (int i = 0; i < len; i++) {
+        for (size_t i = 0; i < len; i++) {
             out = out ^ outs[i];
         }
     }
@@ -218,7 +218,7 @@ class AEAD {
             open_len.push_back(msg_len);
 
             reverse(z, z + msg_len);
-            for (int i = 0; i < msg_len; i++)
+            for (size_t i = 0; i < msg_len; i++)
                 ctxt[i] = msg[i] ^ z[i];
         } else {
             // message is secret
@@ -239,7 +239,7 @@ class AEAD {
 
             if (party == ALICE) {
                 // ALICE computes msg ^ z_A, sends it to BOB.
-                for (int i = 0; i < msg_len; i++)
+                for (size_t i = 0; i < msg_len; i++)
                     ctxt[i] = msg[i] ^ z[i];
                 io->send_data(ctxt, msg_len);
 
@@ -248,7 +248,7 @@ class AEAD {
             } else {
                 // BOB receives msg ^ z_A, computes msg ^ z_A ^ z_B = ctxt
                 io->recv_data(ctxt, msg_len);
-                for (int i = 0; i < msg_len; i++)
+                for (size_t i = 0; i < msg_len; i++)
                     ctxt[i] = ctxt[i] ^ z[i];
 
                 // BOB sends ctxt
@@ -365,7 +365,7 @@ class AEAD {
             open_len.push_back(ctxt_len);
 
             reverse(z, z + ctxt_len);
-            for (int i = 0; i < ctxt_len; i++)
+            for (size_t i = 0; i < ctxt_len; i++)
                 msg[i] = ctxt[i] ^ z[i];
         } else {
             // message is secret
@@ -390,7 +390,7 @@ class AEAD {
             } else {
                 // ALICE receives xor share z_B and recover msg.
                 io->recv_data(msg, ctxt_len);
-                for (int i = 0; i < ctxt_len; i++)
+                for (size_t i = 0; i < ctxt_len; i++)
                     msg[i] = msg[i] ^ z[i] ^ ctxt[i];
             }
         }
@@ -581,7 +581,7 @@ class AEADOffline {
 
     inline void gctr(Integer& res, size_t m) {
         Integer tmp(128, 0, PUBLIC);
-        for (int i = 0; i < m; i++) {
+        for (size_t i = 0; i < m; i++) {
             Integer content = nonce;
             tmp = computeAES_KS(expanded_key, content);
 

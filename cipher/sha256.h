@@ -104,7 +104,7 @@ class SHA256 {
 
     SHA256(){};
     ~SHA256() {
-        for (int i = 0; i < iv_in_hashes.size(); i++) {
+        for (size_t i = 0; i < iv_in_hashes.size(); i++) {
             if (iv_in_hashes[i] != nullptr)
                 delete[] iv_in_hashes[i];
         }
@@ -549,7 +549,7 @@ class SHA256 {
     template <typename IO>
     inline void sha256_check(int party) {
         uint32_t* tmp = new uint32_t[DIGLEN];
-        for (int i = 0; i < iv_in_hashes.size(); i++) {
+        for (size_t i = 0; i < iv_in_hashes.size(); i++) {
             memcpy(tmp, iv_in_hashes[i], DIGLEN * sizeof(uint32_t));
             reverse(tmp, tmp + DIGLEN);
             check_zero<IO>(zk_iv_in_hashes[i], tmp, DIGLEN, party);
