@@ -1,5 +1,8 @@
 /* 
-    This is for the proxy model, which does not need MPC to run the handshake and record phase. The proxy will keep and forward all the TLS transcripts. The client will prove (with interactive zkp) to the proxy (verifier) that he knows the session key (and possibly some private message) encrypted under the given ciphertexts.
+    This is for the proxy model, which does not need MPC to run the handshake and record phase. 
+    The proxy will keep and forward all the TLS transcripts. 
+    The client will prove (with interactive zkp) to the proxy (verifier) 
+    that he knows the session key (and possibly some private message) encrypted under the given ciphertexts.
 */
 
 #ifndef _AESPROVER_
