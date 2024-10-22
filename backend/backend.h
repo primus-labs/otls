@@ -43,7 +43,7 @@ inline void sync_offline_online(OfflinePADOParty* offline, PADOParty<IO>* online
         on_eva->gc->GC = off_eva->gc->GC;
         on_eva->pub_values = off_eva->pub_values;
     }
-    delete offline;
+    // delete offline;
 }
 
 template <typename IO>
