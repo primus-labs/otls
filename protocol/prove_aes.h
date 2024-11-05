@@ -74,7 +74,7 @@ class AESProver {
         unsigned char* riv = new unsigned char[iv_len];
         memcpy(riv, iv, iv_len);
         reverse(riv, riv + iv_len);
-        Integer variable_iv(64, riv, ALICE);
+        Integer variable_iv(64, riv, PUBLIC);
 
         delete[] riv;
 
