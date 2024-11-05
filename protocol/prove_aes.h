@@ -31,44 +31,97 @@ class AESProver {
    public:
     // This is the scheduled aes key.
     Integer expanded_key;
+    Integer fixed_iv;
+    Integer nonce;
 
-    inline AESProver(Integer& key) {
+    inline AESProver(Integer& key, Integer& iv) {
         assert(key.size() == 128);
         expanded_key = computeKS(key);
+
+        assert(iv.size() == 32);
+        fixed_iv = iv;
     }
     ~AESProver() {}
+
+    inline Integer inc(Integer& counter, size_t s) {
+        if (counter.size() < s) {
+            error("invalid length s!");
+        }
+        Integer msb = counter, lsb = counter;
+        msb.bits.erase(msb.bits.begin(), msb.bits.begin() + s);
+        lsb.bits.erase(lsb.bits.begin() + s, lsb.bits.end());
+        lsb = lsb + Integer(s, 1, PUBLIC);
+
+        concat(msb, &lsb, 1);
+        return msb;
+    }
+
+    inline void gctr(Integer& res, size_t m) {
+        Integer tmp(128, 0, PUBLIC);
+        for (size_t i = 0; i < m; i++) {
+            Integer content = nonce;
+            tmp = computeAES_KS(expanded_key, content);
+
+            concat(res, &tmp, 1);
+            nonce = inc(nonce, 32);
+        }
+    }
+
+    inline void set_nonce(const unsigned char* iv,
+                          size_t iv_len) {
+        assert(iv_len == 8);
+
+        unsigned char* riv = new unsigned char[iv_len];
+        memcpy(riv, iv, iv_len);
+        reverse(riv, riv + iv_len);
+        Integer variable_iv(64, riv, PUBLIC);
+
+        delete[] riv;
+
+        Integer ONE = Integer(32, 1, PUBLIC);
+
+        nonce = fixed_iv;
+        concat(nonce, &variable_iv, 1);
+        concat(nonce, &ONE, 1);
+    }
+
+    inline Integer computeCounter(const unsigned char* iv,
+                                  size_t iv_len,
+                                  size_t msg_len) {
+        size_t u = 128 * ((msg_len * 8 + 128 - 1) / 128) - msg_len * 8;
+
+        size_t ctr_len = (msg_len * 8 + 128 - 1) / 128;
+
+        set_nonce(iv, iv_len);
+        Integer Z;
+        gctr(Z, 1 + ctr_len);
+
+        Z.bits.erase(Z.bits.end() - 128, Z.bits.end());
+        Z.bits.erase(Z.bits.begin(), Z.bits.begin() + u);
+        return Z;
+    }
 
     // This proves AES(k, nounce) xor msgs = ctxts in blocks, where msgs is public.
     // Note the length of nounces, msgs and ctxts should be the same and a multiple of 16.
     // len_bytes is a multiple of 16.
-    inline bool prove_public_msgs(const unsigned char* nounces,
+    inline bool prove_public_msgs(const unsigned char* iv,
+                                  size_t iv_len,
                                   const unsigned char* msgs,
                                   const unsigned char* ctxts,
-                                  size_t len_bytes) {
-        assert(len_bytes % 16 == 0);
+                                  size_t msg_len) {
+        Integer c = computeCounter(iv, iv_len, msg_len);
 
-        unsigned char* c_xor_m = new unsigned char[len_bytes];
-        for (int i = 0; i < len_bytes; ++i) {
-            c_xor_m[len_bytes - 1 - i] = msgs[i] ^ ctxts[i];
+        unsigned char* c_xor_m = new unsigned char[msg_len];
+        for (int i = 0; i < msg_len; ++i) {
+            c_xor_m[msg_len - 1 - i] = msgs[i] ^ ctxts[i];
         }
 
-        Integer c;
-        unsigned char* buffer = new unsigned char[16];
-        for (int i = 0; i < len_bytes / 16; ++i) {
-            memcpy(buffer, nounces + i * 16, 16);
-            reverse(buffer, buffer + 16);
-            Integer msg(128, buffer, PUBLIC);
-            Integer tmp = computeAES_KS(expanded_key, msg);
-            concat(c, &tmp, 1);
-        }
-
-        unsigned char* expected = new unsigned char[len_bytes];
+        unsigned char* expected = new unsigned char[msg_len];
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
-        bool res = memcmp(expected, c_xor_m, len_bytes) == 0;
+        bool res = memcmp(expected, c_xor_m, msg_len) == 0;
 
         delete[] c_xor_m;
-        delete[] buffer;
         delete[] expected;
         return res;
     }
@@ -77,33 +130,24 @@ class AESProver {
     // Note the length of nounces and ctxts should be the same and a multiple of 16.
     // The length of msgs should be a multiple of 128.
     // len_bytes is a multiple of 16.
-    inline bool prove_private_msgs(const unsigned char* nounces,
+    inline bool prove_private_msgs(const unsigned char* iv,
+                                   size_t iv_len, 
                                    const Integer& msgs,
                                    const unsigned char* ctxts,
-                                   size_t len_bytes) {
-        assert(len_bytes % 16 == 0);
-        assert(msgs.size() = 8 * len_bytes);
+                                   size_t msg_len) {
+        assert(msgs.size() == 8 * msg_len);
 
-        Integer c;
-        unsigned char* buffer = new unsigned char[16];
-        for (int i = 0; i < len_bytes / 16; ++i) {
-            memcpy(buffer, nounces + i * 16, 16);
-            reverse(buffer, buffer + 16);
-            Integer msg(128, nounces + i, PUBLIC);
-            Integer tmp = computeAES_KS(expanded_key, msg);
-            concat(c, &tmp, 1);
-        }
+        Integer c = computeCounter(iv, iv_len, msg_len);
 
         c ^= msgs;
 
-        unsigned char* expected = new unsigned char[len_bytes];
+        unsigned char* expected = new unsigned char[msg_len];
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
-        reverse(expected, expected + len_bytes);
-        bool res = memcmp(expected, ctxts, len_bytes) == 0;
+        reverse(expected, expected + msg_len);
+        bool res = memcmp(expected, ctxts, msg_len) == 0;
 
         delete[] expected;
-        delete[] buffer;
         return res;
     }
 };
