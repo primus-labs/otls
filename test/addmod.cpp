@@ -13,19 +13,12 @@ int main(int argc, char** argv) {
     BoolIO<NetIO>* ios[threads];
     for (int i = 0; i < threads; i++)
         ios[i] = new BoolIO<NetIO>(io, party == ALICE);
-    //setup_backend(io, party);
-    // BIGNUM *q = BN_new(), *n19 = BN_new();
-    // BN_set_bit(q, 255);
-    // BN_set_word(n19, 19);
-    // BN_sub(q, q, n19); //2^255-19
-    // BN_CTX* ctx = BN_CTX_new();
 
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
     BIGNUM* q = BN_new();
     BN_CTX* ctx = BN_CTX_new();
     EC_GROUP_get_curve(group, q, NULL, NULL, ctx);
 
-    // auto offline = setup_offline_backend(io, party);
     setup_protocol(io, ios, threads, party, true);
 
     Integer a(BN_num_bytes(q) * 8, 0, ALICE);
@@ -34,14 +27,7 @@ int main(int argc, char** argv) {
     addmod(res, a, b, q);
     unsigned char tmp1[32];
     res.reveal(tmp1, PUBLIC);
-    // auto online = setup_online_backend(io, party);
-    // sync_offline_online(offline, online, party);
     switch_to_online<NetIO>(party);
-
-    // Integer a(BN_num_bytes(q) * 8, 0, ALICE);
-    // Integer b(BN_num_bytes(q) * 8, 0, BOB);
-    // addmod(res, a, b, q);
-    // Integer a, b, c;
 
     unsigned char* achar = new unsigned char[32];
     unsigned char* bchar = new unsigned char[32];
@@ -113,7 +99,6 @@ int main(int argc, char** argv) {
     BN_free(aint);
     BN_free(cint);
     BN_free(q);
-    //BN_free(n19);
     BN_CTX_free(ctx);
     finalize_backend();
     delete io;
