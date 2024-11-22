@@ -24,6 +24,11 @@ inline bool finalize_proxy_protocol() {
     return res;
 }
 
+struct AESCounterInfo {
+    size_t id;
+    unsigned char mask[16];
+};
+
 /*
     The AES Prover.
 */
@@ -67,6 +72,25 @@ class AESProver {
         }
     }
 
+    inline void gctr_opt(vector<Integer>& res, const vector<size_t>& ids) {
+        if (ids.empty()) return;
+
+        size_t index = 0;
+        for (size_t i = 0; ; i++) {
+            if (i == ids[index] + 1) {
+                Integer content = nonce;
+                Integer tmp = computeAES_KS(expanded_key, content);
+                res.push_back(tmp);
+
+                index++;
+                if (index >= ids.size()) {
+                    break;
+                }
+            }
+            nonce = inc(nonce, 32);
+        }
+    }
+
     inline void set_nonce(const unsigned char* iv,
                           size_t iv_len) {
         assert(iv_len == 8);
@@ -100,6 +124,22 @@ class AESProver {
         Z.bits.erase(Z.bits.begin(), Z.bits.begin() + u);
         return Z;
     }
+
+    inline vector<Integer> computeCounterOpt(const vector<AESCounterInfo>& counterInfos,
+                                             const unsigned char* iv,
+                                             size_t iv_len) {
+        vector<size_t> ids;
+        for (size_t i = 0; i < counterInfos.size(); i++) {
+            ids.push_back(counterInfos[i].id);
+        }
+
+        vector<Integer> counters;
+        set_nonce(iv, iv_len);
+        gctr_opt(counters, ids);
+
+        return counters;
+    }
+
 
     // This proves AES(k, nounce) xor msgs = ctxts in blocks, where msgs is public.
     // Note the length of nounces, msgs and ctxts should be the same and a multiple of 16.
@@ -144,6 +184,56 @@ class AESProver {
         unsigned char* expected = new unsigned char[msg_len];
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
+        reverse(expected, expected + msg_len);
+        bool res = memcmp(expected, ctxts, msg_len) == 0;
+
+        delete[] expected;
+        return res;
+    }
+
+    inline bool prove_private_msgs_opt(const vector<AESCounterInfo>& counterInfos,
+                                       const unsigned char* iv,
+                                       size_t iv_len, 
+                                       const Integer& msgs,
+                                       const unsigned char* ctxts,
+                                       size_t msg_len) {
+        assert(msgs.size() == 8 * msg_len);
+
+        vector<Integer> counters = computeCounterOpt(counterInfos, iv, iv_len);
+
+        size_t offset = 0;
+        Integer izk_counter;
+        for (size_t i = 0; i < counterInfos.size(); i++) {
+            const AESCounterInfo& c = counterInfos[i];
+            const Integer& oneCounter = counters[i];
+            int begin = -1;
+            int j = 0;
+
+            for (; j < 16; j++) {
+                if (c.mask[j]) {
+                    if (begin == -1) {
+                        begin = j;
+                    }
+                }
+                else {
+                    if (begin != -1) {
+                        izk_counter.bits.insert(izk_counter.bits.begin(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                        begin = -1;
+                    }
+                }
+            }
+            if (begin != -1) {
+                izk_counter.bits.insert(izk_counter.bits.begin(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                begin = -1;
+            }
+            
+        }
+
+        izk_counter ^= msgs;
+
+        unsigned char* expected = new unsigned char[msg_len];
+
+        izk_counter.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
         reverse(expected, expected + msg_len);
         bool res = memcmp(expected, ctxts, msg_len) == 0;
 
