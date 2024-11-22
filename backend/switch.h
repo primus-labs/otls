@@ -70,23 +70,20 @@ inline void reset_offline_ptr() {
     offline_gc_prot_buf = nullptr;
 }
 
-inline void safe_setup_protocol(
-    std::function<void()> setupFn,
-    std::function<void()> backupFn,
-    std::function<void()> resetFn
-) {
+inline void safe_setup_protocol(std::function<void()> setupFn,
+                                std::function<void()> backupFn,
+                                std::function<void()> resetFn) {
     FunctionWrapperV3(
-        [&setupFn, &backupFn]() {
-            reset_prot_ptr();
-            setupFn();
-            backupFn();
-        },
-        [&resetFn](const char* e) {
-            delete_prot_ptr();
-            resetFn();
-            throw std::runtime_error(e);
-        }
-    )();
+      [&setupFn, &backupFn]() {
+          reset_prot_ptr();
+          setupFn();
+          backupFn();
+      },
+      [&resetFn](const char* e) {
+          delete_prot_ptr();
+          resetFn();
+          throw std::runtime_error(e);
+      })();
 
     CHECK_INITIALIZE_EXCEPTION();
 }
@@ -95,38 +92,18 @@ template <typename IO>
 void setup_protocol(
   IO* io, BoolIO<IO>** ios, int threads, int party, bool ENABLE_OFFLINE_ONLINE = false) {
     init_files();
-    safe_setup_protocol(
-        [ios, threads, party]() {
-            setup_zk_bool(ios, threads, party);
-        },
-        backup_zk_ptr,
-        reset_zk_ptr
-    );
+    safe_setup_protocol([ios, threads, party]() { setup_zk_bool(ios, threads, party); },
+                        backup_zk_ptr, reset_zk_ptr);
 
     if (!ENABLE_OFFLINE_ONLINE) {
-        safe_setup_protocol(
-            [io, party]() {
-                setup_backend(io, party);
-            },
-            backup_gc_ptr,
-            reset_gc_ptr
-        );
+        safe_setup_protocol([io, party]() { setup_backend(io, party); }, backup_gc_ptr,
+                            reset_gc_ptr);
     } else {
-        safe_setup_protocol(
-            [io, party]() {
-                setup_online_backend(io, party);
-            },
-            backup_gc_ptr,
-            reset_gc_ptr
-        );
+        safe_setup_protocol([io, party]() { setup_online_backend(io, party); }, backup_gc_ptr,
+                            reset_gc_ptr);
 
-        safe_setup_protocol(
-            [io, party]() {
-                setup_offline_backend(io, party);
-            },
-            backup_offline_ptr,
-            reset_offline_ptr
-        );
+        safe_setup_protocol([io, party]() { setup_offline_backend(io, party); },
+                            backup_offline_ptr, reset_offline_ptr);
     }
     enable_offline = ENABLE_OFFLINE_ONLINE;
 }

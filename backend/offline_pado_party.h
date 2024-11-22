@@ -3,6 +3,7 @@
 #include "emp-tool/emp-tool.h"
 using namespace emp;
 
+/* Define the offline party */
 class OfflinePADOParty : public ProtocolExecution {
    public:
     OfflinePADOParty(int party) : ProtocolExecution(party) {}

@@ -85,14 +85,11 @@ class PostRecord {
                                                 bool is_extended_master_key = false) {
         if (is_extended_master_key) {
             hs->prove_extended_master_key(master_key, pms, session_hash, hash_len, party);
-        }
-        else {
+        } else {
             hs->prove_master_key(master_key, pms, rc, rc_len, rs, rs_len, party);
         }
-        hs->prove_expansion_keys(client_write_key, server_write_key,
-                                 client_write_iv, server_write_iv,
-                                 master_key, rc, rc_len,
-                                 rs, rs_len, party);
+        hs->prove_expansion_keys(client_write_key, server_write_key, client_write_iv,
+                                 server_write_iv, master_key, rc, rc_len, rs, rs_len, party);
 
         hs->prove_client_finished_msg(master_key, client_finished_label,
                                       client_finished_label_length, tau_c, tau_c_len, party);

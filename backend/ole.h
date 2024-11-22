@@ -3,6 +3,8 @@
 #include "emp-ot/emp-ot.h"
 #include "backend/bn_utils.h"
 #include <iostream>
+
+/* Define the OLE protocol with prime fields */
 template <typename IO>
 class OLE {
    public:
@@ -33,7 +35,8 @@ class OLE {
             BN_free(exp[i]);
     }
 
-    //BN_new all memory before calling this function!
+    /* Compute the OLE protocol */
+    // BN_new all memory before calling this function!
     void compute(vector<BIGNUM*>& out, const vector<BIGNUM*>& in) {
         assert(out.size() == in.size());
         BIGNUM *pad1 = BN_new(), *pad2 = BN_new(), *msg = BN_new(), *tmp = BN_new();
@@ -86,4 +89,4 @@ class OLE {
         BN_free(tmp);
     }
 };
-#endif //
+#endif

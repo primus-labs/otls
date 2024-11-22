@@ -4,6 +4,7 @@
 #include "backend/bn_utils.h"
 using namespace emp;
 
+/* Define the online garbler of half-gate garbler */
 template <typename T>
 class OnlineHalfGateGen : public CircuitExecution {
    public:
@@ -24,13 +25,7 @@ class OnlineHalfGateGen : public CircuitExecution {
         constant[1] ^= delta;
     }
     block public_label(bool b) override { return b ? constant[1] : constant[0]; }
-    block and_gate(const block& a, const block& b) override {
-        return out_labels[gid++];
-        // block out[2], table[2];
-        // garble_gate_garble_halfgates(a, a ^ delta, b, b ^ delta, &out[0], &out[1], delta,
-        //                              table, gid++, &prp.aes);
-        // return out[0];
-    }
+    block and_gate(const block& a, const block& b) override { return out_labels[gid++]; }
     block xor_gate(const block& a, const block& b) override { return a ^ b; }
     block not_gate(const block& a) override { return a ^ delta; }
     uint64_t num_and() override { return gid; }

@@ -98,8 +98,6 @@ class HandShake {
     }
 
     inline void compute_pado_VA(EC_POINT* Va, BIGNUM* t, const EC_POINT* Ts) {
-        // BN_rand(t, BN_num_bytes(q) * 8, 0, 0);
-        // BN_mod(t, t, q, ctx);
         BN_rand_range(t, EC_GROUP_get0_order(group));
 
         EC_POINT* Ta = EC_POINT_new(group);
@@ -111,7 +109,6 @@ class HandShake {
         // size is 65 for secp256r1, should make it more general.
         int size = EC_POINT_point2oct(group, Ta, POINT_CONVERSION_UNCOMPRESSED, buf, 65, ctx);
         io->send_data(buf, size);
-        //io->flush();
 
         if (!EC_POINT_mul(group, Va, NULL, Ts, t, ctx))
             error("error in computing VA!\n");
@@ -142,8 +139,6 @@ class HandShake {
     }
 
     inline void compute_client_VB(EC_POINT* Tc, EC_POINT* Vb, BIGNUM* t, const EC_POINT* Ts) {
-        // BN_rand(t, BN_num_bytes(q) * 8, 0, 0);
-        // BN_mod(t, t, q, ctx);
         BN_rand_range(t, EC_GROUP_get0_order(group));
 
         EC_POINT* Tb = EC_POINT_new(group);
@@ -289,75 +284,10 @@ class HandShake {
         extract_integer(server_write_key, key, key_length * 8, key_length * 8);
 
         extract_integer(client_write_iv, key, key_length * 8 * 2, iv_length * 8);
-        extract_integer(server_write_iv, key, key_length * 8 * 2 + iv_length * 8, iv_length * 8);
+        extract_integer(server_write_iv, key, key_length * 8 * 2 + iv_length * 8,
+                        iv_length * 8);
         delete[] seed;
     }
-
-    // inline void compute_master_and_expansion_keys(Integer& ms,
-    //                                               Integer& key,
-    //                                               const BIGNUM* pms,
-    //                                               const unsigned char* rc,
-    //                                               size_t rc_len,
-    //                                               const unsigned char* rs,
-    //                                               size_t rs_len,
-    //                                               int party) {
-    //     size_t len = BN_num_bytes(pms);
-    //     unsigned char* buf = new unsigned char[len];
-    //     BN_bn2bin(pms, buf);
-    //     reverse(buf, buf + len);
-    //     Integer pmsa, pmsb;
-
-    //     // commit the IT-MAC of zk_2 in addmod.
-    //     switch_to_zk();
-    //     zk_pms = Integer(len * 8, buf, ALICE);
-    //     sync_zk_gc<IO>();
-    //     switch_to_gc();
-
-    //     // if (party == ALICE) {
-    //     //     pmsa = Integer(len * 8, buf, ALICE);
-    //     //     pmsb = Integer(len * 8, 0, BOB);
-    //     // } else {
-    //     //     pmsa = Integer(len * 8, 0, ALICE);
-    //     //     pmsb = Integer(len * 8, buf, BOB);
-    //     // }
-
-    //     pmsa = Integer(len * 8, buf, ALICE);
-    //     pmsb = Integer(len * 8, buf, BOB);
-
-    //     Integer pmsbits;
-    //     addmod(pmsbits, pmsa, pmsb, q);
-
-    //     size_t seed_len = rc_len + rs_len;
-    //     unsigned char* seed = new unsigned char[seed_len];
-    //     memcpy(seed, rc, rc_len);
-    //     memcpy(seed + rc_len, rs, rs_len);
-
-    //     prf.init(hmac, pmsbits);
-    //     prf.opt_compute(hmac, ms, master_key_length * 8, pmsbits, master_key_label,
-    //                     master_key_label_length, seed, seed_len, true, true);
-
-    //     memcpy(seed, rs, rs_len);
-    //     memcpy(seed + rs_len, rc, rc_len);
-
-    //     prf.init(hmac, ms);
-    //     prf.opt_compute(hmac, key, expansion_key_length * 8, ms, key_expansion_label,
-    //                     key_expansion_label_length, seed, seed_len, true, true);
-
-    //     delete[] buf;
-    //     delete[] seed;
-    // }
-
-    // inline void compute_finished_msg(unsigned char* ufin,
-    //                                  const Integer& ms,
-    //                                  const unsigned char* label,
-    //                                  size_t label_len,
-    //                                  const unsigned char* tau,
-    //                                  size_t tau_len) {
-    //     Integer ufin_int;
-    //     prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, ms, label, label_len, tau,
-    //                     tau_len, true, true);
-    //     ufin_int.reveal<unsigned char>((unsigned char*)ufin, PUBLIC);
-    // }
 
     inline void compute_client_finished_msg(const unsigned char* label,
                                             size_t label_len,
@@ -372,7 +302,6 @@ class HandShake {
                                    label_len, tau, tau_len, true, true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
-
     }
 
     inline void compute_server_finished_msg(const unsigned char* label,
@@ -389,15 +318,6 @@ class HandShake {
         }
         ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
     }
-
-    // inline void encrypt_client_finished_msg(AEAD<IO>* aead_c,
-    //                                         unsigned char* ctxt,
-    //                                         unsigned char* tag,
-    //                                         const unsigned char* aad,
-    //                                         size_t aad_len,
-    //                                         int party) {
-    //     aead_c->encrypt(io, ctxt, tag, client_ufin, finished_msg_length, aad, aad_len, party);
-    // }
 
     inline void encrypt_client_finished_msg(AEAD<IO>* aead_c,
                                             unsigned char* ctxt,
@@ -442,23 +362,6 @@ class HandShake {
         delete[] msg;
         return res1 & res2;
     }
-
-    // inline bool decrypt_and_check_server_finished_msg(AEAD<IO>& aead_s,
-    //                                                   const unsigned char* ufins,
-    //                                                   const unsigned char* ctxt,
-    //                                                   const unsigned char* tag,
-    //                                                   const unsigned char* aad,
-    //                                                   size_t aad_len,
-    //                                                   int party) {
-    //     unsigned char* msg = new unsigned char[finished_msg_length];
-    //     bool res1 = aead_s.dec_finished_msg(io, msg, ctxt, finished_msg_length, tag, aad,
-    //                                         aad_len, party);
-
-    //     bool res2 = (memcmp(msg, ufins, finished_msg_length) == 0);
-    //     delete[] msg;
-
-    //     return res1 & res2;
-    // }
 
     // ALICE knows pms, which is the entire value, not a share.
     inline void prove_master_key(Integer& ms,
@@ -618,11 +521,8 @@ class HandShake {
 
     inline void handshake_check(int party) {
         prf.prf_check<IO>(party);
-        //   if (!ENABLE_ROUNDS_OPT) {
         hmac.sha256_check<IO>(party);
-        //  }
     }
-
 };
 
 class HandShakeOffline {
@@ -668,7 +568,8 @@ class HandShakeOffline {
         if (!ENABLE_ROUNDS_OPT) {
             prf.opt_compute(hmac, master_key, master_key_length * 8, pmsbits, true, true);
         } else {
-            prf.opt_rounds_compute(hmac, master_key, master_key_length * 8, pmsbits, master_key_label_length + 2 * random_length, true, true);
+            prf.opt_rounds_compute(hmac, master_key, master_key_length * 8, pmsbits,
+                                   master_key_label_length + 2 * random_length, true, true);
         }
 
         delete[] buf;
@@ -688,10 +589,11 @@ class HandShakeOffline {
         prf.init(hmac, pmsbits);
         if (!ENABLE_ROUNDS_OPT) {
             prf.opt_compute(hmac, master_key, extended_master_key_length * 8, pmsbits, true,
-                           true);
+                            true);
         } else {
-            prf.opt_rounds_compute(hmac, master_key, extended_master_key_length * 8, pmsbits, extended_master_key_label_length + session_hash_length, true,
-                                   true);
+            prf.opt_rounds_compute(hmac, master_key, extended_master_key_length * 8, pmsbits,
+                                   extended_master_key_label_length + session_hash_length,
+                                   true, true);
         }
         delete[] buf;
     }
@@ -702,13 +604,15 @@ class HandShakeOffline {
         if (!ENABLE_ROUNDS_OPT) {
             prf.opt_compute(hmac, key, expansion_key_length * 8, master_key, true, true);
         } else {
-            prf.opt_rounds_compute(hmac, key, expansion_key_length * 8, master_key, key_expansion_label_length + 2 * random_length, true, true);
+            prf.opt_rounds_compute(hmac, key, expansion_key_length * 8, master_key,
+                                   key_expansion_label_length + 2 * random_length, true, true);
         }
         extract_integer(client_write_key, key, 0, key_length * 8);
         extract_integer(server_write_key, key, key_length * 8, key_length * 8);
 
         extract_integer(client_write_iv, key, key_length * 8 * 2, iv_length * 8);
-        extract_integer(server_write_iv, key, key_length * 8 * 2 + iv_length * 8, iv_length * 8);
+        extract_integer(server_write_iv, key, key_length * 8 * 2 + iv_length * 8,
+                        iv_length * 8);
     }
 
     inline void compute_client_finished_msg() {
@@ -717,10 +621,11 @@ class HandShakeOffline {
             prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, master_key, true, true);
 
         } else {
-            prf.opt_rounds_compute(hmac, ufin_int, finished_msg_length * 8, master_key, client_finished_label_length + session_hash_length, true, true);
+            prf.opt_rounds_compute(hmac, ufin_int, finished_msg_length * 8, master_key,
+                                   client_finished_label_length + session_hash_length, true,
+                                   true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
-
     }
 
     inline void compute_server_finished_msg() {
@@ -728,7 +633,9 @@ class HandShakeOffline {
         if (!ENABLE_ROUNDS_OPT) {
             prf.opt_compute(hmac, ufin_int, finished_msg_length * 8, master_key, true, true);
         } else {
-            prf.opt_rounds_compute(hmac, ufin_int, finished_msg_length * 8, master_key, server_finished_label_length + session_hash_length, true, true);
+            prf.opt_rounds_compute(hmac, ufin_int, finished_msg_length * 8, master_key,
+                                   server_finished_label_length + session_hash_length, true,
+                                   true);
         }
         ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
     }
@@ -740,7 +647,6 @@ class HandShakeOffline {
     inline void decrypt_server_finished_msg(AEADOffline* aead_s_offline, size_t ufins_len) {
         aead_s_offline->decrypt(ufins_len);
     }
-
 };
 
 #endif

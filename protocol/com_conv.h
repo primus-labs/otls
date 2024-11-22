@@ -6,6 +6,7 @@
 #include "backend/bn_utils.h"
 #include "backend/ole.h"
 
+/* Define the Pederson commitment */
 class PedersenComm {
    public:
     EC_GROUP* group = nullptr;
@@ -51,8 +52,6 @@ class PedersenComm {
         }
 
         EC_POINT_free(tmp);
-
-        //EC_POINTs_mul(group, res, NULL, coef.size(), coms.data(), coef.data(), ctx);
     }
 
     inline void linear_comb_rand(BIGNUM* res,
@@ -69,6 +68,8 @@ class PedersenComm {
         BN_free(tmp);
     }
 };
+
+/* Convert IT-MACed messages into Pedersen commitment */
 template <typename IO>
 class ComConv {
    public:
@@ -251,6 +252,7 @@ class ComConv {
         in.push_back(this->r);
         ole->compute(out, in);
     }
+
     inline void mask_key(BIGNUM* rKEY) {
         vector<BIGNUM*> out, in;
         out.push_back(rKEY);
@@ -345,12 +347,6 @@ class ComConv {
         block seed = zero_block;
         memcpy(&seed, chi_digest, sizeof(block));
         gen_chi(chi, seed);
-
-        // for (int i = 0; i < chunk_len; i++) {
-        //     chi[i] = BN_new();
-        //     BN_rand_range(chi[i], q);
-        //     send_bn(io, chi[i]);
-        // }
 
         // generate linear combination of IT-MAC keys.
         BIGNUM* yKEY = rKEY;
@@ -517,10 +513,6 @@ class ComConv {
         memcpy(&seed, chi_digest, sizeof(block));
 
         gen_chi(chi, seed);
-        // for (int i = 0; i < chunk_len; i++) {
-        //     chi[i] = BN_new();
-        //     recv_bn(io, chi[i]);
-        // }
 
         // generate linear combination of IT-MAC macs.
         BIGNUM* yMAC = rMAC;

@@ -15,8 +15,8 @@ using std::vector;
 class HMAC_SHA256 : public SHA256 {
    public:
     int SHA256_call = 0;
-    HMAC_SHA256(){};
-    ~HMAC_SHA256(){};
+    HMAC_SHA256() {};
+    ~HMAC_SHA256() {};
 
     Integer o_key_pad;
     Integer i_key_pad;
@@ -90,7 +90,6 @@ class HMAC_SHA256 : public SHA256 {
 
             // If enabling the offline-online model, use dig as private values (ALICE side).
             o_msg[i] = Integer(32, dig[i], ALICE);
-            //o_msg[i] = Integer(32, dig[i], PUBLIC);
         }
 
         Integer omsg = o_key_pad;
@@ -102,6 +101,7 @@ class HMAC_SHA256 : public SHA256 {
         delete[] o_msg;
     }
 
+    /* This optimization is to save rounds, resulting in larger communication size. */
     void opt_rounds_hmac_sha256(Integer* res,
                                 const Integer msg,
                                 bool reuse_in_hash_flag = false,
@@ -126,8 +126,8 @@ class HMAC_SHA256 : public SHA256 {
 class HMAC_SHA256_Offline : public SHA256Offline {
    public:
     int SHA256_call = 0;
-    HMAC_SHA256_Offline(){};
-    ~HMAC_SHA256_Offline(){};
+    HMAC_SHA256_Offline() {};
+    ~HMAC_SHA256_Offline() {};
 
     Integer o_key_pad;
     Integer i_key_pad;

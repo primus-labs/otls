@@ -31,7 +31,7 @@ inline void check_zero(const Integer& input, int party) {
     }
 }
 
-/*ujnss typefix: for the caller, must ensure that T is a fixed size*/
+/* For the caller, must ensure that T is a fixed size */
 // data should be the same for ALICE and BOB.
 template <typename IO, typename T>
 inline void check_zero(const Integer& input, const T* data, size_t len, int party) {

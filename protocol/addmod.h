@@ -5,6 +5,8 @@
 
 using namespace std;
 using namespace emp;
+
+/* Compute the (a+b) mod Q circuit, where Q is a shared value */
 inline void addmod(Integer& res, const Integer& a, const Integer& b, Integer& Q) {
     Integer aa(a);
     Integer bb(b);
@@ -22,6 +24,7 @@ inline void addmod(Integer& res, const Integer& a, const Integer& b, Integer& Q)
     res.bits.pop_back();
 }
 
+/* Compute the (a+b) mod q circuit */
 inline void addmod(Integer& res, const Integer& a, const Integer& b, BIGNUM* q) {
     unsigned char* intq = new unsigned char[BN_num_bytes(q)];
     BN_bn2bin(q, intq);

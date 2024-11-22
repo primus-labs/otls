@@ -136,13 +136,13 @@ class E2F {
             BN_copy(ybma, y);
         }
         BIGNUM* w = BN_new();
-        BN_mod_sub(w, xbma, b, ole->q, ole->ctx); //epsilon1 = open(xb-xa-b)
+        BN_mod_sub(w, xbma, b, ole->q, ole->ctx); // epsilon1 = open(xb-xa-b)
 
         BIGNUM* eta = BN_new();
-        BN_mod_sub(eta, ybma, bp, ole->q, ole->ctx); //epsilon2 = open(yb-ya-bp)
+        BN_mod_sub(eta, ybma, bp, ole->q, ole->ctx); // epsilon2 = open(yb-ya-bp)
 
         BIGNUM* open_vec[] = {w, eta, nullptr};
-        open(open_vec, party);                            //open epsilon1, epsilon2
+        open(open_vec, party); // open epsilon1, epsilon2
 
         BN_mod_mul(w, w, a, ole->q, ole->ctx);
         BN_mod_add(w, w, c, ole->q, ole->ctx);
@@ -158,8 +158,8 @@ class E2F {
         BN_mod_inverse(w, w, ole->q, ole->ctx);
         BN_mod_mul(eta, w, eta, ole->q, ole->ctx);
 
-        BN_mod_sub(eta, eta, r, ole->q, ole->ctx);   //epsilon3 = open(eta-r)
-        open(eta, party);                            //open epsilon3
+        BN_mod_sub(eta, eta, r, ole->q, ole->ctx); // epsilon3 = open(eta-r)
+        open(eta, party);                          // open epsilon3
 
         BN_mod_mul(out, eta, r, ole->q, ole->ctx);   // epsilon3*[r]
         BN_mod_add(out, out, out, ole->q, ole->ctx); // 2*epsilon3*[r]
@@ -170,7 +170,7 @@ class E2F {
         if (party == BOB)
             BN_mod_sqr(ybma, eta, ole->q, ole->ctx); // epsilon3^2
 
-        //epsilon3^2 + 2epsilon3*[r] + [r^2] - [xb]-[xa]
+        // epsilon3^2 + 2epsilon3*[r] + [r^2] - [xb]-[xa]
         BN_mod_add(out, out, ybma, ole->q, ole->ctx);
 
         BN_free(xbma);

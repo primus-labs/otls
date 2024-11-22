@@ -1,5 +1,6 @@
 #include "backend/switch.h"
 
+/* Switch between gc and izk */
 #ifndef THREADING
 CircuitExecution* gc_circ_buf = nullptr;
 ProtocolExecution* gc_prot_buf = nullptr;

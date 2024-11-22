@@ -4,6 +4,7 @@
 #include "backend/bn_utils.h"
 using namespace emp;
 
+/* Optimized half-gate garbler process */
 template <typename T>
 class OptHalfGateGen : public CircuitExecution {
    public:

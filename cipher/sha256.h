@@ -102,7 +102,7 @@ class SHA256 {
       0x5b9cca4fUL, 0x682e6ff3UL, 0x748f82eeUL, 0x78a5636fUL, 0x84c87814UL, 0x8cc70208UL,
       0x90befffaUL, 0xa4506cebUL, 0xbef9a3f7UL, 0xc67178f2UL};
 
-    SHA256(){};
+    SHA256() {};
     ~SHA256() {
         for (size_t i = 0; i < iv_in_hashes.size(); i++) {
             if (iv_in_hashes[i] != nullptr)
@@ -362,7 +362,7 @@ class SHA256 {
             memset(data, 0, 56);
         }
 
-        bitlen += datalen * 8; /*ujnss typefix: must be 64 bit */
+        bitlen += datalen * 8; /* must be 64 bits */
         data[63] = bitlen;
         data[62] = bitlen >> 8;
         data[61] = bitlen >> 16;
@@ -440,15 +440,9 @@ class SHA256 {
 
         for (int i = 0; i < KLEN; i++) { //compression function main loop
             S1 = rrot(e, 6) ^ rrot(e, 11) ^ rrot(e, 25);
-            //    ch = (e&f)^((e^ONE)&g);
             ch = (e & (f ^ g)) ^ g;
             temp1 = h + sha256_k[i] + S1 + ch + w[i]; //22009 AND
-            //    temp1 = h+sha256_k[i]+w[i]+S1+ch;//22070 AND
-            //    temp1 = h+sha256_k[i]+S1+w[i]+ch;//22038 AND
-            //    temp1 = ((sha256_k[i]+w[i])+h)+S1+ch;
             S0 = rrot(a, 2) ^ rrot(a, 13) ^ rrot(a, 22);
-            //    maj = (a&b)^(a&c)^(b&c);
-            //    maj = (a&(b^c))^(b&c);
             maj = ((a ^ b) & (a ^ c)) ^ a;
             temp2 = S0 + maj;
 
@@ -620,8 +614,8 @@ class SHA256Offline {
       Integer(WORDLEN, 0x90befffaUL, PUBLIC), Integer(WORDLEN, 0xa4506cebUL, PUBLIC),
       Integer(WORDLEN, 0xbef9a3f7UL, PUBLIC), Integer(WORDLEN, 0xc67178f2UL, PUBLIC)};
 
-    SHA256Offline(){};
-    ~SHA256Offline(){};
+    SHA256Offline() {};
+    ~SHA256Offline() {};
 
     inline void refresh() {
         compression_calls_num = 0;
@@ -732,6 +726,7 @@ class SHA256Offline {
         }
     }
 
+    /* This optimization aims to save rounds, resulting in larger communication size*/
     void opt_rounds_update(Integer* dig,
                            const Integer padded_input,
                            bool reuse_in_hash_flag = false) {
@@ -758,11 +753,11 @@ class SHA256Offline {
                 chunk_compress(dig, tmp_block);
 
                 for (int i = 0; i < DIGLEN; i++)
-                   iv_in_hash[i] = dig[i];
+                    iv_in_hash[i] = dig[i];
                 gc_in_open_flag = true;
             } else {
                 for (int i = 0; i < DIGLEN; i++)
-                   dig[i] = iv_in_hash[i];
+                    dig[i] = iv_in_hash[i];
             }
         } else {
             chunk_compress(dig, tmp_block);
@@ -796,15 +791,9 @@ class SHA256Offline {
 
         for (int i = 0; i < KLEN; i++) { //compression function main loop
             S1 = rrot(e, 6) ^ rrot(e, 11) ^ rrot(e, 25);
-            //    ch = (e&f)^((e^ONE)&g);
             ch = (e & (f ^ g)) ^ g;
             temp1 = h + sha256_k[i] + S1 + ch + w[i]; //22009 AND
-            //    temp1 = h+sha256_k[i]+w[i]+S1+ch;//22070 AND
-            //    temp1 = h+sha256_k[i]+S1+w[i]+ch;//22038 AND
-            //    temp1 = ((sha256_k[i]+w[i])+h)+S1+ch;
             S0 = rrot(a, 2) ^ rrot(a, 13) ^ rrot(a, 22);
-            //    maj = (a&b)^(a&c)^(b&c);
-            //    maj = (a&(b^c))^(b&c);
             maj = ((a ^ b) & (a ^ c)) ^ a;
             temp2 = S0 + maj;
 

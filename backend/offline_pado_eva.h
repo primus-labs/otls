@@ -3,6 +3,7 @@
 #include "offline_hg_eva.h"
 #include "offline_pado_party.h"
 
+/* Offline evaluator (BOB) of the protocol */
 template <typename IO>
 class OfflinePADOEva : public OfflinePADOParty {
    public:

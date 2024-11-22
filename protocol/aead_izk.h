@@ -8,7 +8,7 @@
 
 using namespace emp;
 
-// Implicitly homomorphic property and check zero of IT-MAC.
+/* Implicitly homomorphic property and check zero of IT-MAC. */
 template <typename IO>
 inline void itmac_hom_add_check(Integer& res, Integer& pre_res, int party, block blk) {
     assert(pre_res.size() == 128);
@@ -26,7 +26,7 @@ inline void itmac_hom_add_check(Integer& res, Integer& pre_res, int party, block
     check_zero<IO>(res ^ pre_res, party);
 }
 
-// Implicitly homomorphic property and check zero of IT-MAC.
+/* Implicitly homomorphic property and check zero of IT-MAC. */
 template <typename IO>
 inline void itmac_hom_add_check(
   Integer& res, Integer& pre_res, int party, const unsigned char* share, size_t len) {
@@ -106,7 +106,7 @@ class AEAD_Proof {
         delete[] riv;
 
         Integer ONE = Integer(32, 1, PUBLIC);
-        
+
         nonce = fixed_iv;
         concat(nonce, &variable_iv, 1);
         concat(nonce, &ONE, 1);

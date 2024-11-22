@@ -15,6 +15,7 @@
 #include "backend/offline_pado_party.h"
 using namespace emp;
 
+/* Initialize the offline backend of two parties */
 template <typename IO>
 inline OfflinePADOParty* setup_offline_backend(IO* io, int party) {
     if (party == ALICE) {
@@ -29,6 +30,7 @@ inline OfflinePADOParty* setup_offline_backend(IO* io, int party) {
     return (OfflinePADOParty*)ProtocolExecution::prot_exec;
 }
 
+/* Sync the offline information with online backend */
 template <typename IO>
 inline void sync_offline_online(OfflinePADOParty* offline, PADOParty<IO>* online, int party) {
     if (party == ALICE) {
@@ -43,9 +45,9 @@ inline void sync_offline_online(OfflinePADOParty* offline, PADOParty<IO>* online
         on_eva->gc->GC = off_eva->gc->GC;
         on_eva->pub_values = off_eva->pub_values;
     }
-    // delete offline;
 }
 
+/* Initialize the online backend */
 template <typename IO>
 inline PADOParty<IO>* setup_online_backend(IO* io, int party) {
     if (party == ALICE) {
@@ -60,6 +62,7 @@ inline PADOParty<IO>* setup_online_backend(IO* io, int party) {
     return (PADOParty<IO>*)ProtocolExecution::prot_exec;
 }
 
+/* Initialize the protocol backend, only online phase enabled, no offline */
 template <typename IO>
 inline PADOParty<IO>* setup_backend(IO* io, int party) {
     if (party == ALICE) {
@@ -74,49 +77,9 @@ inline PADOParty<IO>* setup_backend(IO* io, int party) {
     return (PADOParty<IO>*)ProtocolExecution::prot_exec;
 }
 
-// inline OfflinePADOGen* setup_offline_backend(int party) {
-//     assert(party == ALICE);
-//     OfflineHalfGateGen* t = new OfflineHalfGateGen();
-//     CircuitExecution::circ_exec = t;
-//     ProtocolExecution::prot_exec = new OfflinePADOGen(t);
-//     return (OfflinePADOGen*)ProtocolExecution::prot_exec;
-// }
-
+/* Finalize the backend and delete all the pointers */
 inline void finalize_backend() {
     delete CircuitExecution::circ_exec;
     delete ProtocolExecution::prot_exec;
 }
-
-/*template<typename IO>
-inline PADOParty<IO>* swap_role(int party) {
-	PADOParty<IO>* p = (PADOParty<IO>*)ProtocolExecution::prot_exec;
-	if(p->cur_party == party) {
-		error("party misaligned!");
-	}
-	IKNP<IO> * old_ot = p->ot;
-	IKNP<IO> * new_ot = new IKNP<IO>(old_ot->io, true);
-	block k0[128], k1[128];
-	bool s[128];
-	if(party == ALICE) {
-		auto t = new HalfGateGen<IO>(p->io);
-		block_to_bool(s, t->delta);
-		old_ot->recv_rot(k0, s, 128);
-		new_ot->setup_send(s, k0);
-
-		auto pro = new PADOGen<IO>(p->io, t, new_ot);
-		finalize_backend();
-		CircuitExecution::circ_exec = t;
-		ProtocolExecution::prot_exec = pro;
-	} else {
-		auto t = new HalfGateEva<IO>(p->io);
-
-		old_ot->send_rot(k0, k1, 128);
-		new_ot->setup_recv(k0, k1);
-		auto pro = new PADOEva<IO>(p->io, t, new_ot);
-		finalize_backend();
-		CircuitExecution::circ_exec = t;
-		ProtocolExecution::prot_exec = pro;
-	}
-	return (PADOParty<IO>*)ProtocolExecution::prot_exec;
-}*/
 #endif

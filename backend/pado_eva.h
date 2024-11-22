@@ -2,6 +2,7 @@
 #define PADO_EVA_H__
 #include "backend/pado_party.h"
 
+/* The evaluator (BOB) in the protocol */
 template <typename IO>
 class PADOEva : public PADOParty<IO> {
    public:

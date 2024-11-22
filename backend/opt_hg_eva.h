@@ -4,6 +4,7 @@
 #include "backend/bn_utils.h"
 using namespace emp;
 
+/* Optimized half-gate evaluator process */
 template <typename T>
 class OptHalfGateEva : public CircuitExecution {
    public:

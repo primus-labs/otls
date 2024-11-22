@@ -2,8 +2,7 @@
 #define PADO_GEN_H__
 #include "backend/pado_party.h"
 
-//TODO: allow tuning delta
-//TODO: preset batch_size
+/* The generator (ALICE) in the protocol */
 template <typename IO>
 class PADOGen : public PADOParty<IO> {
    public:

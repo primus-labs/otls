@@ -1,11 +1,11 @@
 
 #include "cipher/utils.h"
 #ifndef THREADING
-BristolFormat *aes_ks = nullptr;
-BristolFormat *aes_enc_ks = nullptr;
+BristolFormat* aes_ks = nullptr;
+BristolFormat* aes_enc_ks = nullptr;
 #else
-__thread BristolFormat *aes_ks = nullptr;
-__thread BristolFormat *aes_enc_ks = nullptr;
+__thread BristolFormat* aes_ks = nullptr;
+__thread BristolFormat* aes_enc_ks = nullptr;
 #endif
 
 static const char* aes_ks_file = "cipher/circuit_files/aes128_ks.txt";

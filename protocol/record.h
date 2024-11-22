@@ -44,8 +44,8 @@ class Record {
 
 class RecordOffline {
    public:
-    RecordOffline(){};
-    ~RecordOffline(){};
+    RecordOffline() {};
+    ~RecordOffline() {};
 
     inline void encrypt(AEADOffline* aead_c_offline, size_t msg_len) {
         aead_c_offline->encrypt(msg_len, true);

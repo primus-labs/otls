@@ -4,6 +4,7 @@
 #include "backend/bn_utils.h"
 using namespace emp;
 
+/* Define the offline evalutor of half-gate evaluator */
 template <typename IO>
 class OfflineHalfGateEva : public CircuitExecution {
    public:

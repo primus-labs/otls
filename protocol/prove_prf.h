@@ -16,7 +16,7 @@
  * The PRF Prover
  */
 class PRFProver {
-    public:
+   public:
     HMAC_SHA256 hmac;
     PRF prf;
     EC_GROUP* group = nullptr;
@@ -64,7 +64,8 @@ class PRFProver {
 
         prf.init(hmac, pmsbits);
         prf.opt_compute(hmac, ms, master_key_length * 8, pmsbits, master_key_label,
-                        master_key_label_length, seed, seed_len, reuse_in_hash_flag, reuse_out_hash_flag, zk_flag);
+                        master_key_label_length, seed, seed_len, reuse_in_hash_flag,
+                        reuse_out_hash_flag, zk_flag);
 
         delete[] seed;
         delete[] buf;
@@ -90,7 +91,8 @@ class PRFProver {
         prf.init(hmac, pmsbits);
         prf.opt_compute(hmac, ms, extended_master_key_length * 8, pmsbits,
                         extended_master_key_label, extended_master_key_label_length,
-                        session_hash, hash_len, reuse_in_hash_flag, reuse_out_hash_flag, zk_flag);
+                        session_hash, hash_len, reuse_in_hash_flag, reuse_out_hash_flag,
+                        zk_flag);
 
         delete[] buf;
     }
@@ -113,7 +115,8 @@ class PRFProver {
         Integer key;
         prf.init(hmac, ms);
         prf.opt_compute(hmac, key, expansion_key_length * 8, ms, key_expansion_label,
-                        key_expansion_label_length, seed, seed_len, reuse_in_hash_flag, reuse_out_hash_flag, zk_flag);
+                        key_expansion_label_length, seed, seed_len, reuse_in_hash_flag,
+                        reuse_out_hash_flag, zk_flag);
 
         extract_integer(key_c, key, 0, key_length * 8);
         extract_integer(key_s, key, key_length * 8, key_length * 8);
@@ -124,24 +127,19 @@ class PRFProver {
         delete[] seed;
     }
 
-    inline void prove_client_finished_msg(Integer& ufin,
-                                          const Integer& ms,
-                                          const unsigned char* tau,
-                                          size_t tau_len,
-                                          int party) {
-        prf.opt_compute(hmac, ufin, finished_msg_length * 8, ms, client_finished_label, client_finished_label_length, tau,
-                        tau_len, reuse_in_hash_flag, reuse_out_hash_flag, zk_flag);
+    inline void prove_client_finished_msg(
+      Integer& ufin, const Integer& ms, const unsigned char* tau, size_t tau_len, int party) {
+        prf.opt_compute(hmac, ufin, finished_msg_length * 8, ms, client_finished_label,
+                        client_finished_label_length, tau, tau_len, reuse_in_hash_flag,
+                        reuse_out_hash_flag, zk_flag);
     }
 
-    inline void prove_server_finished_msg(Integer& ufin,
-                                          const Integer& ms,
-                                          const unsigned char* tau,
-                                          size_t tau_len,
-                                          int party) {
-        prf.opt_compute(hmac, ufin, finished_msg_length * 8, ms, server_finished_label, server_finished_label_length, tau,
-                        tau_len, reuse_in_hash_flag, reuse_out_hash_flag, zk_flag);
+    inline void prove_server_finished_msg(
+      Integer& ufin, const Integer& ms, const unsigned char* tau, size_t tau_len, int party) {
+        prf.opt_compute(hmac, ufin, finished_msg_length * 8, ms, server_finished_label,
+                        server_finished_label_length, tau, tau_len, reuse_in_hash_flag,
+                        reuse_out_hash_flag, zk_flag);
     }
-
 };
 
 #endif

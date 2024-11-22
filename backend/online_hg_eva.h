@@ -3,6 +3,8 @@
 #include "emp-tool/emp-tool.h"
 #include "backend/bn_utils.h"
 using namespace emp;
+
+/* Define the online evalutor of half-gate evaluator */
 template <typename T>
 class OnlineHalfGateEva : public CircuitExecution {
    public:

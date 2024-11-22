@@ -4,6 +4,7 @@
 #include "emp-ot/emp-ot.h"
 using namespace emp;
 
+/* Define the general party in the protocol */
 template <typename IO>
 class PADOParty : public ProtocolExecution {
    public:

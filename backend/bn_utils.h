@@ -5,6 +5,7 @@
 #include "emp-tool/emp-tool.h"
 using namespace emp;
 
+/* Hash the 128-bit block into a large field with a ccrh hasher */
 inline void H(BIGNUM* out, block b, BIGNUM* q, BN_CTX* ctx, CCRH& ccrh) {
     block arr[2];
     arr[0] = b ^ makeBlock(0, 1);
@@ -15,6 +16,7 @@ inline void H(BIGNUM* out, block b, BIGNUM* q, BN_CTX* ctx, CCRH& ccrh) {
     BN_mod(out, out, q, ctx);
 }
 
+/* Send a big integer with IO */
 template <typename IO>
 inline void send_bn(IO* io, BIGNUM* bn, Hash* hash = nullptr) {
     unsigned char arr[1000];
@@ -25,6 +27,7 @@ inline void send_bn(IO* io, BIGNUM* bn, Hash* hash = nullptr) {
         hash->put(arr, length);
 }
 
+/* Receive a big integer with IO */
 template <typename IO>
 inline void recv_bn(IO* io, BIGNUM* bn, Hash* hash = nullptr) {
     unsigned char arr[1000];
@@ -36,6 +39,7 @@ inline void recv_bn(IO* io, BIGNUM* bn, Hash* hash = nullptr) {
     BN_bin2bn(arr, length, bn);
 }
 
+/* Garbling an AND gate with half gates*/
 inline void garble_gate_garble_halfgates(block LA0,
                                          block A1,
                                          block LB0,
@@ -86,13 +90,16 @@ inline void garble_gate_garble_halfgates(block LA0,
     *out1 = *out0 ^ delta;
 }
 
+/* Check the block is zero */
 inline bool isZero(const block* b) { return _mm_testz_si128(*b, *b) > 0; }
 
+/* Check the block is one */
 inline bool isOne(const block* b) {
     __m128i neq = _mm_xor_si128(*b, all_one_block);
     return _mm_testz_si128(neq, neq) > 0;
 }
 
+/* Evaluating an AND gate with half gates*/
 inline void garble_gate_eval_halfgates(
   block A, block B, block* out, const block* table, uint64_t idx, const AES_KEY* key) {
     block HA, HB, W;

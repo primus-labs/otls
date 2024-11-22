@@ -11,17 +11,15 @@ using namespace emp;
 using std::string;
 using std::vector;
 
-// static string circuit_file_location =
-//   macro_xstr(EMP_CIRCUIT_PATH) + string("bristol_fashion/");
-// static BristolFashion aes = BristolFashion((circuit_file_location + "aes_128.txt").c_str());
 #ifndef THREADING
-extern BristolFormat *aes_ks;
-extern BristolFormat *aes_enc_ks;
+extern BristolFormat* aes_ks;
+extern BristolFormat* aes_enc_ks;
 #else
-extern __thread BristolFormat *aes_ks;
-extern __thread BristolFormat *aes_enc_ks;
+extern __thread BristolFormat* aes_ks;
+extern __thread BristolFormat* aes_enc_ks;
 #endif
 
+/* Right rotation on Integer*/
 inline Integer rrot(const Integer& rhs, int sht) {
     return (rhs >> sht) ^ (rhs << (rhs.size() - sht));
 }
@@ -29,10 +27,12 @@ inline Integer rrot(const Integer& rhs, int sht) {
 void init_files();
 void uninit_files();
 
+/* Right rotation on uint32_t */
 inline uint32_t rrot(const uint32_t& rhs, int sht) {
     return (rhs >> sht) | (rhs << (32 - sht));
 }
 
+/* Left rotation on Integer */
 inline Integer lrot(const Integer& rhs, int sht) {
     Integer tmp(rhs);
     return (tmp << sht) ^ (tmp >> (tmp.size() - sht));
@@ -49,11 +49,6 @@ inline Integer str_to_int(string str, int party) {
     Integer res(mlen, tmp, party); // note that this line could increase roundtrip
     delete[] tmp;
     return res;
-}
-
-inline void char_to_uint32(uint32_t* res, const char* in, size_t len) {
-    for (size_t i = 0; i < len / 4; i++) {
-    }
 }
 
 inline string int_to_hex(vector<uint32_t> vint) {
@@ -183,9 +178,9 @@ inline block mulBlock(block a, block b) {
 inline block powBlock(block a, uint64_t len) {
     size_t leading_zeros = 0;
 
-     /*ujnss typefix: must be 64 bit */
+    /* must be 64 bits */
     for (int i = sizeof(uint64_t) * 8 - 1; i >= 0; i--) {
-        /*ujnss typefix: must be 64 bit */
+        /* must be 64 bits */
         if ((len >> i) & 1)
             break;
         leading_zeros++;
@@ -193,7 +188,7 @@ inline block powBlock(block a, uint64_t len) {
     block h = a;
     block res = (len & 1) ? a : set_bit(zero_block, 127);
 
-     /*ujnss typefix: must be 64 bit */
+    /* must be 64 bits */
     for (size_t i = 1; i < sizeof(uint64_t) * 8 - leading_zeros; i++) {
         h = mulBlock(h, h);
         if ((len >> i) & 1)
@@ -223,20 +218,14 @@ inline block ghash(block h, block* x, size_t m) {
     return y;
 }
 
-// inline Integer computeAES(const Integer& key, const Integer& msg) {
-//     Integer o = Integer(128, 0, PUBLIC);
-//     Integer in(msg);
-//     concat(in, &key, 1);
-//     aes.compute(o.bits.data(), in.bits.data());
-//     return o;
-// }
-
+/* Compute the key schedule circuit, will be reused */
 inline Integer computeKS(Integer& key) {
     Integer o(1408, 0, PUBLIC);
     aes_ks->compute(o.bits.data(), key.bits.data(), nullptr);
     return o;
 }
 
+/* Compute the AES circuit, assuming KS is finished */
 inline Integer computeAES_KS(Integer& key, Integer& msg) {
     Integer o(128, 0, PUBLIC);
     aes_enc_ks->compute(o.bits.data(), key.bits.data(), msg.bits.data());
@@ -244,7 +233,7 @@ inline Integer computeAES_KS(Integer& key, Integer& msg) {
     return o;
 }
 
-// Transfer gc share into xor share.
+/* Transfer gc share into xor share. */
 inline block integer_to_block(Integer& in) {
     if (in.size() != 128)
         error("the length of input should be 128!\n");
@@ -261,12 +250,13 @@ inline block integer_to_block(Integer& in) {
     return b;
 }
 
-// Transfer gc share into xor share.
+/* Transfer gc shares into xor shares. */
 inline void integer_to_block(block* out, Integer* in, size_t len) {
     for (size_t i = 0; i < len; i++)
         out[i] = integer_to_block(in[i]);
 }
 
+/* Transfer gc shares into xor shares. */
 inline void integer_to_block(block* out, Integer& in) {
     if (in.size() % 128 != 0)
         error("the length of input should be multiples of 128!\n");

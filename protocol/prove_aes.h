@@ -67,8 +67,7 @@ class AESProver {
         }
     }
 
-    inline void set_nonce(const unsigned char* iv,
-                          size_t iv_len) {
+    inline void set_nonce(const unsigned char* iv, size_t iv_len) {
         assert(iv_len == 8);
 
         unsigned char* riv = new unsigned char[iv_len];
@@ -85,9 +84,7 @@ class AESProver {
         concat(nonce, &ONE, 1);
     }
 
-    inline Integer computeCounter(const unsigned char* iv,
-                                  size_t iv_len,
-                                  size_t msg_len) {
+    inline Integer computeCounter(const unsigned char* iv, size_t iv_len, size_t msg_len) {
         size_t u = 128 * ((msg_len * 8 + 128 - 1) / 128) - msg_len * 8;
 
         size_t ctr_len = (msg_len * 8 + 128 - 1) / 128;
@@ -131,7 +128,7 @@ class AESProver {
     // The length of msgs should be a multiple of 128.
     // len_bytes is a multiple of 16.
     inline bool prove_private_msgs(const unsigned char* iv,
-                                   size_t iv_len, 
+                                   size_t iv_len,
                                    const Integer& msgs,
                                    const unsigned char* ctxts,
                                    size_t msg_len) {

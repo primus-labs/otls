@@ -2,6 +2,7 @@
 #define Online_PADO_EVA_H__
 #include "backend/pado_party.h"
 
+/* Online evaluator (BOB) of the protocol */
 template <typename IO>
 class OnlinePADOEva : public PADOParty<IO> {
    public:
@@ -29,7 +30,6 @@ class OnlinePADOEva : public PADOParty<IO> {
     void reveal(bool* b, int party, const block* label, int length) {
         for (int i = 0; i < length; ++i) {
             bool lsb = getLSB(label[i]), tmp;
-            //if (party == BOB or party == PUBLIC) {
             if (party == BOB) {
                 this->io->recv_data(&tmp, 1);
                 b[i] = (tmp != lsb);

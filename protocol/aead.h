@@ -76,7 +76,6 @@ class AEAD {
         zk_h = Integer(8 * sizeof(block), &gc_h, ALICE);
         sync_zk_gc<IO>();
         switch_to_gc();
-
     }
     ~AEAD() {
         if (ole != nullptr)
@@ -258,7 +257,6 @@ class AEAD {
         delete[] z;
 
         // Now compute the tag.
-
         size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
         size_t len = u / 8 + msg_len + v / 8 + aad_len + 16;
 
@@ -266,7 +264,7 @@ class AEAD {
 
         unsigned char ilen[8], mlen[8];
         for (int i = 0; i < 8; i++) {
-            /*ujnss typefix: must be 64 bit*/
+            /* must be 64 bits */
             ilen[i] = (8 * aad_len) >> (7 - i) * 8;
             mlen[i] = (8 * msg_len) >> (7 - i) * 8;
         }
@@ -280,7 +278,6 @@ class AEAD {
 
         reverse(x, x + len);
         block* xblk = (block*)x;
-        //reverse(xblk, xblk + (8 * len) / 128);
 
         block out = zero_block;
         obv_ghash(out, xblk, (8 * len) / 128, party);
@@ -397,7 +394,6 @@ class AEAD {
         delete[] z;
 
         // Now compute the tag.
-
         size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
         size_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
 
@@ -405,7 +401,7 @@ class AEAD {
 
         unsigned char ilen[8], mlen[8];
         for (int i = 0; i < 8; i++) {
-            /*ujnss typefix: must be 64 bit*/
+            /* must be 64 bits */
             ilen[i] = (8 * aad_len) >> (7 - i) * 8;
             mlen[i] = (8 * ctxt_len) >> (7 - i) * 8;
         }
@@ -419,7 +415,6 @@ class AEAD {
 
         reverse(x, x + len);
         block* xblk = (block*)x;
-        //reverse(xblk, xblk + (8 * len) / 128);
 
         block out = zero_block;
         obv_ghash(out, xblk, (8 * len) / 128, party);
@@ -509,7 +504,7 @@ inline void compute_tag(unsigned char* tag,
     unsigned char* x = new unsigned char[len];
     unsigned char ilen[8], mlen[8];
     for (int i = 0; i < 8; i++) {
-        /*ujnss typefix: must be 64 bit*/
+        /* must be 64 bits */
         ilen[i] = (8 * aad_len) >> (7 - i) * 8;
         mlen[i] = (8 * ctxt_len) >> (7 - i) * 8;
     }

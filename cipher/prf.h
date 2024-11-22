@@ -9,7 +9,7 @@ using namespace emp;
 
 class PRF {
    public:
-    PRF(){};
+    PRF() {};
     ~PRF() {
         for (size_t i = 0; i < pub_M.size(); i++) {
             if (pub_M[i] != nullptr) {
@@ -235,8 +235,8 @@ class PRF {
 
 class PRFOffline {
    public:
-    PRFOffline(){};
-    ~PRFOffline(){};
+    PRFOffline() {};
+    ~PRFOffline() {};
     size_t hmac_calls_num = 0;
 
     inline void init(HMAC_SHA256_Offline& hmac, const Integer secret) {
@@ -286,14 +286,14 @@ class PRFOffline {
         Integer* A = new Integer[blks + 1];
         A[0] = Integer(8 * seedlen, 0, ALICE);
 
-
         Integer* tmp = new Integer[hmac.DIGLEN];
 
         for (size_t i = 1; i < blks + 1; i++) {
-            hmac.opt_rounds_hmac_sha256(tmp, A[i - 1], reuse_in_hash_flag, reuse_out_hash_flag);
+            hmac.opt_rounds_hmac_sha256(tmp, A[i - 1], reuse_in_hash_flag,
+                                        reuse_out_hash_flag);
             hmac_calls_num++;
 
-            concat(A[i], &tmp[0], hmac.VALLEN); 
+            concat(A[i], &tmp[0], hmac.VALLEN);
 
             Integer As;
             concat(As, &A[i], 1);
@@ -325,7 +325,8 @@ class PRFOffline {
                                    size_t seedlen,
                                    bool reuse_in_hash_flag = false,
                                    bool reuse_out_hash_flag = false) {
-        opt_rounds_phash(hmac, res, bitlen, secret, seedlen, reuse_in_hash_flag, reuse_out_hash_flag);
+        opt_rounds_phash(hmac, res, bitlen, secret, seedlen, reuse_in_hash_flag,
+                         reuse_out_hash_flag);
     }
 };
 

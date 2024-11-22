@@ -5,6 +5,7 @@
 
 using namespace emp;
 
+/* Define the hash-based commitment*/
 class Commitment {
    public:
     Hash hash;
