@@ -68,14 +68,19 @@ void aead_enc_garble_then_prove_test(
 
     size_t iv_len = sizeof(iv);
 
+    unsigned char fixed_iv_oct[4];
+    memcpy(fixed_iv_oct, iv, 4);
+    reverse(fixed_iv_oct, fixed_iv_oct + 4);
+    Integer fixed_iv(4 * 8, fixed_iv_oct, PUBLIC);
+
     unsigned char* ctxt = new unsigned char[msg_len];
     unsigned char tag[16];
 
     auto start = emp::clock_start();
 
     // AEAD encryption with GC
-    AEAD<IO>* aead = new AEAD<IO>(io, io_opt, ot, key);
-    aead->encrypt(io, ctxt, tag, msg, msg_len, aad, aad_len, iv, iv_len, party, sec_type);
+    AEAD<IO>* aead = new AEAD<IO>(io, io_opt, ot, key, fixed_iv);
+    aead->encrypt(io, ctxt, tag, msg, msg_len, aad, aad_len, iv + 4, iv_len - 4, party, sec_type);
 
     cout << "time: " << emp::time_from(start) << " us" << endl;
     cout << "tag: ";
@@ -94,9 +99,10 @@ void aead_enc_garble_then_prove_test(
     start = emp::clock_start();
     switch_to_zk();
     Integer key_zk(128, keyc, ALICE);
-    AEAD_Proof<IO>* aead_proof = new AEAD_Proof<IO>(aead, key_zk, party);
+    Integer fixed_iv_zk(4 * 8, fixed_iv_oct, ALICE);
+    AEAD_Proof<IO>* aead_proof = new AEAD_Proof<IO>(aead, key_zk, fixed_iv, party);
     Integer msg_zk, msg_z0;
-    aead_proof->prove_aead(msg_zk, msg_z0, ctxt, msg_len, iv, iv_len, sec_type);
+    aead_proof->prove_aead(msg_zk, msg_z0, ctxt, msg_len, iv + 4, iv_len - 4, sec_type);
     if (sec_type) {
         cout << msg_zk.reveal<string>() << endl;
     }
@@ -133,6 +139,10 @@ void aead_dec_garble_then_prove_test(
                           0xdb, 0xad, 0xde, 0xca, 0xf8, 0x88};
 
     size_t iv_len = sizeof(iv);
+
+    unsigned char fixed_iv_oct[4];
+    memcpy(fixed_iv_oct, iv, 4);
+    reverse(fixed_iv_oct, fixed_iv_oct + 4);
 
     unsigned char ctxt[] = {0x42, 0x83, 0x1e, 0xc2, 0x21, 0x77, 0x74, 0x24, 0x4b, 0x72,
                             0x21, 0xb7, 0x84, 0xd0, 0xd4, 0x9c, 0xe3, 0xaa, 0x21, 0x2f,
@@ -175,9 +185,10 @@ void aead_dec_garble_then_prove_test(
     start = emp::clock_start();
     switch_to_zk();
     Integer key_zk(128, keyc, ALICE);
-    AEAD_Proof<IO>* aead_proof = new AEAD_Proof<IO>(aead, key_zk, party);
+    Integer fixed_iv_zk(4 * 8, fixed_iv_oct, ALICE);
+    AEAD_Proof<IO>* aead_proof = new AEAD_Proof<IO>(aead, key_zk, fixed_iv_oct, party);
     Integer msg_zk, msg_z0;
-    aead_proof->prove_aead(msg_zk, msg_z0, ctxt, msg_len, iv, iv_len, sec_type);
+    aead_proof->prove_aead(msg_zk, msg_z0, ctxt, msg_len, iv + 4, iv_len - 4, sec_type);
     if (sec_type) {
         cout << msg_zk.reveal<string>() << endl;
     }
