@@ -58,16 +58,16 @@ int main(int argc, char** argv) {
 
     auto start = emp::clock_start();
     auto comm = io[0]->counter;
-    auto rounds = io[0]->rounds;
+    // auto rounds = io[0]->rounds;
 
     setup_proxy_protocol(ios, threads, party);
 
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
     cout << "setup comm: " << (io[0]->counter - comm) * 1.0 / 1024 << " Kbytes" << endl;
-    cout << "setup rounds: " << (io[0]->rounds - rounds) << " rounds" << endl;
+    // cout << "setup rounds: " << (io[0]->rounds - rounds) << " rounds" << endl;
 
     comm = io[0]->counter;
-    rounds = io[0]->rounds - rounds;
+    // rounds = io[0]->rounds - rounds;
 
     start = emp::clock_start();
     bool res = prove_aes();
@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
 
     cout << "prove time: " << emp::time_from(start) << " us" << endl;
     cout << "prove comm: " << (io[0]->counter - comm) * 1.0 / 1024 << " Kbytes" << endl;
-    cout << "prove rounds: " << (io[0]->rounds - rounds) << " rounds" << endl;
+    // cout << "prove rounds: " << (io[0]->rounds - rounds) << " rounds" << endl;
 #if defined(__linux__)
     struct rusage rusage;
     if (!getrusage(RUSAGE_SELF, &rusage))
