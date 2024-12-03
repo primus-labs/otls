@@ -348,6 +348,7 @@ void zk_gc_prf_test(int party) {
     }
 
     switch_to_zk();
+    res = Integer();
     secret = Integer(128, secret_u.data(), ALICE);
     output = Integer(800, output_u.data());
     prf.init(hmac, secret);

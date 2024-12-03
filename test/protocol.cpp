@@ -126,7 +126,7 @@ void full_protocol(IO* io, IO* io_opt, COT<IO>* cot, int party) {
     prd->reveal_pms(Ts);
     // Use correct finc_ctxt, fins_ctxt, iv_c, iv_s according to TLS!
     prd->prove_and_check_handshake_step1(rc, 32, rs, 32, tau_c, 32, tau_s, 32,
-                                         rc, 32);
+                                         rc, 32, true);
     prd->prove_and_check_handshake_step2(finc_ctxt, finished_msg_length, 
                                          iv_c_oct, 8);
     prd->prove_and_check_handshake_step3(finc_ctxt, finished_msg_length,

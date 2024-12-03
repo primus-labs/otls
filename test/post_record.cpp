@@ -138,11 +138,11 @@ void post_record_test(IO* io, IO* io_opt, COT<IO>* cot, int party) {
     switch_to_zk();
     PostRecord<IO>* prd = new PostRecord<IO>(io, hs, aead_c, aead_s, rd, party);
     prd->reveal_pms(Ts);
-    prd->prove_and_check_handshake_step1(rc, 32, rs, 32, tau_c, 32, tau_s, 32, rc, 32);
+    prd->prove_and_check_handshake_step1(rc, 32, rs, 32, tau_c, 32, tau_s, 32, rc, 32, true);
     prd->prove_and_check_handshake_step2(finc_ctxt, finished_msg_length,
                                          iv_c_oct, 8);
     prd->prove_and_check_handshake_step3(finc_ctxt, finished_msg_length,
-                                         iv_s_oct, 12);
+                                         iv_s_oct, 8);
     Integer prd_cmsg, prd_cmsg2, prd_smsg, prd_smsg2, prd_cz0, prd_c2z0, prd_sz0, prd_s2z0;
     prd->prove_record_client(prd_cmsg, prd_cz0, cctxt, 64, iv_c_oct, 8);
     prd->prove_record_server(prd_smsg, prd_sz0, sctxt, 64, iv_s_oct, 8);

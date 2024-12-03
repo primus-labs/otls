@@ -80,14 +80,8 @@ int main(int argc, char** argv) {
     cout << "protocol setup: " << emp::time_from(start) << " us" << endl;
     //setup_backend(io, party);
 
-    //auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
-    //IKNP<NetIO>* cot = prot->ot;
-    FerretCOT<NetIO>* cot;
-    if (party == ALICE) {
-        cot = ((ZKProver<NetIO>*)(zk_prot_buf))->ostriple->ferret;
-    } else {
-        cot = ((ZKVerifier<NetIO>*)(zk_prot_buf))->ostriple->ferret;
-    }
+    auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
+    IKNP<NetIO>* cot = prot->ot;
     ole_test<NetIO>(io, cot, party);
 
     finalize_protocol();
@@ -111,7 +105,7 @@ int main(int argc, char** argv) {
 
     // setup_backend(ios[0], party);
 
-    // //	FerretCOT<NetIO> * cot = new FerretCOT<NetIO>(party, 1, ios, true, true, ferret_b13);
+    // //    FerretCOT<NetIO> * cot = new FerretCOT<NetIO>(party, 1, ios, true, true, ferret_b13);
 
     // auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
     // IKNP<NetIO>* cot = prot->ot;
@@ -174,7 +168,7 @@ int main(int argc, char** argv) {
     //             cout << "wrong!2\n";
     //     }
     // }
-    // //	delete cot;
+    // //    delete cot;
     // finalize_backend();
     // for (int i = 0; i < 1; ++i)
     //     delete ios[i];

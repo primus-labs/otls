@@ -71,7 +71,7 @@ void aead_enc_garble_then_prove_test(
     unsigned char fixed_iv_oct[4];
     memcpy(fixed_iv_oct, iv, 4);
     reverse(fixed_iv_oct, fixed_iv_oct + 4);
-    Integer fixed_iv(4 * 8, fixed_iv_oct, PUBLIC);
+    Integer fixed_iv(4 * 8, fixed_iv_oct, ALICE);
 
     unsigned char* ctxt = new unsigned char[msg_len];
     unsigned char tag[16];
@@ -100,7 +100,7 @@ void aead_enc_garble_then_prove_test(
     switch_to_zk();
     Integer key_zk(128, keyc, ALICE);
     Integer fixed_iv_zk(4 * 8, fixed_iv_oct, ALICE);
-    AEAD_Proof<IO>* aead_proof = new AEAD_Proof<IO>(aead, key_zk, fixed_iv, party);
+    AEAD_Proof<IO>* aead_proof = new AEAD_Proof<IO>(aead, key_zk, fixed_iv_zk, party);
     Integer msg_zk, msg_z0;
     aead_proof->prove_aead(msg_zk, msg_z0, ctxt, msg_len, iv + 4, iv_len - 4, sec_type);
     if (sec_type) {
@@ -143,6 +143,7 @@ void aead_dec_garble_then_prove_test(
     unsigned char fixed_iv_oct[4];
     memcpy(fixed_iv_oct, iv, 4);
     reverse(fixed_iv_oct, fixed_iv_oct + 4);
+    Integer fixed_iv(4 * 8, fixed_iv_oct, ALICE);
 
     unsigned char ctxt[] = {0x42, 0x83, 0x1e, 0xc2, 0x21, 0x77, 0x74, 0x24, 0x4b, 0x72,
                             0x21, 0xb7, 0x84, 0xd0, 0xd4, 0x9c, 0xe3, 0xaa, 0x21, 0x2f,
@@ -159,9 +160,9 @@ void aead_dec_garble_then_prove_test(
     auto start = emp::clock_start();
 
     // AEAD decryption with GC
-    AEAD<NetIO>* aead = new AEAD<NetIO>(io, io_opt, ot, key);
+    AEAD<NetIO>* aead = new AEAD<NetIO>(io, io_opt, ot, key, fixed_iv);
     bool res =
-      aead->decrypt(io, msg, ctxt, ctxt_len, tag, aad, aad_len, iv, iv_len, party, sec_type);
+      aead->decrypt(io, msg, ctxt, ctxt_len, tag, aad, aad_len, iv + 4, iv_len - 4, party, sec_type);
 
     cout << "time: " << emp::time_from(start) << " us" << endl;
     if (party == ALICE) {
@@ -186,7 +187,7 @@ void aead_dec_garble_then_prove_test(
     switch_to_zk();
     Integer key_zk(128, keyc, ALICE);
     Integer fixed_iv_zk(4 * 8, fixed_iv_oct, ALICE);
-    AEAD_Proof<IO>* aead_proof = new AEAD_Proof<IO>(aead, key_zk, fixed_iv_oct, party);
+    AEAD_Proof<IO>* aead_proof = new AEAD_Proof<IO>(aead, key_zk, fixed_iv_zk, party);
     Integer msg_zk, msg_z0;
     aead_proof->prove_aead(msg_zk, msg_z0, ctxt, msg_len, iv + 4, iv_len - 4, sec_type);
     if (sec_type) {
@@ -219,7 +220,7 @@ int main(int argc, char** argv) {
     IKNP<NetIO>* cot = prot->ot;
     //it_mac_add_test<NetIO>(io, party);
     aead_enc_garble_then_prove_test<NetIO>(io, io_opt, cot, party, true);
-    // aead_dec_garble_then_prove_test<NetIO>(io, io_opt, cot, party, true);
+    aead_dec_garble_then_prove_test<NetIO>(io, io_opt, cot, party, true);
 
     finalize_protocol();
 
