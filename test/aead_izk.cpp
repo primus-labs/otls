@@ -90,7 +90,7 @@ void aead_enc_garble_then_prove_test(
     cout << endl;
 
     cout << "ctxt: ";
-    for (int i = 0; i < msg_len; i++) {
+    for (size_t i = 0; i < msg_len; i++) {
         cout << hex << (int)ctxt[i];
     }
     cout << endl;
@@ -168,7 +168,7 @@ void aead_dec_garble_then_prove_test(
     if (party == ALICE) {
         cout << "ALICE res: " << res << endl;
         cout << "ALICE msg: ";
-        for (int i = 0; i < msg_len; i++) {
+        for (size_t i = 0; i < msg_len; i++) {
             cout << hex << (int)msg[i];
         }
         cout << endl;
@@ -176,7 +176,7 @@ void aead_dec_garble_then_prove_test(
     } else {
         cout << "BOB res: " << res << endl;
         cout << "BOB msg: ";
-        for (int i = 0; i < msg_len; i++) {
+        for (size_t i = 0; i < msg_len; i++) {
             cout << hex << (int)msg[i];
         }
         cout << endl;

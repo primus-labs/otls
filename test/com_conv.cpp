@@ -34,7 +34,7 @@ void com_conv_test(
     EC_POINT_mul(group, h, s, NULL, NULL, ctx);
 
     vector<block> raw(array_len);
-    for (int i = 0; i < raw.size(); i++)
+    for (size_t i = 0; i < raw.size(); i++)
         raw[i] = input[i].bit;
 
     size_t batch_size = 255;
@@ -45,7 +45,7 @@ void com_conv_test(
     coms.resize(chunk_len);
     rnds.resize(chunk_len);
 
-    for (int i = 0; i < chunk_len; i++) {
+    for (size_t i = 0; i < chunk_len; i++) {
         coms[i] = EC_POINT_new(group);
         rnds[i] = BN_new();
     }
@@ -79,7 +79,7 @@ void com_conv_test(
         cout << "ALICE comms: " << io->counter - comm << " bytes" << endl;
     }
 
-    for (int i = 0; i < chunk_len; i++) {
+    for (size_t i = 0; i < chunk_len; i++) {
         EC_POINT_free(coms[i]);
         BN_free(rnds[i]);
     }

@@ -82,11 +82,11 @@ void handshake_test(IO* io, IO* io_opt, COT<IO>* cot, int party) {
     bool res = aead_c_server->decrypt(io, msg, ctxt, finished_msg_length, tag, aad, aad_len,
                                       iv_c_oct, 8, party);
     cout << "res: " << res << endl;
-    for (int i = 0; i < finished_msg_length; i++)
+    for (size_t i = 0; i < finished_msg_length; i++)
         cout << hex << (int)msg[i];
     cout << endl;
 
-    for (int i = 0; i < finished_msg_length; i++)
+    for (size_t i = 0; i < finished_msg_length; i++)
         cout << hex << (int)hs->client_ufin[i];
     cout << endl;
 

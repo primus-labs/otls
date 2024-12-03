@@ -205,11 +205,11 @@ int main(int argc, char** argv) {
     // finalize_backend();
 
 #ifndef THREADING
-    for (int i = 0; i < CheatRecord::message.size(); i++) {
+    for (size_t i = 0; i < CheatRecord::message.size(); i++) {
         cout << CheatRecord::message[i] << endl;
     }
 #else
-    for (int i = 0; i < CheatRecord::message->size(); i++) {
+    for (size_t i = 0; i < CheatRecord::message->size(); i++) {
         cout << (*CheatRecord::message)[i] << endl;
     }
 #endif
