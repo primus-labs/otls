@@ -219,28 +219,22 @@ int main(int argc, char** argv) {
 
     auto start = emp::clock_start();
     auto comm = io->counter;
-    // auto rounds = io->rounds;
     setup_protocol(io, ios, threads, party, true);
-    // cout << "setup rounds: " << io->rounds << endl;
-    // rounds = io->rounds;
     // aead_encrypt_test_offline(sec_type);
     aead_decrypt_test_offline(sec_type);
     cout << "offline time: " << emp::time_from(start) << " us" << endl;
 
     switch_to_online<NetIO>(party);
     cout << "offline comm: " << io->counter - comm << endl;
-    // cout << "offline rounds: " << io->rounds - rounds << endl;
     auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
 
     comm = io->counter;
-    // rounds = io->rounds;
     start = emp::clock_start();
     // aead_encrypt_test(io, io_opt, cot, party, sec_type);
     aead_decrypt_test(io, io_opt, cot, party, sec_type);
     cout << "online time: " << dec << emp::time_from(start) << " us" << endl;
     cout << "online comm: " << io->counter - comm << endl;
-    // cout << "online rounds: " << io->rounds - rounds << endl;
 
     finalize_protocol();
     bool cheat = CheatRecord::cheated();

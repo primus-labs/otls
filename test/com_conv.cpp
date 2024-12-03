@@ -55,9 +55,7 @@ void com_conv_test(
 
     if (party == BOB) {
         auto start = emp::clock_start();
-        // auto rounds = io->rounds;
         bool res = conv.compute_com_send(coms, raw, pc, batch_size);
-        // cout << "BOB rounds: " << io->rounds - rounds << endl;
         if (res) {
             cout << "BOB check passed" << endl;
         } else {
@@ -67,9 +65,7 @@ void com_conv_test(
         cout << "BOB comm: " << io->counter - comm << " bytes" << endl;
     } else {
         auto start = emp::clock_start();
-        // auto rounds = io->rounds;
         bool res = conv.compute_com_recv(coms, rnds, raw, pc, batch_size);
-        // cout << "ALICE rounds: " << io->rounds - rounds << endl;
         if (res) {
             cout << "ALICE check passed" << endl;
         } else {
