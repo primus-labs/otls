@@ -139,7 +139,6 @@ class AESProver {
         set_nonce(iv, iv_len);
         gctr_opt(counters, ids);
 
-        size_t offset = 0;
         Integer izk_counter;
         for (size_t i = 0; i < counterInfos.size(); i++) {
             const AESCounterInfo& c = counterInfos[i];
@@ -181,7 +180,7 @@ class AESProver {
         Integer c = computeCounter(iv, iv_len, msg_len);
 
         unsigned char* c_xor_m = new unsigned char[msg_len];
-        for (int i = 0; i < msg_len; ++i) {
+        for (size_t i = 0; i < msg_len; ++i) {
             c_xor_m[msg_len - 1 - i] = msgs[i] ^ ctxts[i];
         }
 
@@ -229,7 +228,7 @@ class AESProver {
         Integer c = computeCounterOpt(counterInfos, iv, iv_len);
 
         unsigned char* c_xor_m = new unsigned char[msg_len];
-        for (int i = 0; i < msg_len; ++i) {
+        for (size_t i = 0; i < msg_len; ++i) {
             c_xor_m[msg_len - 1 - i] = msgs[i] ^ ctxts[i];
         }
 
