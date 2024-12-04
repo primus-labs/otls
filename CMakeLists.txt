@@ -41,6 +41,10 @@ set(sources
   backend/switch.cpp
   cipher/utils.cpp
 )
+option(USE_PRIMUS_EMP "use primus emp" OFF)
+IF(USE_PRIMUS_EMP)
+  add_definitions(-DUSE_PRIMUS_EMP=1)
+ENDIF()
 add_compile_options(-fPIC)
 add_library(otls ${sources})
 target_link_libraries(otls ${EMP-TOOL_LIBRARIES} ${EMP-ZK_LIBRARIES} dl)

@@ -73,6 +73,7 @@ inline void reset_offline_ptr() {
 inline void safe_setup_protocol(std::function<void()> setupFn,
                                 std::function<void()> backupFn,
                                 std::function<void()> resetFn) {
+#if USE_PRIMUS_EMP
     FunctionWrapperV3(
       [&setupFn, &backupFn]() {
           reset_prot_ptr();
@@ -86,6 +87,23 @@ inline void safe_setup_protocol(std::function<void()> setupFn,
       })();
 
     CHECK_INITIALIZE_EXCEPTION();
+#else
+    try {
+        reset_prot_ptr();
+        setupFn();
+        backupFn();
+    }
+    catch(std::exception& e) {
+        delete_prot_ptr();
+        resetFn();
+        throw std::runtime_error(e.what());
+    }
+    catch(...) {
+        delete_prot_ptr();
+        resetFn();
+        throw std::runtime_error("unknow error");
+    }
+#endif
 }
 
 template <typename IO>
