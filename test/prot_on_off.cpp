@@ -51,7 +51,6 @@ void full_protocol_offline() {
 template <typename IO>
 void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int party) {
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
-    //HandShake<NetIO>* hs = new HandShake<NetIO>(io, cot, group);
 
     EC_POINT* V = EC_POINT_new(group);
     EC_POINT* Tc = EC_POINT_new(group);
@@ -89,8 +88,6 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     BIGNUM* full_pms = BN_new();
     unsigned char iv_c_oct[8], iv_s_oct[8];
 
-    // hs->compute_pms_offline(party);
-
     auto start = emp::clock_start();
     if (party == BOB) {
         hs->compute_pado_VA(V, Ts);
@@ -127,7 +124,6 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     // Use correct ciphertext instead of finc_ctxt!
     hs->decrypt_server_finished_msg(aead_s, msg, finc_ctxt, finished_msg_length, finc_tag, aad,
                                     aad_len, iv_s_oct, 8, party);
-    // cout << "handshake time: " << emp::time_from(start) << " us" << endl;
 
     unsigned char* cctxt = new unsigned char[QUERY_BYTE_LEN];
     unsigned char* ctag = new unsigned char[tag_length];
@@ -138,7 +134,6 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
 
     // the client encrypts the first message, and sends to the server.
     rd->encrypt(aead_c, io, cctxt, ctag, cmsg, QUERY_BYTE_LEN, aad, aad_len, iv_c_oct, 8, party);
-    // cout << "record time: " << emp::time_from(start) << " us" << endl;
     // prove handshake in post-record phase.
     start = emp::clock_start();
     switch_to_zk();
@@ -161,7 +156,6 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
 
     sync_zk_gc<IO>();
     switch_to_gc();
-    // cout << "post record: " << emp::time_from(start) << " us" << endl;
     EC_POINT_free(V);
     EC_POINT_free(Tc);
     BN_free(t);
@@ -170,7 +164,6 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     BN_free(full_pms);
     EC_POINT_free(Ts);
 
-    // delete hs;
     delete[] rc;
     delete[] rs;
     delete[] ufinc;
@@ -260,6 +253,6 @@ int main(int argc, char** argv) {
     for (int i = 0; i < threads; i++) {
         delete ios[i];
     }
-    // delete io_opt;
+    delete io_opt;
     return 0;
 }

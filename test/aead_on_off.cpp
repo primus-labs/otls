@@ -63,7 +63,6 @@ void aead_encrypt_test(
     comm = io->counter;
     aead->encrypt(io, ctxt, tag, msg, msg_len, aad, aad_len, iv + 4, iv_len - 4, party, sec_type);
     cout << "encrypt comm: " << io->counter - comm << endl;
-    //aead.enc_finished_msg(io, ctxt, tag, msg, msg_len, aad, aad_len, party);
 
     cout << "tag: ";
     for (int i = 0; i < 16; i++) {
@@ -121,13 +120,6 @@ void aead_decrypt_test(
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
     Integer key(128, keyc, ALICE);
-
-    // unsigned char msg[] = {0xd9, 0x31, 0x32, 0x25, 0xf8, 0x84, 0x06, 0xe5, 0xa5, 0x59,
-    //                        0x09, 0xc5, 0xaf, 0xf5, 0x26, 0x9a, 0x86, 0xa7, 0xa9, 0x53,
-    //                        0x15, 0x34, 0xf7, 0xda, 0x2e, 0x4c, 0x30, 0x3d, 0x8a, 0x31,
-    //                        0x8a, 0x72, 0x1c, 0x3c, 0x0c, 0x95, 0x95, 0x68, 0x09, 0x53,
-    //                        0x2f, 0xcf, 0x0e, 0x24, 0x49, 0xa6, 0xb5, 0x25, 0xb1, 0x6a,
-    //                        0xed, 0xf5, 0xaa, 0x0d, 0xe6, 0x57, 0xba, 0x63, 0x7b, 0x39};
 
     unsigned char msg[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -220,7 +212,7 @@ int main(int argc, char** argv) {
     auto start = emp::clock_start();
     auto comm = io->counter;
     setup_protocol(io, ios, threads, party, true);
-    // aead_encrypt_test_offline(sec_type);
+    aead_encrypt_test_offline(sec_type);
     aead_decrypt_test_offline(sec_type);
     cout << "offline time: " << emp::time_from(start) << " us" << endl;
 
@@ -231,7 +223,7 @@ int main(int argc, char** argv) {
 
     comm = io->counter;
     start = emp::clock_start();
-    // aead_encrypt_test(io, io_opt, cot, party, sec_type);
+    aead_encrypt_test(io, io_opt, cot, party, sec_type);
     aead_decrypt_test(io, io_opt, cot, party, sec_type);
     cout << "online time: " << dec << emp::time_from(start) << " us" << endl;
     cout << "online comm: " << io->counter - comm << endl;

@@ -16,8 +16,6 @@ int main(int argc, char** argv) {
 
 	setup_backend(ios[0], party);
 
-	//	FerretCOT<NetIO> * cot = new FerretCOT<NetIO>(party, 1, ios, true, true, ferret_b13);
-
 	auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
 	IKNP<NetIO> * cot = prot->ot;
 	vector<block> out;
@@ -50,7 +48,6 @@ int main(int argc, char** argv) {
 		tmp = tmp ^ out[0];
 		cout <<"B:"<< tmp[0]<<endl;
 	}
-	//	delete cot;
 	finalize_backend();
 	for(int i = 0; i < 1; ++i)
 		delete ios[i];

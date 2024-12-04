@@ -12,22 +12,10 @@ int main(int argc, char** argv) {
     NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
     NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + 1);
 
-    // NetIO* ios[2];
-    // for (int i = 0; i < 2; ++i)
-    //     ios[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-
-    // setup_backend(ios[0], party);
     setup_backend(io, party);
-
-    //	FerretCOT<NetIO> * cot = new FerretCOT<NetIO>(party, 1, ios, true, true, ferret_b13);
 
     auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
-
-    // BIGNUM *q = BN_new(), *n19 = BN_new();
-    // BN_set_bit(q, 255);
-    // BN_set_word(n19, 19);
-    // BN_sub(q, q, n19); //2^255-19
 
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
     BIGNUM* q = BN_new();
@@ -97,6 +85,6 @@ int main(int argc, char** argv) {
 
     finalize_backend();
 
-    // for (int i = 0; i < 1; ++i)
-    //     delete ios[i];
+    delete io;
+	delete io_opt;
 }

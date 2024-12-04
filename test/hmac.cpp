@@ -61,7 +61,7 @@ void hmac_sha256test() {
     hmac256.opt_rounds_hmac_sha256(dig, msg, true, true);
     cout << "time: " << time_from(start) << "us" << endl;
 
-    // cout << "call: " << hmac256.SHA256_call << endl;
+    cout << "call: " << hmac256.SHA256_call << endl;
     cout << "hmac-sha256: ";
     print_hex_32(dig, hmac256.DIGLEN);
     delete[] dig;
@@ -160,49 +160,33 @@ void zk_gc_hmac_test() {
     cout << "hmac_sha256: ";
     print_hex_32(dig, hmac256.DIGLEN);
 
-    // switch_to_zk();
+    switch_to_zk();
 
-    // key = str_to_int(key_str, ALICE);
-    // hmac256.init(key);
-    // hmac256.opt_hmac_sha256(dig, msg, 77, true, true, true);
-    // cout << "hmac_sha256: ";
-    // print_hex_32(dig, hmac256.DIGLEN);
+    key = str_to_int(key_str, ALICE);
+    hmac256.init(key);
+    hmac256.opt_hmac_sha256(dig, msg, 77, true, true, true);
+    cout << "hmac_sha256: ";
+    print_hex_32(dig, hmac256.DIGLEN);
 
-    // sync_zk_gc<NetIO>();
-    // switch_to_gc();
+    sync_zk_gc<NetIO>();
+    switch_to_gc();
     delete[] dig;
 }
 
 int threads = 1;
 int main(int argc, char** argv) {
-    // setup_plain_prot(true, "hmacsha256.txt");
-    // //setup_plain_prot(false, "");
-    // hmac_sha256test();
-    // cout << "AND gates: " << CircuitExecution::circ_exec->num_and() << endl;
-    // finalize_plain_prot();
-
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
-    //setup_backend(io, party);
 
-    //hmac_sha256circ();
-    //sha256test();
-    //optsha256test();
-    //hmac_sha256test();
-    //opt_hmac_sha256test();
-    //opt_hmac_sha256circ();
-    //sha256_compressiontest();
     BoolIO<NetIO>* ios[threads];
     for (int i = 0; i < threads; i++)
         ios[i] = new BoolIO<NetIO>(io, party == ALICE);
 
     setup_protocol(io, ios, threads, party);
-    // zk_gc_hmac_test();
+    zk_gc_hmac_test();
     hmac_sha256test();
     finalize_protocol();
-    // cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and() << endl;
-    // finalize_backend();
 
 #ifndef THREADING
     for (size_t i = 0; i < CheatRecord::message.size(); i++) {

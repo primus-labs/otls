@@ -30,7 +30,6 @@ void zk_gc_prf_test_offline(int party) {
     prf.init(hmac, secret);
     prf.opt_compute(hmac, res, 800, secret, true, true);
 
-    // (output == res).reveal<bool>(PUBLIC);
 }
 
 void zk_gc_prf_test(int party, bool flag = false) {
@@ -51,8 +50,6 @@ void zk_gc_prf_test(int party, bool flag = false) {
       0x5a, 0x51, 0x10, 0xff, 0xf7, 0x01, 0x87, 0x34, 0x7b, 0x66};
 
     reverse(secret_u.begin(), secret_u.end());
-    //reverse(seed_u.begin(), seed_u.end());
-    //reverse(label_u.begin(), label_u.end());
     reverse(output_u.begin(), output_u.end());
 
     Integer secret(128, secret_u.data(), ALICE);
@@ -68,14 +65,6 @@ void zk_gc_prf_test(int party, bool flag = false) {
     prf.opt_compute(hmac, res, 800, secret, label, label_u.size(), seed, seed_u.size(), true,
                     true);
 
-    //assert(output == res);
-    // Bit check = (output == res);
-    // cout << check.bit << endl;
-    // if (check.reveal<bool>(PUBLIC)) {
-    //     cout << "test passed!" << endl;
-    // } else {
-    //     cout << "test failed" << endl;
-    // }
     if (flag) {
         switch_to_zk();
         Integer res;

@@ -218,7 +218,7 @@ int main(int argc, char** argv) {
     cout << "setup time: " << emp::time_from(start) << endl;
     auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
-    //it_mac_add_test<NetIO>(io, party);
+    it_mac_add_test<NetIO>(io, party);
     aead_enc_garble_then_prove_test<NetIO>(io, io_opt, cot, party, true);
     aead_dec_garble_then_prove_test<NetIO>(io, io_opt, cot, party, true);
 

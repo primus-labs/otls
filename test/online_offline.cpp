@@ -23,7 +23,6 @@ void test_sort(int party, bool online = false) {
     sort(res, size);
     for (int i = 0; i < size; ++i) {
         auto r = res[i].reveal<int32_t>();
-        // if (party == ALICE and online)
         cout << r << endl;
     }
     delete[] A;

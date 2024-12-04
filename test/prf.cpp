@@ -44,7 +44,6 @@ void prf_test() {
     prf.init(hmac, secret);
     prf.compute(hmac, res, 800, secret, label, seed);
 
-    //assert(output == res);
     if ((output == res).reveal<bool>(PUBLIC)) {
         cout << "test passed!" << endl;
     } else {
@@ -75,8 +74,6 @@ void opt_prf_test() {
       0x44, 0x3e, 0xb6, 0x8c, 0x46, 0x77, 0xdc, 0x84, 0xaa, 0x21, 0x85, 0x00, 0x36, 0x3b};
 
     reverse(secret_u.begin(), secret_u.end());
-    //reverse(seed_u.begin(), seed_u.end());
-    //reverse(label_u.begin(), label_u.end());
     reverse(output_u.begin(), output_u.end());
 
     Integer secret(48 * 8, secret_u.data(), ALICE);
@@ -91,7 +88,6 @@ void opt_prf_test() {
     prf.init(hmac, secret);
     prf.opt_compute(hmac, res, 40 * 8, secret, label, label_u.size(), seed, seed_u.size(),
                     true, true);
-    //assert(output == res);
     if ((output == res).reveal<bool>(PUBLIC)) {
         cout << "test passed!" << endl;
     } else {
@@ -162,7 +158,6 @@ void opt_prf_circ_test() {
     HMAC_SHA256 hmac;
 
     prf.init(hmac, secret);
-    //prf.opt_compute(hmac, res, 48 * 8, secret, label, label_len, seed, seed_len, true, true);
     prf.opt_compute(hmac, res, 96, secret, label, label_len, seed, seed_len, true, true);
 
     cout << "Call Compression Function: " << hmac.compression_calls() << " times" << endl;
@@ -239,30 +234,22 @@ void nopt_handshake_prf_circ_test() {
     size_t pms_len = 256;
 
     unsigned char mk_label[] = {"master key"};
-    // size_t mk_label_len = 10;
 
     unsigned char ke_label[] = {"key expansion"};
-    // size_t ke_label_len = 13;
 
     unsigned char cfin_label[] = {"client finished"};
-    // size_t cfin_label_len = 15;
 
     unsigned char sfin_label[] = {"server finished"};
-    // size_t sfin_label_len = 15;
 
     unsigned char mk_seed[] = {
       "0123456789012345678901234567890123456789012345678901234567890123"};
-    // size_t mk_seed_len = 64;
 
     unsigned char ke_seed[] = {
       "2345678901234567890123456789012301234567890123456789012345678901"};
-    // size_t ke_seed_len = 64;
 
     unsigned char ctau[] = {"01234567890123456789012345678901"};
-    // size_t ctau_len = 32;
 
     unsigned char stau[] = {"67890123456789010123456789012345"};
-    // size_t stau_len = 32;
 
     PRF prf;
     Integer pms(pms_len, pms_u.data(), ALICE);
@@ -272,16 +259,12 @@ void nopt_handshake_prf_circ_test() {
     Integer ms;
     auto start = emp::clock_start();
     prf.init(hmac, pms);
-    // prf.opt_compute(hmac, ms, 384, pms, mk_label, mk_label_len, mk_seed, mk_seed_len, true,
-    //                 true);
     Integer mk_label_int(mk_label, PUBLIC);
     Integer mk_seed_int(mk_seed, PUBLIC);
     prf.compute(hmac, ms, 384, pms, mk_label_int, mk_seed_int);
 
     Integer sk;
     prf.init(hmac, ms);
-    // prf.opt_compute(hmac, sk, 320, ms, ke_label, ke_label_len, ke_seed, ke_seed_len, true,
-    //                 true);
     Integer ke_label_int(ke_label, PUBLIC);
     Integer ke_seed_int(ke_seed, PUBLIC);
     prf.compute(hmac, sk, 448, ms, ke_label_int, ke_seed_int);
@@ -290,15 +273,11 @@ void nopt_handshake_prf_circ_test() {
     Integer cfin_label_int(cfin_label, PUBLIC);
     Integer cfin_seed_int(ctau, PUBLIC);
     prf.compute(hmac, ucfin, 96, ms, cfin_label_int, cfin_seed_int);
-    // prf.opt_compute(hmac, ucfin, 96, ms, cfin_label, cfin_label_len, ctau, ctau_len, true,
-    //                 true);
 
     Integer usfin;
     Integer sfin_label_int(sfin_label, PUBLIC);
     Integer sfin_seed_int(stau, PUBLIC);
     prf.compute(hmac, usfin, 96, ms, sfin_label_int, sfin_seed_int);
-    // prf.opt_compute(hmac, usfin, 96, ms, sfin_label, sfin_label_len, stau, stau_len, true,
-    //                 true);
 
     cout << "time: " << emp::time_from(start) << " us" << endl;
     cout << "Call Compression Function: " << hmac.compression_calls() << " times" << endl;
@@ -323,8 +302,6 @@ void zk_gc_prf_test(int party) {
       0x5a, 0x51, 0x10, 0xff, 0xf7, 0x01, 0x87, 0x34, 0x7b, 0x66};
 
     reverse(secret_u.begin(), secret_u.end());
-    //reverse(seed_u.begin(), seed_u.end());
-    //reverse(label_u.begin(), label_u.end());
     reverse(output_u.begin(), output_u.end());
 
     Integer secret(128, secret_u.data(), ALICE);
@@ -340,7 +317,6 @@ void zk_gc_prf_test(int party) {
     prf.opt_rounds_compute(hmac, res, 800, secret, label, label_u.size(), seed, seed_u.size(),
                            true, true);
 
-    //assert(output == res);
     if ((output == res).reveal<bool>(PUBLIC)) {
         cout << "test passed!" << endl;
     } else {
@@ -352,8 +328,6 @@ void zk_gc_prf_test(int party) {
     secret = Integer(128, secret_u.data(), ALICE);
     output = Integer(800, output_u.data());
     prf.init(hmac, secret);
-    // prf.opt_compute(hmac, res, 800, secret, label, label_u.size(), seed, seed_u.size(), true,
-    //                 true, true);
     prf.opt_rounds_compute(hmac, res, 800, secret, label, label_u.size(), seed, seed_u.size(),
                            true, true, true);
     if ((output == res).reveal<bool>(PUBLIC)) {
@@ -371,29 +345,15 @@ void zk_gc_prf_test(int party) {
 
 int threads = 1;
 int main(int argc, char** argv) {
-    // setup_plain_prot(false, "");
-    // prf_test();
-    // opt_prf_test();
-    // finalize_plain_prot();
-
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
     BoolIO<NetIO>* ios[threads];
     for (int i = 0; i < threads; i++)
         ios[i] = new BoolIO<NetIO>(io, party == ALICE);
-    // setup_backend(io, party);
-
-    //prf_test();
-    // opt_prf_test();
-    //opt_prf_circ_test();
-    //handshake_prf_circ_test();
-    // cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and() << endl;
-    // finalize_backend();
 
     setup_protocol(io, ios, threads, party);
     zk_gc_prf_test(party);
-    //opt_prf_test();
     finalize_protocol();
 
     bool cheat = CheatRecord::cheated();

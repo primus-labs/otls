@@ -23,11 +23,8 @@ int main(int argc, char** argv) {
         ios[i] = new BoolIO<NetIO>(io, party == ALICE);
 
     setup_protocol<NetIO>(io, ios, threads, party);
-    //setup_backend(io, party);
     switch_test();
 
-    //backup_gc_ptr();
-    //setup_zk_bool<BoolIO<NetIO>>(ios, threads, party);
     switch_to_zk();
     switch_test();
 

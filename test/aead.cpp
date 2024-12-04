@@ -26,7 +26,7 @@ void convert(int party) {
         }
         cout << dec << endl;
     }
-    // delete[] b;
+    delete[] b;
     delete[] c;
 }
 
@@ -65,7 +65,6 @@ void aead_encrypt_test(
     auto start = emp::clock_start();
     AEAD<NetIO> aead(io, io_opt, ot, key, fixed_iv);
     aead.encrypt(io, ctxt, tag, msg, msg_len, aad, aad_len, iv + 4, iv_len - 4, party, sec_type);
-    //aead.enc_finished_msg(io, ctxt, tag, msg, msg_len, aad, aad_len, party);
 
     cout << "time: " << emp::time_from(start) << " us" << endl;
     cout << "tag: ";
@@ -89,13 +88,6 @@ void aead_decrypt_test(
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
     Integer key(128, keyc, ALICE);
-
-    // unsigned char msg[] = {0xd9, 0x31, 0x32, 0x25, 0xf8, 0x84, 0x06, 0xe5, 0xa5, 0x59,
-    //                        0x09, 0xc5, 0xaf, 0xf5, 0x26, 0x9a, 0x86, 0xa7, 0xa9, 0x53,
-    //                        0x15, 0x34, 0xf7, 0xda, 0x2e, 0x4c, 0x30, 0x3d, 0x8a, 0x31,
-    //                        0x8a, 0x72, 0x1c, 0x3c, 0x0c, 0x95, 0x95, 0x68, 0x09, 0x53,
-    //                        0x2f, 0xcf, 0x0e, 0x24, 0x49, 0xa6, 0xb5, 0x25, 0xb1, 0x6a,
-    //                        0xed, 0xf5, 0xaa, 0x0d, 0xe6, 0x57, 0xba, 0x63, 0x7b, 0x39};
 
     unsigned char msg[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -171,9 +163,9 @@ int main(int argc, char** argv) {
     auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
 
-    // aead_encrypt_test(io, io_opt, cot, party);
+    aead_encrypt_test(io, io_opt, cot, party);
     aead_decrypt_test(io, io_opt, cot, party, true);
-    //convert(party);
+    convert(party);
     cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and() << endl;
     finalize_protocol();
     cout << io->counter << endl;

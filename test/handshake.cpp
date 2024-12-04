@@ -29,8 +29,6 @@ void handshake_test(IO* io, IO* io_opt, COT<IO>* cot, int party) {
     unsigned char* tau_c = new unsigned char[32];
     unsigned char* tau_s = new unsigned char[32];
 
-    //unsigned char* iv_oct = new unsigned char[24];
-
     memset(rc, 0x11, 32);
     memset(rs, 0x22, 32);
     memset(tau_c, 0x33, 32);
@@ -165,7 +163,6 @@ void handshake_test(IO* io, IO* io_opt, COT<IO>* cot, int party) {
     delete[] msg2;
     delete[] tag;
     delete[] msg;
-    // delete[] iv_oct;
 
     delete aead_c;
     delete aead_s;

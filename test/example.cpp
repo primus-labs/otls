@@ -40,7 +40,6 @@ int main(int argc, char** argv) {
 
 	setup_backend(io, party);
 	test_sort(party);
-	//swap_role<NetIO>(ALICE+BOB-party);
 	test_sort(party);
 	cout << "gates: "<<CircuitExecution::circ_exec->num_and()<<endl;
 	finalize_backend();

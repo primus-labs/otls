@@ -14,7 +14,6 @@ void com_conv_test(
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
     BIGNUM* q = BN_new();
     BN_CTX* ctx = BN_CTX_new();
-    //EC_GROUP_get_curve(group, q, NULL, NULL, ctx);
     BN_copy(q, EC_GROUP_get0_order(group));
 
     BIGNUM* sa = BN_new();
@@ -107,9 +106,6 @@ int main(int argc, char** argv) {
     unsigned char* val = new unsigned char[array_len / 8];
     prg.random_data(val, array_len / 8);
     Integer input(array_len, val, ALICE);
-
-    // this step is critical.
-    // ios[0]->flush();
 
     com_conv_test<NetIO>(io, cot, fcot->Delta, party, input, array_len);
     finalize_protocol();

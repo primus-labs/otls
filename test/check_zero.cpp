@@ -8,7 +8,6 @@ void check_zero_test(int party) {
     int len = 10;
     unsigned char* data = new unsigned char[len];
     uint32_t* data2 = new uint32_t[len];
-    //prg.random_data(data, len);
     for (int i = 0; i < len; i++) {
         data[i] = 0x11;
         data2[i] = 0x11223344;
@@ -47,14 +46,9 @@ int main(int argc, char** argv) {
     BoolIO<NetIO>* ios[threads];
     for (int i = 0; i < threads; i++)
         ios[i] = new BoolIO<NetIO>(io, party == ALICE);
-    // setup_zk_bool<BoolIO<NetIO>>(ios, threads, party);
-    // check_zero_test<NetIO>(party);
-    // bool cheat = finalize_zk_bool<BoolIO<NetIO>>();
-    // if (cheat)
-    //     error("cheat!\n");
 
     setup_protocol<NetIO>(io, ios, threads, party);
-    //gc_zk_check_test<NetIO>(party);
+    gc_zk_check_test<NetIO>(party);
     switch_to_zk();
     check_zero_test<NetIO>(party);
     sync_zk_gc<NetIO>();
