@@ -1,5 +1,5 @@
-#ifndef PADO_Online_HALFGATE_GEN_
-#define PADO_Online_HALFGATE_GEN_
+#ifndef PRIMUS_Online_HALFGATE_GEN_
+#define PRIMUS_Online_HALFGATE_GEN_
 #include "emp-tool/emp-tool.h"
 #include "backend/bn_utils.h"
 using namespace emp;

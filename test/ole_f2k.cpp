@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
 
     setup_backend(ios[0], party);
 
-    auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
+    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
     vector<block> out;
     vector<block> in;

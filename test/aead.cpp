@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
         ios[i] = new BoolIO<NetIO>(io, party == ALICE);
 
     setup_protocol(io, ios, threads, party);
-    auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
+    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
 
     aead_encrypt_test(io, io_opt, cot, party);

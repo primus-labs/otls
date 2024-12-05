@@ -1,18 +1,18 @@
-#ifndef Offline_PADO_GEN_H__
-#define Offline_PADO_GEN_H__
+#ifndef Offline_PRIMUS_GEN_H__
+#define Offline_PRIMUS_GEN_H__
 #include "offline_primus_party.h"
 #include "offline_hg_gen.h"
 
 /* Offline generator (ALICE) of the protocol */
 template <typename IO>
-class OfflinePADOGen : public OfflinePADOParty {
+class OfflinePrimusGen : public OfflinePrimusParty {
    public:
     IO* io;
     OfflineHalfGateGen<IO>* gc;
     block seed;
     PRG prg;
 
-    OfflinePADOGen(IO* io, OfflineHalfGateGen<IO>* gc) : OfflinePADOParty(ALICE) {
+    OfflinePrimusGen(IO* io, OfflineHalfGateGen<IO>* gc) : OfflinePrimusParty(ALICE) {
         this->io = io;
         this->gc = gc;
         PRG().random_block(&seed, 1);

@@ -1,5 +1,5 @@
-#ifndef PADO_OLE_F2K_H
-#define PADO_OLE_F2K_H
+#ifndef PRIMUS_OLE_F2K_H
+#define PRIMUS_OLE_F2K_H
 #include "emp-ot/emp-ot.h"
 #include <iostream>
 

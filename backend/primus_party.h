@@ -1,12 +1,12 @@
-#ifndef PADO_PARTY_H__
-#define PADO_PARTY_H__
+#ifndef PRIMUS_PARTY_H__
+#define PRIMUS_PARTY_H__
 #include "emp-tool/emp-tool.h"
 #include "emp-ot/emp-ot.h"
 using namespace emp;
 
 /* Define the general party in the protocol */
 template <typename IO>
-class PADOParty : public ProtocolExecution {
+class PrimusParty : public ProtocolExecution {
    public:
     IO* io = nullptr;
     IKNP<IO>* ot = nullptr;
@@ -18,7 +18,7 @@ class PADOParty : public ProtocolExecution {
     int batch_size = 1024 * 16;
     using ProtocolExecution::cur_party;
 
-    PADOParty(IO* io, int party, IKNP<IO>* in_ot) : ProtocolExecution(party) {
+    PrimusParty(IO* io, int party, IKNP<IO>* in_ot) : ProtocolExecution(party) {
         this->io = io;
         if (in_ot == nullptr)
             ot = new IKNP<IO>(io, true);
@@ -35,7 +35,7 @@ class PADOParty : public ProtocolExecution {
         buff = new bool[batch_size];
     }
 
-    ~PADOParty() {
+    ~PrimusParty() {
         delete[] buf;
         delete[] buff;
         delete ot;

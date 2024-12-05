@@ -1,15 +1,15 @@
-#ifndef PADO_GEN_H__
-#define PADO_GEN_H__
+#ifndef PRIMUS_GEN_H__
+#define PRIMUS_GEN_H__
 #include "backend/primus_party.h"
 
 /* The generator (ALICE) in the protocol */
 template <typename IO>
-class PADOGen : public PADOParty<IO> {
+class PrimusGen : public PrimusParty<IO> {
    public:
     OptHalfGateGen<IO>* gc;
     Hash hash;
-    PADOGen(IO* io, OptHalfGateGen<IO>* gc, IKNP<IO>* in_ot = nullptr)
-        : PADOParty<IO>(io, ALICE, in_ot) {
+    PrimusGen(IO* io, OptHalfGateGen<IO>* gc, IKNP<IO>* in_ot = nullptr)
+        : PrimusParty<IO>(io, ALICE, in_ot) {
         this->gc = gc;
         if (in_ot == nullptr) {
             bool delta_bool[128];

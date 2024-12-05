@@ -1,16 +1,16 @@
-#ifndef Online_PADO_GEN_H__
-#define Online_PADO_GEN_H__
+#ifndef Online_PRIMUS_GEN_H__
+#define Online_PRIMUS_GEN_H__
 #include "backend/primus_party.h"
 
 /* Offline evaluator (ALICE) of the protocol */
 template <typename IO>
-class OnlinePADOGen : public PADOParty<IO> {
+class OnlinePrimusGen : public PrimusParty<IO> {
    public:
     OnlineHalfGateGen<IO>* gc;
     PRG prg;
     Hash hash;
-    OnlinePADOGen(IO* io, OnlineHalfGateGen<IO>* gc, IKNP<IO>* in_ot = nullptr)
-        : PADOParty<IO>(io, ALICE, in_ot) {
+    OnlinePrimusGen(IO* io, OnlineHalfGateGen<IO>* gc, IKNP<IO>* in_ot = nullptr)
+        : PrimusParty<IO>(io, ALICE, in_ot) {
         this->gc = gc;
         if (in_ot == nullptr) {
             bool delta_bool[128];

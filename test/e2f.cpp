@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
 
     setup_backend(io, party);
 
-    auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
+    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
 
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);

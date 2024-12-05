@@ -1,5 +1,5 @@
-#ifndef PADO_VOPE_H
-#define PADO_VOPE_H
+#ifndef PRIMUS_VOPE_H
+#define PRIMUS_VOPE_H
 #include "emp-ot/emp-ot.h"
 #include "backend/bn_utils.h"
 #include "cipher/utils.h"
@@ -74,4 +74,4 @@ class VOPE {
     }
 };
 
-#endif // PADO_VOPE_H
+#endif // PRIMUS_VOPE_H

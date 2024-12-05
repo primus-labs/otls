@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
 
     switch_to_zk();
 
-    IKNP<NetIO>* cot = ((PADOParty<NetIO>*)(gc_prot_buf))->ot;
+    IKNP<NetIO>* cot = ((PrimusParty<NetIO>*)(gc_prot_buf))->ot;
     FerretCOT<NetIO>* fcot;
     if (party == ALICE) {
         fcot = ((ZKProver<NetIO>*)(zk_prot_buf))->ostriple->ferret;

@@ -1,18 +1,18 @@
-#ifndef Online_PADO_EVA_H__
-#define Online_PADO_EVA_H__
+#ifndef Online_PRIMUS_EVA_H__
+#define Online_PRIMUS_EVA_H__
 #include "backend/primus_party.h"
 
 /* Online evaluator (BOB) of the protocol */
 template <typename IO>
-class OnlinePADOEva : public PADOParty<IO> {
+class OnlinePrimusEva : public PrimusParty<IO> {
    public:
     OnlineHalfGateEva<IO>* gc;
     PRG prg;
     vector<bool> pub_values;
     uint64_t reveal_counter = 0;
     Hash hash;
-    OnlinePADOEva(IO* io, OnlineHalfGateEva<IO>* gc, IKNP<IO>* in_ot = nullptr)
-        : PADOParty<IO>(io, BOB, in_ot) {
+    OnlinePrimusEva(IO* io, OnlineHalfGateEva<IO>* gc, IKNP<IO>* in_ot = nullptr)
+        : PrimusParty<IO>(io, BOB, in_ot) {
         this->gc = gc;
         if (in_ot == nullptr) {
             this->ot->setup_recv();

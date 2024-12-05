@@ -1,16 +1,16 @@
-#ifndef PADO_EVA_H__
-#define PADO_EVA_H__
+#ifndef PRIMUS_EVA_H__
+#define PRIMUS_EVA_H__
 #include "backend/primus_party.h"
 
 /* The evaluator (BOB) in the protocol */
 template <typename IO>
-class PADOEva : public PADOParty<IO> {
+class PrimusEva : public PrimusParty<IO> {
    public:
     OptHalfGateEva<IO>* gc;
     PRG prg;
     Hash hash;
-    PADOEva(IO* io, OptHalfGateEva<IO>* gc, IKNP<IO>* in_ot = nullptr)
-        : PADOParty<IO>(io, BOB, in_ot) {
+    PrimusEva(IO* io, OptHalfGateEva<IO>* gc, IKNP<IO>* in_ot = nullptr)
+        : PrimusParty<IO>(io, BOB, in_ot) {
         this->gc = gc;
         if (in_ot == nullptr) {
             this->ot->setup_recv();

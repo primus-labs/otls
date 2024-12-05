@@ -1,16 +1,16 @@
-#ifndef _OFFLINE_PADO_EVA_H_
-#define _OFFLINE_PADO_EVA_H_
+#ifndef _OFFLINE_PRIMUS_EVA_H_
+#define _OFFLINE_PRIMUS_EVA_H_
 #include "offline_hg_eva.h"
 #include "offline_primus_party.h"
 
 /* Offline evaluator (BOB) of the protocol */
 template <typename IO>
-class OfflinePADOEva : public OfflinePADOParty {
+class OfflinePrimusEva : public OfflinePrimusParty {
    public:
     IO* io;
     OfflineHalfGateEva<IO>* gc;
     vector<bool> pub_values;
-    OfflinePADOEva(IO* io, OfflineHalfGateEva<IO>* gc) : OfflinePADOParty(BOB) {
+    OfflinePrimusEva(IO* io, OfflineHalfGateEva<IO>* gc) : OfflinePrimusParty(BOB) {
         this->io = io;
         this->gc = gc;
     }

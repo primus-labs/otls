@@ -1,5 +1,5 @@
-#ifndef PADO_COM_COV_H
-#define PADO_COM_COV_H
+#ifndef PRIMUS_COM_COV_H
+#define PRIMUS_COM_COV_H
 #include <openssl/bn.h>
 #include <string.h>
 
@@ -582,4 +582,4 @@ class ComConv {
     }
 };
 
-#endif // PADO_COM_COV_H
+#endif // PRIMUS_COM_COV_H

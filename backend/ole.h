@@ -1,5 +1,5 @@
-#ifndef PADO_OLE_H
-#define PADO_OLE_H
+#ifndef PRIMUS_OLE_H
+#define PRIMUS_OLE_H
 #include "emp-ot/emp-ot.h"
 #include "backend/bn_utils.h"
 #include <iostream>

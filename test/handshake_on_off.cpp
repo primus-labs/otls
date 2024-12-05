@@ -228,7 +228,7 @@ int main(int argc, char** argv) {
     comm = io->counter;
 
     start = emp::clock_start();
-    auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
+    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
     handshake_test<NetIO>(io, io_opt, cot, party, ENABLE_ROUNDS_OPT);
     cout << "online time: " << dec << emp::time_from(start) << endl;

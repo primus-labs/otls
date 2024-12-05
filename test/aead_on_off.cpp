@@ -218,7 +218,7 @@ int main(int argc, char** argv) {
 
     switch_to_online<NetIO>(party);
     cout << "offline comm: " << io->counter - comm << endl;
-    auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
+    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
 
     comm = io->counter;

@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
     setup_protocol<NetIO>(io, ios, threads, party);
     cout << "protocol setup: " << emp::time_from(start) << " us" << endl;
 
-    auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
+    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
     ole_test<NetIO>(io, cot, party);
 

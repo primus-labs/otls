@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
 
     setup_protocol<NetIO>(io, ios, threads, party);
 
-    auto prot = (PADOParty<NetIO>*)(ProtocolExecution::prot_exec);
+    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
     handshake_test<NetIO>(io, io_opt, cot, party);
     finalize_protocol();

@@ -1,5 +1,5 @@
-#ifndef PADO_BN_UTILS_H__
-#define PADO_BN_UTILS_H__
+#ifndef PRIMUS_BN_UTILS_H__
+#define PRIMUS_BN_UTILS_H__
 
 #include <openssl/bn.h>
 #include "emp-tool/emp-tool.h"
@@ -135,4 +135,4 @@ inline void garble_gate_eval_halfgates(
     *out = W;
 }
 
-#endif // PADO_BN_UTILS_H__
+#endif // PRIMUS_BN_UTILS_H__

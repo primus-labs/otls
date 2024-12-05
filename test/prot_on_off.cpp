@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
     start = clock_start();
     comm = io->counter;
 
-    auto prot = (PADOParty<NetIO>*)(gc_prot_buf);
+    auto prot = (PrimusParty<NetIO>*)(gc_prot_buf);
     IKNP<NetIO>* cot = prot->ot;
     HandShake<NetIO>* hs = new HandShake<NetIO>(io, io_opt, cot, group);
 

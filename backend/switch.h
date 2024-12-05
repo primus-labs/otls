@@ -143,8 +143,8 @@ inline void switch_to_gc() {
 
 template <typename IO>
 void switch_to_online(int party) {
-    auto offline = (OfflinePADOParty*)offline_gc_prot_buf;
-    auto online = (PADOParty<IO>*)gc_prot_buf;
+    auto offline = (OfflinePrimusParty*)offline_gc_prot_buf;
+    auto online = (PrimusParty<IO>*)gc_prot_buf;
 
     sync_offline_online(offline, online, party);
     switch_to_gc();
