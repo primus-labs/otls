@@ -43,6 +43,8 @@ class AESProver {
     Integer fixed_iv;
     Integer nonce;
 
+    // `key` and `iv` are client(server) write key and iv respectively derived from master secret.
+    // Note the length of `key` is 16-bytes and the length of `iv` is 4-bytes.
     inline AESProver(Integer& key, Integer& iv) {
         assert(key.size() == 128);
         expanded_key = computeKS(key);
@@ -95,6 +97,9 @@ class AESProver {
         }
     }
 
+    // `iv_len` should be 8, the `iv` derived from master secret
+    // will be concated with this iv to form the full iv, the 
+    // length of which is 12-bytes.
     inline void set_nonce(const unsigned char* iv,
                           size_t iv_len) {
         assert(iv_len == 8);

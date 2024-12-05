@@ -39,6 +39,8 @@ class AEAD {
     vector<block> mul_hs;
 
     OLEF2K<IO>* ole = nullptr;
+    // `key` and `iv` are client(server) write key and iv respectively derived from master secret.
+    // Note the length of `key` is 16-bytes and the length of `iv` is 4-bytes.
     AEAD(IO* io, IO* io_opt, COT<IO>* ot, Integer& key, Integer& iv) {
         ole = new OLEF2K<IO>(io, ot);
         this->io_opt = io_opt;
@@ -119,6 +121,9 @@ class AEAD {
         }
     }
 
+    // `iv_len` should be 8, the `iv` derived from master secret
+    // will be concated with this iv to form the full iv, the 
+    // length of which is 12-bytes.
     inline void set_nonce(const unsigned char* iv,
                           size_t iv_len,
                           bool ENABLE_ONLINE_OFFLINE = true) {
@@ -549,6 +554,8 @@ class AEADOffline {
     Integer nonce;
     Integer fixed_iv;
 
+    // `key` and `iv` are client(server) write key and iv respectively derived from master secret.
+    // Note the length of `key` is 16-bytes and the length of `iv` is 4-bytes.
     AEADOffline(Integer& key, Integer& iv) {
         expanded_key = computeKS(key);
         Integer H = computeH();
