@@ -47,7 +47,7 @@ class HandShake {
     BIGNUM* q;
     BN_CTX* ctx;
 
-    BIGNUM* ta_pado;
+    BIGNUM* ta_primus;
     BIGNUM* tb_client;
     EC_POINT* Ta_client;
     EC_POINT* Ts;
@@ -71,7 +71,7 @@ class HandShake {
         this->group = group;
         q = BN_new();
         bn_pms = BN_new();
-        ta_pado = BN_new();
+        ta_primus = BN_new();
         tb_client = BN_new();
         Ta_client = EC_POINT_new(this->group);
         Ts = EC_POINT_new(this->group);
@@ -83,7 +83,7 @@ class HandShake {
         BN_CTX_free(ctx);
         BN_free(q);
         BN_free(bn_pms);
-        BN_free(ta_pado);
+        BN_free(ta_primus);
         BN_free(tb_client);
         EC_POINT_free(Ta_client);
         EC_POINT_free(Ts);
@@ -93,11 +93,11 @@ class HandShake {
     }
 
     // The Ts value is received from the Server.
-    inline void compute_pado_VA(EC_POINT* Va, const EC_POINT* Ts) {
-        compute_pado_VA(Va, ta_pado, Ts);
+    inline void compute_primus_VA(EC_POINT* Va, const EC_POINT* Ts) {
+        compute_primus_VA(Va, ta_primus, Ts);
     }
 
-    inline void compute_pado_VA(EC_POINT* Va, BIGNUM* t, const EC_POINT* Ts) {
+    inline void compute_primus_VA(EC_POINT* Va, BIGNUM* t, const EC_POINT* Ts) {
         BN_rand_range(t, EC_GROUP_get0_order(group));
 
         EC_POINT* Ta = EC_POINT_new(group);
@@ -332,7 +332,7 @@ class HandShake {
         aead_c->encrypt(io, ctxt, tag, ufinc, ufinc_len, aad, aad_len, iv, iv_len, party);
     }
 
-    // The ufins string is computed by pado and client, need to check the equality with the decrypted string
+    // The ufins string is computed by primus and client, need to check the equality with the decrypted string
     inline bool decrypt_server_finished_msg(AEAD<IO>* aead_s,
                                             unsigned char* msg,
                                             const unsigned char* ctxt,

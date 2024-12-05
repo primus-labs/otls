@@ -1,6 +1,6 @@
 #ifndef PADO_GEN_H__
 #define PADO_GEN_H__
-#include "backend/pado_party.h"
+#include "backend/primus_party.h"
 
 /* The generator (ALICE) in the protocol */
 template <typename IO>

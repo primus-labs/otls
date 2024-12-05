@@ -1,6 +1,6 @@
 #ifndef Online_PADO_GEN_H__
 #define Online_PADO_GEN_H__
-#include "backend/pado_party.h"
+#include "backend/primus_party.h"
 
 /* Offline evaluator (ALICE) of the protocol */
 template <typename IO>

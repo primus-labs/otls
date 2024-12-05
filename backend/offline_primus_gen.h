@@ -1,6 +1,6 @@
 #ifndef Offline_PADO_GEN_H__
 #define Offline_PADO_GEN_H__
-#include "offline_pado_party.h"
+#include "offline_primus_party.h"
 #include "offline_hg_gen.h"
 
 /* Offline generator (ALICE) of the protocol */

@@ -64,7 +64,7 @@ void full_protocol(IO* io, IO* io_opt, COT<IO>* cot, int party) {
     size_t aad_len = sizeof(aad);
     auto start = emp::clock_start();
     if (party == BOB) {
-        hs->compute_pado_VA(V, Ts);
+        hs->compute_primus_VA(V, Ts);
     } else {
         hs->compute_client_VB(Tc, V, Ts);
     }

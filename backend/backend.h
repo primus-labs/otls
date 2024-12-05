@@ -6,13 +6,13 @@
 #include "backend/offline_hg_gen.h"
 #include "backend/online_hg_gen.h"
 #include "backend/online_hg_eva.h"
-#include "backend/pado_gen.h"
-#include "backend/pado_eva.h"
-#include "backend/offline_pado_gen.h"
-#include "backend/offline_pado_eva.h"
-#include "backend/online_pado_gen.h"
-#include "backend/online_pado_eva.h"
-#include "backend/offline_pado_party.h"
+#include "backend/primus_gen.h"
+#include "backend/primus_eva.h"
+#include "backend/offline_primus_gen.h"
+#include "backend/offline_primus_eva.h"
+#include "backend/online_primus_gen.h"
+#include "backend/online_primus_eva.h"
+#include "backend/offline_primus_party.h"
 using namespace emp;
 
 /* Initialize the offline backend of two parties */

@@ -52,7 +52,7 @@ class PostRecord {
 
     inline void reveal_pms(EC_POINT* Ts) {
         if (party == BOB) {
-            send_bn(io, hs->ta_pado);
+            send_bn(io, hs->ta_primus);
         } else {
             BIGNUM* t = BN_new();
             recv_bn(io, t);

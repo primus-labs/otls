@@ -44,7 +44,7 @@ void post_record_test(IO* io, IO* io_opt, COT<IO>* cot, int party) {
     size_t aad_len = sizeof(aad);
 
     if (party == BOB) {
-        hs->compute_pado_VA(V, Ts);
+        hs->compute_primus_VA(V, Ts);
     } else {
         hs->compute_client_VB(Tc, V, Ts);
     }

@@ -67,7 +67,7 @@ void handshake_test(
     size_t aad_len = sizeof(aad);
 
     if (party == BOB) {
-        hs->compute_pado_VA(V, Ts);
+        hs->compute_primus_VA(V, Ts);
     } else {
         hs->compute_client_VB(Tc, V, Ts);
     }
@@ -128,7 +128,7 @@ void handshake_test(
 
     // prove handshake
     if (party == BOB) {
-        send_bn(io, hs->ta_pado);
+        send_bn(io, hs->ta_primus);
     } else {
         recv_bn(io, t);
         EC_POINT* T = EC_POINT_new(hs->group);

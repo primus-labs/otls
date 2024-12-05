@@ -1,7 +1,7 @@
 #ifndef _OFFLINE_PADO_EVA_H_
 #define _OFFLINE_PADO_EVA_H_
 #include "offline_hg_eva.h"
-#include "offline_pado_party.h"
+#include "offline_primus_party.h"
 
 /* Offline evaluator (BOB) of the protocol */
 template <typename IO>
