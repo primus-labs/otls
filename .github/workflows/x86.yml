@@ -5,7 +5,7 @@ jobs:
   build_x86:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         build_type: [Debug, Release]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -16,7 +16,7 @@ jobs:
     - name: install dependency
       run: |
         wget https://raw.githubusercontent.com/emp-toolkit/emp-readme/master/scripts/install.py
-        python3 install.py --deps --tool --ot
+        python3 install.py --deps --tool --ot --zk
     - name: Create Build Environment
       run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE && make
     - name: Test
