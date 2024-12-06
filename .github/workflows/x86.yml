@@ -22,4 +22,5 @@ jobs:
     - name: Test
       shell: bash
       run: |
+        mkdir data
         ctest --output-on-failure
