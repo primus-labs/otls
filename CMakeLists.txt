@@ -2,27 +2,33 @@ cmake_minimum_required (VERSION 3.0)
 project (otls)
 set(NAME "otls")
 
-IF(ENABLE_WASM)
+IF(ENABLE_WASM OR ENABLE_ANDROID)
   set(CMAKE_FOLDER ${CMAKE_PREFIX_PATH})
+  IF(ENABLE_ANDROID)
+    set(CMAKE_FOLDER ${CMAKE_PREFIX_PATHA})
+  ENDIF()
   include(${CMAKE_FOLDER}/cmake/emp-base.cmake)
 
   find_package(OpenSSL REQUIRED)
   include_directories(${OPENSSL_INCLUDE_DIR})
 
-  set(EMP-TOOL_INCLUDE_DIRS ${CMAKE_PREFIX_PATH}/include)
-  set(EMP-TOOL_LIBRARIES ${CMAKE_PREFIX_PATH}/lib/libemp-tool.a ${OPENSSL_LIBRARIES})
+  set(EMP-TOOL_INCLUDE_DIRS ${CMAKE_FOLDER}/include)
+  set(EMP-TOOL_LIBRARIES ${CMAKE_FOLDER}/lib/libemp-tool.a ${OPENSSL_LIBRARIES})
   include_directories(${EMP-TOOL_INCLUDE_DIRS})
 
-  set(EMP-OT_INCLUDE_DIRS ${CMAKE_PREFIX_PATH}/include)
+  set(EMP-OT_INCLUDE_DIRS ${CMAKE_FOLDER}/include)
   set(EMP-OT_LIBRARIES "")
   include_directories(${EMP-OT_INCLUDE_DIRS})
 
-  set(EMP-ZK_INCLUDE_DIRS ${CMAKE_PREFIX_PATH}/include)
-  set(EMP-ZK_LIBRARIES ${CMAKE_PREFIX_PATH}/lib/libemp-zk.a)
+  set(EMP-ZK_INCLUDE_DIRS ${CMAKE_FOLDER}/include)
+  set(EMP-ZK_LIBRARIES ${CMAKE_FOLDER}/lib/libemp-zk.a)
   include_directories(${EMP-ZK_INCLUDE_DIRS})
 
   set(NO_WARN_FLAGS "-Wno-unused-function -Wno-unused-command-line-argument")
-  set(CCFLAGS "-msimd128 -msse -msse2 -msse4.1 -msse4.2 -s ASSERTIONS=1")
+  set(CCFLAGS "-msse -msse2 -msse4.1 -msse4.2")
+  IF(ENABLE_WASM)
+    set(CCFLAGS "-msimd128 ${CCFLAGS}")
+  ENDIF()
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${NO_WARN_FLAGS} ${CCFLAGS}")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${NO_WARN_FLAGS} ${CCFLAGS}")
 ELSE()
@@ -40,6 +46,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 set(sources
   backend/switch.cpp
   cipher/utils.cpp
+  cipher/circuit_files/aes128_ks_data.cpp
+  cipher/circuit_files/aes128_with_ks_data.cpp
 )
 add_compile_options(-fPIC)
 add_library(otls ${sources})
