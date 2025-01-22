@@ -36,6 +36,14 @@ set(sources
   backend/switch.cpp
   cipher/utils.cpp
 )
+option(LOAD_CIRCUIT_FROM_MEM "" OFF)
+IF(LOAD_CIRCUIT_FROM_MEM)
+  add_definitions(-DLOAD_CIRCUIT_FROM_MEM=1)
+  list(APPEND sources
+    cipher/circuit_files/aes128_ks_data.cpp
+    cipher/circuit_files/aes128_with_ks_data.cpp
+  )
+ENDIF()
 option(USE_PRIMUS_EMP "use primus emp" OFF)
 IF(USE_PRIMUS_EMP)
   add_definitions(-DUSE_PRIMUS_EMP=1)
