@@ -74,17 +74,26 @@ inline void garble_gate_garble_halfgates(block LA0,
         HB1 = keys[3] ^ masks[3];
     }
 
+    // table[0] = HLA0 ^ HA1;
+    // if (pb)
+    //     table[0] = table[0] ^ delta;
+    // W0 = HLA0;
+    // if (pa)
+    //     W0 = W0 ^ table[0];
+    // tmp = HLB0 ^ HB1;
+    // table[1] = tmp ^ LA0;
+    // W0 = W0 ^ HLB0;
+    // if (pb)
+    //     W0 = W0 ^ tmp;
+
     table[0] = HLA0 ^ HA1;
-    if (pb)
-        table[0] = table[0] ^ delta;
+    table[0] = table[0] ^ (select_mask[pb] & delta);
     W0 = HLA0;
-    if (pa)
-        W0 = W0 ^ table[0];
+    W0 = W0 ^ (select_mask[pa] & table[0]);
     tmp = HLB0 ^ HB1;
     table[1] = tmp ^ LA0;
     W0 = W0 ^ HLB0;
-    if (pb)
-        W0 = W0 ^ tmp;
+    W0 = W0 ^ (select_mask[pb] & tmp);
 
     *out0 = W0;
     *out1 = *out0 ^ delta;
@@ -126,12 +135,10 @@ inline void garble_gate_eval_halfgates(
     }
 
     W = HA ^ HB;
-    if (sa)
-        W = W ^ table[0];
-    if (sb) {
-        W = W ^ table[1];
-        W = W ^ A;
-    }
+    W = W ^ (select_mask[sa] & table[0]);
+    W = W ^ (select_mask[sb] & table[1]);
+    W = W ^ (select_mask[sb] & A);
+
     *out = W;
 }
 
