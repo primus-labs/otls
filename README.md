@@ -1,15 +1,21 @@
 ## Installation
-### Install Emp-Toolkit
-`otls` is dependent on `emp-toolkit`. If you have installed `emp-toolkit`, you can skip this section. Otherwise, follow the below instructions.
-1. `wget https://raw.githubusercontent.com/emp-toolkit/emp-readme/master/scripts/install.py`
-2. `python install.py --deps --tool --ot --zk`
-    1. You can use `--ot=[release]` to install a particular branch or release
-    2. By default it will build for Release. `-DCMAKE_BUILD_TYPE=[Release|Debug]` option is also available.
-    3. No sudo? Change [`CMAKE_INSTALL_PREFIX`](https://cmake.org/cmake/help/v2.8.8/cmake.html#variable%3aCMAKE_INSTALL_PREFIX).
+### Install Primus-Emp
+`otls` is dependent on `primus-emp`.
+```bash
+git clone https://github.com/primus-labs/primus-emp.git
+
+# Building
+bash ./primus-emp/compile.sh
+
+```
 
 ### Install OTLS
-1. `wget https://raw.githubusercontent.com/primus-labs/otls/main/install.sh`
-2. `bash install.sh`
+```bash
+git clone https://github.com/primus-labs/otls.git
+
+# Building
+bash ./otls/compile.sh
+```
 
 ## Introduction
 `otls` provides primitive building blocks for proving `TLS` with `IZK` without leaking private information. Currently, it has implemented `SHA256` and `AES128-GCM`. In other words, it can prove TLS 1.2 with two cipher suites: `ECDHE-RSA-AES128-GCM-SHA256` and `ECDHE-ECDSA-AES128-GCM-SHA256`. It has two proving models, `Proxy Model` and `MPC Model`.
