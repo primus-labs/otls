@@ -3,7 +3,9 @@
 #include "cipher/utils.h"
 #include "backend/backend.h"
 #include "protocol/aead_izk.h"
+#include "io_utils.h"
 
+int threads = 4;
 void aead_encrypt_test_offline(bool sec_type = false) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
@@ -56,7 +58,7 @@ void aead_encrypt_test(
     unsigned char* ctxt = new unsigned char[msg_len];
     unsigned char tag[16];
 
-    auto comm = io->counter;
+    auto comm = io->counter; 
     AEAD<NetIO>* aead = new AEAD<NetIO>(io, io_opt, ot, key, fixed_iv);
     cout << "constructor comm: " << io->counter - comm << endl;
 
@@ -196,45 +198,46 @@ void aead_decrypt_test(
     delete aead_proof;
 }
 
-int threads = 1;
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
-    NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
-    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + 1);
+    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
+    NetIO* io[threads];
     BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; i++)
-        ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+    for (int i = 0; i < threads; i++) {
+        io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
+        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+    }
 
     bool sec_type = false;
 
     auto start = emp::clock_start();
-    auto comm = io->counter;
-    setup_protocol(io, ios, threads, party, true);
+    auto comm = getComm(io, threads, io_opt);
+    setup_protocol(io[0], ios, threads, party, true);
     aead_encrypt_test_offline(sec_type);
     aead_decrypt_test_offline(sec_type);
     cout << "offline time: " << emp::time_from(start) << " us" << endl;
 
     switch_to_online<NetIO>(party);
-    cout << "offline comm: " << io->counter - comm << endl;
+    cout << "offline comm: " << getComm(io, threads, io_opt) - comm << endl;
     auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
 
-    comm = io->counter;
+    comm = getComm(io, threads, io_opt);
     start = emp::clock_start();
-    aead_encrypt_test(io, io_opt, cot, party, sec_type);
-    aead_decrypt_test(io, io_opt, cot, party, sec_type);
+    aead_encrypt_test(io[0], io_opt, cot, party, sec_type);
+    aead_decrypt_test(io[0], io_opt, cot, party, sec_type);
     cout << "online time: " << dec << emp::time_from(start) << " us" << endl;
-    cout << "online comm: " << io->counter - comm << endl;
+    cout << "online comm: " << getComm(io, threads, io_opt) - comm << endl;
 
     finalize_protocol();
     bool cheat = CheatRecord::cheated();
     if (cheat)
         error("cheat!\n");
-    delete io;
     delete io_opt;
     for (int i = 0; i < threads; i++) {
         delete ios[i];
+        delete io[i];
     }
 }

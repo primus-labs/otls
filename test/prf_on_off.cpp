@@ -4,6 +4,7 @@
 #include "cipher/hmac_sha256.h"
 #include "backend/switch.h"
 #include "backend/check_zero.h"
+#include "io_utils.h"
 
 #include <iostream>
 #include <vector>
@@ -87,22 +88,24 @@ void zk_gc_prf_test(int party, bool flag = false) {
     }
 }
 
-int threads = 1;
+int threads = 4;
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
-    NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
+    NetIO* io[threads];
     BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; i++)
-        ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+    for (int i = 0; i < threads; i++) {
+        io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
+        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+    }
 
     auto start = emp::clock_start();
-    setup_protocol(io, ios, threads, party, true);
+    setup_protocol(io[0], ios, threads, party, true);
 
     zk_gc_prf_test_offline(party);
 
     cout << "offline time: " << emp::time_from(start) << " us" << endl;
-    auto comm = io->counter;
+    auto comm = getComm(io, threads, nullptr);
     cout << "offline comm: " << comm << endl;
 
     switch_to_online<NetIO>(party);
@@ -111,16 +114,16 @@ int main(int argc, char** argv) {
     zk_gc_prf_test(party, true);
     cout << "online time: " << emp::time_from(start) << " us" << endl;
     if (party == ALICE)
-        cout << "ALICE online comm: " << io->counter - comm << endl;
+        cout << "ALICE online comm: " << getComm(io, threads, nullptr) - comm << endl;
     else
-        cout << "BOB online comm: " << io->counter - comm << endl;
+        cout << "BOB online comm: " << getComm(io, threads, nullptr) - comm << endl;
 
     finalize_protocol();
     bool cheat = CheatRecord::cheated();
     if (cheat)
         error("cheat!\n");
-    delete io;
     for (int i = 0; i < threads; i++) {
         delete ios[i];
+	delete io[i];
     }
 }

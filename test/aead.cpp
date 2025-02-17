@@ -148,34 +148,41 @@ void aead_decrypt_test(
     }
 }
 
-int threads = 1;
+int threads = 4;
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
-    NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
-    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + 1);
+    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
+    NetIO* io[threads];
     BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; i++)
-        ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+    for (int i = 0; i < threads; i++) {
+        io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
+        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+    }
 
-    setup_protocol(io, ios, threads, party);
+    setup_protocol(io[0], ios, threads, party);
     auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
 
-    aead_encrypt_test(io, io_opt, cot, party);
-    aead_decrypt_test(io, io_opt, cot, party, true);
+    aead_encrypt_test(io[0], io_opt, cot, party);
+    aead_decrypt_test(io[0], io_opt, cot, party, true);
     convert(party);
     cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and() << endl;
     finalize_protocol();
-    cout << io->counter << endl;
+    size_t totalCounter = 0;
+    for (int i = 0; i < threads; i++) {
+        totalCounter += io[i]->counter;
+    }
+    totalCounter += io_opt->counter;
+    cout << totalCounter << endl;
 
     bool cheat = CheatRecord::cheated();
     if (cheat)
         error("cheat!\n");
-    delete io;
     delete io_opt;
     for (int i = 0; i < threads; i++) {
         delete ios[i];
+        delete io[i];
     }
 }

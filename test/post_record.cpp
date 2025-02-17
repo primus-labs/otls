@@ -190,24 +190,26 @@ void post_record_test(IO* io, IO* io_opt, COT<IO>* cot, int party) {
     EC_GROUP_free(group);
 }
 
-const int threads = 1;
+const int threads = 4;
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
-    NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
-    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + 1);
+    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
+    NetIO* io[threads];
     BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; i++)
-        ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+    for (int i = 0; i < threads; i++) {
+        io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
+        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+    }
 
     auto start = emp::clock_start();
-    setup_protocol<NetIO>(io, ios, threads, party);
+    setup_protocol<NetIO>(io[0], ios, threads, party);
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
     auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
     start = emp::clock_start();
-    post_record_test<NetIO>(io, io_opt, cot, party);
+    post_record_test<NetIO>(io[0], io_opt, cot, party);
     cout << "post_record time: " << emp::time_from(start) << " us" << endl;
     finalize_protocol();
 
@@ -215,10 +217,10 @@ int main(int argc, char** argv) {
     if (cheat)
         error("cheat!\n");
 
-    delete io;
     delete io_opt;
     for (int i = 0; i < threads; i++) {
         delete ios[i];
+        delete io[i];
     }
     return 0;
 }

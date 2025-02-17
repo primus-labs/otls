@@ -173,17 +173,19 @@ void zk_gc_hmac_test() {
     delete[] dig;
 }
 
-int threads = 1;
+int threads = 4;
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
-    NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
 
+    NetIO* io[threads];
     BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; i++)
-        ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+    for (int i = 0; i < threads; i++) {
+        io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
+        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+    }
 
-    setup_protocol(io, ios, threads, party);
+    setup_protocol(io[0], ios, threads, party);
     zk_gc_hmac_test();
     hmac_sha256test();
     finalize_protocol();
@@ -201,8 +203,8 @@ int main(int argc, char** argv) {
     if (cheat)
         error("cheat!\n");
 
-    delete io;
     for (int i = 0; i < threads; i++) {
+        delete io[i];
         delete ios[i];
     }
 }

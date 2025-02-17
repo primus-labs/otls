@@ -2,6 +2,7 @@
 #include "backend/backend.h"
 #include <iostream>
 #include "backend/bn_utils.h"
+#include "io_utils.h"
 
 using namespace std;
 using namespace emp;
@@ -200,48 +201,50 @@ void handshake_test(
     EC_GROUP_free(group);
 }
 
-const int threads = 1;
+const int threads = 4;
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
-    NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
-    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + 1);
+    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
+    NetIO* io[threads];
     BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; i++)
-        ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+    for (int i = 0; i < threads; i++) {
+        io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
+        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+    }
 
     auto start = emp::clock_start();
-    auto comm = io->counter;
-    setup_protocol<NetIO>(io, ios, threads, party, true);
+    auto comm = getComm(io, threads, io_opt); 
+    setup_protocol<NetIO>(io[0], ios, threads, party, true);
     cout << "setup time: " << dec << emp::time_from(start) << endl;
-    cout << "setup comm: " << io->counter << endl;
+    cout << "setup comm: " << getComm(io, threads, io_opt) << endl;
 
-    comm = io->counter;
+    comm = getComm(io, threads, io_opt);
     start = emp::clock_start();
     bool ENABLE_ROUNDS_OPT = false;
     handshake_test_offline(ENABLE_ROUNDS_OPT);
     switch_to_online<NetIO>(party);
     cout << "offline time: " << dec << emp::time_from(start) << endl;
-    cout << "offline comm: " << io->counter - comm << endl;
+    cout << "offline comm: " << getComm(io, threads, io_opt) - comm << endl;
 
-    comm = io->counter;
+    comm = getComm(io, threads, io_opt);
 
     start = emp::clock_start();
     auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
-    handshake_test<NetIO>(io, io_opt, cot, party, ENABLE_ROUNDS_OPT);
+    handshake_test<NetIO>(io[0], io_opt, cot, party, ENABLE_ROUNDS_OPT);
     cout << "online time: " << dec << emp::time_from(start) << endl;
-    cout << "online comm: " << io->counter - comm << endl;
+    cout << "online comm: " << getComm(io, threads, io_opt) - comm << endl;
     finalize_protocol();
 
     bool cheat = CheatRecord::cheated();
     if (cheat)
         error("cheat!\n");
-    delete io;
     delete io_opt;
     for (int i = 0; i < threads; i++) {
         delete ios[i];
+        delete io[i];
     }
     return 0;
 }

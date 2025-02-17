@@ -13,6 +13,7 @@
 #include <sys/resource.h>
 #include <mach/mach.h>
 #endif
+#include "io_utils.h"
 
 using namespace std;
 using namespace emp;
@@ -77,27 +78,26 @@ bool prove_prf(int party) {
     return res;
 }
 
-const int threads = 1;
+const int threads = 4;
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io[threads];
+    BoolIO<NetIO>* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-    }
-    BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; i++)
         ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+    }
 
     auto start = emp::clock_start();
-    auto comm = io[0]->counter;
+    auto comm = getComm(io, threads, nullptr);
 
     setup_proxy_protocol(ios, threads, party);
 
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
-    cout << "setup comm: " << (io[0]->counter - comm) * 1.0 / 1024 << " Kbytes" << endl;
+    cout << "setup comm: " << (getComm(io, threads, nullptr) - comm) * 1.0 / 1024 << " Kbytes" << endl;
 
-    comm = io[0]->counter;
+    comm = getComm(io, threads, nullptr);
 
     start = emp::clock_start();
     bool res = prove_prf(party);
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
         error("cheated\n");
 
     cout << "prove time: " << emp::time_from(start) << " us" << endl;
-    cout << "prove comm: " << (io[0]->counter - comm) * 1.0 / 1024 << " Kbytes" << endl;
+    cout << "prove comm: " << (getComm(io, threads, nullptr) - comm) * 1.0 / 1024 << " Kbytes" << endl;
 #if defined(__linux__)
     struct rusage rusage;
     if (!getrusage(RUSAGE_SELF, &rusage))
@@ -132,8 +132,8 @@ int main(int argc, char** argv) {
 #endif
 
     for (int i = 0; i < threads; ++i) {
-        delete ios[i]->io;
         delete ios[i];
+        delete io[i];
     }
 
     return 0;

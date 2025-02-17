@@ -16,6 +16,7 @@
 #include <sys/resource.h>
 #include <mach/mach.h>
 #endif
+#include "io_utils.h"
 
 using namespace std;
 using namespace emp;
@@ -23,7 +24,7 @@ using namespace emp;
 const size_t QUERY_BYTE_LEN = 2 * 1024;
 const size_t RESPONSE_BYTE_LEN = 2 * 1024;
 
-const int threads = 1;
+const int threads = 4;
 
 void full_protocol_offline() {
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
@@ -186,42 +187,44 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
-    NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
-    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + 1);
+    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
+    NetIO* io[threads];
     BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; i++)
-        ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+    for (int i = 0; i < threads; i++) {
+        io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
+        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+    }
 
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
 
     auto start = emp::clock_start();
-    auto comm = io->counter;
-    setup_protocol<NetIO>(io, ios, threads, party, true);
+    auto comm = getComm(io, threads, io_opt);
+    setup_protocol<NetIO>(io[0], ios, threads, party, true);
     // setup_protocol<NetIO>(io, ios, threads, party);
 
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
-    cout << "setup comm: " << io->counter << endl;
+    cout << "setup comm: " << getComm(io, threads, io_opt) << endl;
 
     start = clock_start();
-    comm = io->counter;
+    comm = getComm(io, threads, io_opt);
 
     auto prot = (PrimusParty<NetIO>*)(gc_prot_buf);
     IKNP<NetIO>* cot = prot->ot;
-    HandShake<NetIO>* hs = new HandShake<NetIO>(io, io_opt, cot, group);
+    HandShake<NetIO>* hs = new HandShake<NetIO>(io[0], io_opt, cot, group);
 
     full_protocol_offline();
     hs->compute_pms_offline(party);
 
     switch_to_online<NetIO>(party);
     cout << "offline time: " << emp::time_from(start) << " us" << endl;
-    cout << "offline comm: " << io->counter - comm << endl;
+    cout << "offline comm: " << getComm(io, threads, io_opt) - comm << endl;
 
     start = emp::clock_start();
-    comm = io->counter;
-    full_protocol<NetIO>(hs, io, io_opt, cot, party);
+    comm = getComm(io, threads, io_opt);
+    full_protocol<NetIO>(hs, io[0], io_opt, cot, party);
     cout << "online time: " << emp::time_from(start) << " us" << endl;
-    cout << "online comm: " << io->counter - comm << endl;
+    cout << "online comm: " << getComm(io, threads, io_opt) - comm << endl;
 
     cout << "gc AND gates: " << dec << gc_circ_buf->num_and() << endl;
     cout << "zk AND gates: " << dec << zk_circ_buf->num_and() << endl;
@@ -248,10 +251,10 @@ int main(int argc, char** argv) {
     else
         std::cout << "[Mac]Query RSS failed" << std::endl;
 #endif
-    cout << "comm: " << ((io->counter) * 1.0) / 1024 << " KBytes" << endl;
-    delete io;
+    cout << "comm: " << (getComm(io, threads, io_opt) * 1.0) / 1024 << " KBytes" << endl;
     for (int i = 0; i < threads; i++) {
         delete ios[i];
+        delete io[i];
     }
     delete io_opt;
     return 0;

@@ -5,21 +5,23 @@
 
 using namespace std;
 
-int threads = 1;
+int threads = 4;
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
-    NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
+    NetIO* io[threads];
     BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; i++)
-        ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+    for (int i = 0; i < threads; i++) {
+        io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
+        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+    }
 
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
     BIGNUM* q = BN_new();
     BN_CTX* ctx = BN_CTX_new();
     EC_GROUP_get_curve(group, q, NULL, NULL, ctx);
 
-    setup_protocol(io, ios, threads, party, true);
+    setup_protocol(io[0], ios, threads, party, true);
 
     Integer a(BN_num_bytes(q) * 8, 0, ALICE);
     Integer b(BN_num_bytes(q) * 8, 0, BOB);
@@ -43,8 +45,8 @@ int main(int argc, char** argv) {
 
         BN_bn2bin(aint, achar);
 
-        io->send_data(achar, 32);
-        io->recv_data(bchar, 32);
+        io[0]->send_data(achar, 32);
+        io[0]->recv_data(bchar, 32);
 
         unsigned char* aachar = new unsigned char[32];
         memcpy(aachar, achar, 32);
@@ -60,8 +62,8 @@ int main(int argc, char** argv) {
 
         BN_bn2bin(bint, bchar);
 
-        io->recv_data(achar, 32);
-        io->send_data(bchar, 32);
+        io[0]->recv_data(achar, 32);
+        io[0]->send_data(bchar, 32);
 
         unsigned char* bbchar = new unsigned char[32];
         memcpy(bbchar, bchar, 32);
@@ -101,5 +103,8 @@ int main(int argc, char** argv) {
     BN_free(q);
     BN_CTX_free(ctx);
     finalize_backend();
-    delete io;
+    for (int i = 0; i < threads; i++) {
+        delete ios[i];
+        delete io[i];
+    }
 }

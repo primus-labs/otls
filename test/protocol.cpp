@@ -16,6 +16,7 @@
 #include <sys/resource.h>
 #include <mach/mach.h>
 #endif
+#include "io_utils.h"
 
 using namespace std;
 using namespace emp;
@@ -174,19 +175,21 @@ void full_protocol(IO* io, IO* io_opt, COT<IO>* cot, int party) {
 int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
-    NetIO* io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
-    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + 1);
+    NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
+    NetIO* io[threads];
     BoolIO<NetIO>* ios[threads];
-    for (int i = 0; i < threads; i++)
-        ios[i] = new BoolIO<NetIO>(io, party == ALICE);
+    for (int i = 0; i < threads; i++) {
+        io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
+        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+    }
 
     auto start = emp::clock_start();
-    setup_protocol<NetIO>(io, ios, threads, party);
+    setup_protocol<NetIO>(io[0], ios, threads, party);
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
     auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
     IKNP<NetIO>* cot = prot->ot;
-    full_protocol<NetIO>(io, io_opt, cot, party);
+    full_protocol<NetIO>(io[0], io_opt, cot, party);
     cout << "total time: " << emp::time_from(start) << " us" << endl;
 
     cout << "gc AND gates: " << dec << gc_circ_buf->num_and() << endl;
@@ -214,11 +217,11 @@ int main(int argc, char** argv) {
     else
         std::cout << "[Mac]Query RSS failed" << std::endl;
 #endif
-    cout << "comm: " << ((io->counter) * 1.0) / 1024 << " KBytes" << endl;
-    delete io;
+    cout << "comm: " << (getComm(io, threads, io_opt) * 1.0) / 1024 << " KBytes" << endl;
     delete io_opt;
     for (int i = 0; i < threads; i++) {
         delete ios[i];
+        delete io[i];
     }
     return 0;
 }
