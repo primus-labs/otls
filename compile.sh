@@ -1,4 +1,12 @@
 #!/bin/bash
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 \${path_to_primus_emp}"
+    exit 1;
+fi
+
+primus_emp_dir=$1
+primus_emp_installdir=${primus_emp_dir}/install
+
 curdir=$(pwd)
 builddir=${curdir}/build
 installdir=${curdir}/install
@@ -19,22 +27,18 @@ repo=otls
 #
 # ######################
 echo "compile ${repo}"
-repo_dir=${curdir}/${repo}
-if [ -d ${repo_dir} ]; then
-  mkdir -p ${builddir}/${repo}
-  cd ${builddir}/${repo}
+repo_dir=${curdir}
+mkdir -p ${builddir}/${repo}
+cd ${builddir}/${repo}
 
-  cmake ${repo_dir} \
-    -DTHREADING=${enable_threading} \
-    -DENABLE_OTLS_TEST=${enable_test} \
-    -DCMAKE_INSTALL_PREFIX=${installdir} \
-    -DCMAKE_PREFIX_PATH=${installdir} \
-    -DCMAKE_BUILD_TYPE=${build_type}
-  make -j4
-  make install
-else
-  echo "${repo} not exist!"
-fi
+cmake ${repo_dir} \
+  -DTHREADING=${enable_threading} \
+  -DENABLE_OTLS_TEST=${enable_test} \
+  -DCMAKE_INSTALL_PREFIX=${installdir} \
+  -DCMAKE_PREFIX_PATH=${primus_emp_installdir} \
+  -DCMAKE_BUILD_TYPE=${build_type}
+make -j4
+make install
 
 cd ${curdir}
 exit 0
