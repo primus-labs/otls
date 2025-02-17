@@ -3,18 +3,20 @@
 `otls` is dependent on `primus-emp`.
 ```bash
 git clone https://github.com/primus-labs/primus-emp.git
+cd primus-emp
 
 # Building
-bash ./primus-emp/compile.sh
+bash ./compile.sh
 
 ```
 
 ### Install OTLS
 ```bash
 git clone https://github.com/primus-labs/otls.git
+cd otls
 
 # Building
-bash ./otls/compile.sh
+bash ./compile.sh
 ```
 
 ## Introduction
