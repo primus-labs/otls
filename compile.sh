@@ -1,10 +1,12 @@
 #!/bin/bash
-if [ $# -ne 1 ]; then
-    echo "Usage: $0 \${path_to_primus_emp}"
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 \${path_to_primus_emp} \${build_type}"
     exit 1;
 fi
 
 primus_emp_dir=$1
+echo "primus_emp_dir: ${primus_emp_dir}"
+build_type=${2:-"Release"}
 primus_emp_installdir=${primus_emp_dir}/install
 
 curdir=$(pwd)
@@ -12,7 +14,6 @@ builddir=${curdir}/build
 installdir=${curdir}/install
 mkdir -p ${builddir} ${installdir}
 
-build_type=${1:-"Release"}
 enable_threading=ON
 enable_test=ON
 

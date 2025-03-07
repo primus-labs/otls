@@ -5,7 +5,7 @@ jobs:
   build_x86:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
         build_type: [Debug, Release]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -15,12 +15,16 @@ jobs:
     - uses: actions/checkout@v2
     - name: install dependency
       run: |
-        wget https://raw.githubusercontent.com/emp-toolkit/emp-readme/master/scripts/install.py
-        python3 install.py --deps --tool --ot --zk
+        uname -a
+        git clone --recursive https://github.com/primus-labs/primus-emp
+        cd primus-emp
+        ./compile.sh $BUILD_TYPE
     - name: Create Build Environment
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE && make
+      run: |
+        ./compile.sh $GITHUB_WORKSPACE/primus-emp $BUILD_TYPE
     - name: Test
       shell: bash
       run: |
-        mkdir data
+        cd build/otls
+        mkdir -p data
         ctest --output-on-failure

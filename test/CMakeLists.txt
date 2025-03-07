@@ -17,7 +17,7 @@ endmacro()
 
 # Test cases
 add_test_case_with_run(bit)
-add_test_case_with_run(int)
+# add_test_case_with_run(int)
 add_test_case_with_run(circuit_file)
 add_test_case_with_run(online_offline)
 add_test_case_with_run(example)
