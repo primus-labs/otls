@@ -1,13 +1,13 @@
-name: x86
+name: arm 
 on: [push, pull_request]
 
 jobs:
-  build_x86:
+  build_arm:
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-13]
+        os: [ubuntu-22.04-arm, macos-latest]
         build_type: [Debug, Release]
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{matrix.os}}
     timeout-minutes: 30
     env:
       BUILD_TYPE: ${{matrix.build_type}}
