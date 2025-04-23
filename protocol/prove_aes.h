@@ -14,7 +14,27 @@
 template <typename IO>
 void setup_proxy_protocol(BoolIO<IO>** ios, int threads, int party) {
     init_files();
-    setup_zk_bool<BoolIO<IO>>(ios, threads, party);
+#if USE_PRIMUS_EMP
+    FunctionWrapperV3(
+      [ios, threads, party]() {
+          setup_zk_bool<BoolIO<IO>>(ios, threads, party);
+      },
+      [](const char* e) {
+          throw std::runtime_error(e);
+      })();
+
+    CHECK_INITIALIZE_EXCEPTION();
+#else
+    try {
+        setup_zk_bool<BoolIO<IO>>(ios, threads, party);
+    }
+    catch(std::exception& e) {
+        throw std::runtime_error(e.what());
+    }
+    catch(...) {
+        throw std::runtime_error("unknow error");
+    }
+#endif
 }
 
 template <typename IO>
