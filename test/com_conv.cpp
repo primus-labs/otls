@@ -108,6 +108,7 @@ int main(int argc, char** argv) {
     unsigned char* val = new unsigned char[array_len / 8];
     prg.random_data(val, array_len / 8);
     Integer input(array_len, val, ALICE);
+    ios[0]->flush();
 
     com_conv_test<NetIO>(io[0], cot, fcot->Delta, party, input, array_len);
     finalize_protocol();
