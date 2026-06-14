@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #include "emp-tool/emp-tool.h"
+#include "compat/primus_compat.h"  // FULLPORT: Integer = UnsignedInt_T<block>（上游 emp）
 #include <iostream>
 #include <vector>
 #include <string>
@@ -110,7 +111,7 @@ inline void intvec_to_int(Integer& out, Integer* in, size_t len) {
     out = Integer(s * len, 0, PUBLIC);
     Integer tmp = Integer(s * len, 0, PUBLIC);
     for (size_t i = 0; i < len; i++) {
-        in[i].resize(s * len, false);
+        in[i].resize(s * len);  // FULLPORT: 上游 resize 单参(零扩展); fork 第二参 false=零扩展, 语义等价
         out ^= ((tmp ^ in[i]) << ((len - 1 - i) * s));
     }
 }
@@ -221,14 +222,14 @@ inline block ghash(block h, block* x, size_t m) {
 /* Compute the key schedule circuit, will be reused */
 inline Integer computeKS(Integer& key) {
     Integer o(1408, 0, PUBLIC);
-    aes_ks->compute(o.bits.data(), key.bits.data(), nullptr);
+    aes_ks->compute<block>(o.bits.data(), key.bits.data(), nullptr);  // FULLPORT: 上游 BristolFormat::compute<Wire>, 显式 <block>
     return o;
 }
 
 /* Compute the AES circuit, assuming KS is finished */
 inline Integer computeAES_KS(Integer& key, Integer& msg) {
     Integer o(128, 0, PUBLIC);
-    aes_enc_ks->compute(o.bits.data(), key.bits.data(), msg.bits.data());
+    aes_enc_ks->compute<block>(o.bits.data(), key.bits.data(), msg.bits.data());  // FULLPORT: 显式 <block>
     reverse(o.bits.begin(), o.bits.end());
     return o;
 }

@@ -11,22 +11,13 @@
 #include "emp-tool/emp-tool.h"
 #include "cipher/utils.h"
 
-template <typename IO>
-void setup_proxy_protocol(BoolIO<IO>** ios, int threads, int party) {
+// FULLPORT: 上游 emp-zk-bool 是单 IO/单线程: setup_zk_bool(BoolIO*, party).
+// fork 的 (ios[], threads) 多通道架构在首版迁移收敛为单 BoolIO（接受单线程）。
+// USE_PRIMUS_EMP/FunctionWrapperV3 是 fork 专有, 删除, 用普通 try/catch。
+inline void setup_proxy_protocol(emp::BoolIO* io, int party) {
     init_files();
-#if USE_PRIMUS_EMP
-    FunctionWrapperV3(
-      [ios, threads, party]() {
-          setup_zk_bool<BoolIO<IO>>(ios, threads, party);
-      },
-      [](const char* e) {
-          throw std::runtime_error(e);
-      })();
-
-    CHECK_INITIALIZE_EXCEPTION();
-#else
     try {
-        setup_zk_bool<BoolIO<IO>>(ios, threads, party);
+        setup_zk_bool(io, party);
     }
     catch(std::exception& e) {
         throw std::runtime_error(e.what());
@@ -34,14 +25,14 @@ void setup_proxy_protocol(BoolIO<IO>** ios, int threads, int party) {
     catch(...) {
         throw std::runtime_error("unknow error");
     }
-#endif
 }
 
-template <typename IO>
+// 上游 finalize_zk_bool() 返回 void; 作弊检测在 teardown 经 MAC digest 比对/AND 批检查,
+// 失败时上游 error()→exit(1)（= reject, soundness/I1 保留）。到这里即未作弊。
 inline bool finalize_proxy_protocol() {
-    bool res = finalize_zk_bool<IO>();
+    finalize_zk_bool();
     uninit_files();
-    return res;
+    return true;
 }
 
 // The counter blocks infomation to be proved and the length of each counter block is 16 bytes.
@@ -211,7 +202,7 @@ class AESProver {
 
         unsigned char* expected = new unsigned char[msg_len];
 
-        c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
+        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: 上游 reveal(void*,party) 非模板
         bool res = memcmp(expected, c_xor_m, msg_len) == 0;
 
         delete[] c_xor_m;
@@ -234,7 +225,7 @@ class AESProver {
 
         unsigned char* expected = new unsigned char[msg_len];
 
-        c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
+        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: 上游 reveal(void*,party) 非模板
         reverse(expected, expected + msg_len);
         bool res = memcmp(expected, ctxts, msg_len) == 0;
 
@@ -259,7 +250,7 @@ class AESProver {
 
         unsigned char* expected = new unsigned char[msg_len];
 
-        c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
+        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: 上游 reveal(void*,party) 非模板
         bool res = memcmp(expected, c_xor_m, msg_len) == 0;
 
         delete[] c_xor_m;
@@ -283,7 +274,7 @@ class AESProver {
 
         unsigned char* expected = new unsigned char[msg_len];
 
-        c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
+        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: 上游 reveal(void*,party) 非模板
         reverse(expected, expected + msg_len);
         bool res = memcmp(expected, ctxts, msg_len) == 0;
 
