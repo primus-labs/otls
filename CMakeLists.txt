@@ -11,6 +11,11 @@ IF(DEFINED EMP_UPSTREAM_ROOT)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
   find_package(OpenSSL REQUIRED)
   include_directories(${OPENSSL_INCLUDE_DIR})
+  # FULLPORT: vendored emp-tool headers the migration needs but upstream-from-source
+  # does not produce (emp::Backend, fork BristolFormat, + 3 path-placeholders). Listed
+  # FIRST so the flat `emp-tool/...` includes resolve here; runtime headers come from
+  # install-up. Makes the build reproducible without patching external emp repos.
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/emp-compat/include)
   include_directories(${EMP_UPSTREAM_ROOT}/include)
   set(EMP-TOOL_INCLUDE_DIRS ${EMP_UPSTREAM_ROOT}/include)
   set(EMP-OT_INCLUDE_DIRS   ${EMP_UPSTREAM_ROOT}/include)
