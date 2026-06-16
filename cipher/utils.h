@@ -120,6 +120,20 @@ inline void concat(Integer& res, const Integer* in, size_t len) {
         res.bits.insert(res.bits.begin(), in[i].bits.begin(), in[i].bits.end());
 }
 
+inline void concat_opt(Integer& res, const Integer* in, size_t len) {
+    Integer tmp;
+    size_t total_bits = 0;
+    for (size_t i = 0; i < len; i++)
+        total_bits += in[i].bits.size();
+    total_bits += res.bits.size();
+    tmp.bits.reserve(total_bits);
+
+    for (size_t i = len; i-- > 0; )
+        tmp.bits.insert(tmp.bits.end(), in[i].bits.begin(), in[i].bits.end());
+    tmp.bits.insert(tmp.bits.end(), res.bits.begin(), res.bits.end());
+    res.bits.swap(tmp.bits);
+}
+
 inline void reverse_concat(Integer& res, const Integer* in, size_t len) {
     for (size_t i = 0; i < len; i++)
         res.bits.insert(res.bits.end(), in[i].bits.begin(), in[i].bits.end());

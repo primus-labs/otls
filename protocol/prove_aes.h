@@ -88,14 +88,17 @@ class AESProver {
     }
 
     inline void gctr(Integer& res, size_t m) {
-        Integer tmp(128, 0, PUBLIC);
+        // Integer tmp(128, 0, PUBLIC);
+        vector<Integer> tmp;
+        tmp.resize(m);
         for (size_t i = 0; i < m; i++) {
             Integer content = nonce;
-            tmp = computeAES_KS(expanded_key, content);
+            tmp[i] = computeAES_KS(expanded_key, content);
 
-            concat(res, &tmp, 1);
+            // concat(res, &tmp, 1);
             nonce = inc(nonce, 32);
         }
+        concat_opt(res, tmp.data(), tmp.size());
     }
 
     inline void gctr_opt(vector<Integer>& res, const vector<size_t>& ids) {
@@ -162,9 +165,11 @@ class AESProver {
 
         vector<Integer> counters;
         set_nonce(iv, iv_len);
+        auto _start = emp::clock_start();
         gctr_opt(counters, ids);
 
         Integer izk_counter;
+        vector<Integer> vec;
         for (size_t i = 0; i < counterInfos.size(); i++) {
             const AESCounterInfo& c = counterInfos[i];
             const Integer& oneCounter = counters[i];
@@ -179,17 +184,24 @@ class AESProver {
                 }
                 else {
                     if (begin != -1) {
-                        izk_counter.bits.insert(izk_counter.bits.begin(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                        // izk_counter.bits.insert(izk_counter.bits.begin(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                        Integer tmp;
+                        tmp.bits.insert(tmp.bits.end(), oneCounter.bits.end() -j * 8, oneCounter.bits.end() - begin * 8);
+                        vec.push_back(tmp);
                         begin = -1;
                     }
                 }
             }
             if (begin != -1) {
-                izk_counter.bits.insert(izk_counter.bits.begin(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                // izk_counter.bits.insert(izk_counter.bits.begin(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                Integer tmp;
+                tmp.bits.insert(tmp.bits.end(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                vec.push_back(tmp);
                 begin = -1;
             }
             
         }
+        concat_opt(izk_counter, vec.data(), vec.size());
 
         return izk_counter;
     }
