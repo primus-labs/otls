@@ -23,7 +23,7 @@ void zk_gc_prf_test_offline(int party) {
       0x4f, 0x79, 0x67, 0x89, 0xba, 0xa4, 0x80, 0x82, 0xd1, 0x22, 0xee, 0x42, 0xc5, 0xa7, 0x2e,
       0x5a, 0x51, 0x10, 0xff, 0xf7, 0x01, 0x87, 0x34, 0x7b, 0x66};
 
-    Integer output(800, output_u.data());
+    Integer output(800, output_u.data(), PUBLIC);
 
     Integer res;
     PRFOffline prf;
@@ -57,7 +57,7 @@ void zk_gc_prf_test(int party, bool flag = false) {
     unsigned char* seed = seed_u.data();
     unsigned char* label = label_u.data();
 
-    Integer output(800, output_u.data());
+    Integer output(800, output_u.data(), PUBLIC);
 
     Integer res;
     PRF prf;
@@ -70,7 +70,7 @@ void zk_gc_prf_test(int party, bool flag = false) {
         switch_to_zk();
         Integer res;
         secret = Integer(128, secret_u.data(), ALICE);
-        output = Integer(800, output_u.data());
+        output = Integer(800, output_u.data(), PUBLIC);
         prf.init(hmac, secret);
         prf.opt_compute(hmac, res, 800, secret, label, label_u.size(), seed, seed_u.size(),
                         true, true, true);
@@ -93,14 +93,14 @@ int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     auto start = emp::clock_start();
-    setup_protocol(io[0], ios, threads, party, true);
+    setup_protocol(io[0], ios[0], party, true);
 
     zk_gc_prf_test_offline(party);
 

@@ -282,7 +282,7 @@ class SHA256 {
                     chunk_compress(dig, input_data.data());
                     Integer tmpInt;
                     reverse_concat(tmpInt, dig, VALLEN);
-                    tmpInt.reveal<uint32_t>((uint32_t*)plain_dig, PUBLIC);
+                    tmpInt.reveal((uint32_t*)plain_dig, PUBLIC);
 
                     iv_in_hashes.push_back(nullptr);
                     iv_in_hashes.back() = new uint32_t[DIGLEN];
@@ -329,7 +329,7 @@ class SHA256 {
             chunk_compress(dig, input_data.data());
             Integer tmpInt;
             reverse_concat(tmpInt, dig, VALLEN);
-            tmpInt.reveal<uint32_t>((uint32_t*)plain_dig, PUBLIC);
+            tmpInt.reveal((uint32_t*)plain_dig, PUBLIC);
 
             delete[] dig;
         }
@@ -707,7 +707,7 @@ class SHA256Offline {
                 reverse_concat(tmpInt, dig, VALLEN);
 
                 uint32_t plain_dig[VALLEN];
-                tmpInt.reveal<uint32_t>((uint32_t*)plain_dig, PUBLIC);
+                tmpInt.reveal((uint32_t*)plain_dig, PUBLIC);
 
                 gc_in_open_flag = true;
             }
@@ -722,7 +722,7 @@ class SHA256Offline {
             reverse_concat(tmpInt, dig, VALLEN);
 
             uint32_t plain_dig[VALLEN];
-            tmpInt.reveal<uint32_t>((uint32_t*)plain_dig, PUBLIC);
+            tmpInt.reveal((uint32_t*)plain_dig, PUBLIC);
         }
     }
 

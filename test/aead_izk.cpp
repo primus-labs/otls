@@ -45,7 +45,7 @@ void it_mac_add_test(IO* io, int party) {
 
 template <typename IO>
 void aead_enc_garble_then_prove_test(
-  IO* io, IO* io_opt, COT<IO>* ot, int party, bool sec_type = false) {
+  IO* io, IO* io_opt, COT* ot, int party, bool sec_type = false) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
@@ -116,7 +116,7 @@ void aead_enc_garble_then_prove_test(
 
 template <typename IO>
 void aead_dec_garble_then_prove_test(
-  IO* io, IO* io_opt, COT<IO>* ot, int party, bool sec_type = false) {
+  IO* io, IO* io_opt, COT* ot, int party, bool sec_type = false) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
@@ -209,17 +209,16 @@ int main(int argc, char** argv) {
     NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     auto start = emp::clock_start();
-    setup_protocol<NetIO>(io[0], ios, threads, party);
+    setup_protocol<NetIO>(io[0], ios[0], party);
     cout << "setup time: " << emp::time_from(start) << endl;
-    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
-    IKNP<NetIO>* cot = prot->ot;
+    IKNP* cot = gc_cot();  // FULLPORT: get the COT of the current GC backend
     it_mac_add_test<NetIO>(io[0], party);
     aead_enc_garble_then_prove_test<NetIO>(io[0], io_opt, cot, party, true);
     aead_dec_garble_then_prove_test<NetIO>(io[0], io_opt, cot, party, true);

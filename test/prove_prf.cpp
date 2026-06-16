@@ -21,7 +21,7 @@ using namespace emp;
 void print_integer(const char* msg, Integer n) {
     size_t m = n.bits.size() / 8;
     unsigned char* buff = new unsigned char[m];
-    n.reveal<unsigned char>(buff, PUBLIC);
+    n.reveal(buff, PUBLIC);
     reverse(buff, buff + m);
 
     printf("unsigned char %s[] = {", msg);
@@ -83,16 +83,16 @@ int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     auto start = emp::clock_start();
     auto comm = getComm(io, threads, nullptr);
 
-    setup_proxy_protocol(ios, threads, party);
+    setup_proxy_protocol(ios[0], party);
 
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
     cout << "setup comm: " << (getComm(io, threads, nullptr) - comm) * 1.0 / 1024 << " Kbytes" << endl;
@@ -105,9 +105,9 @@ int main(int argc, char** argv) {
         error("prove error:\n");
     }
 
-    cout << "zk AND gates: " << CircuitExecution::circ_exec->num_and() << endl;
+    cout << "zk AND gates: " << backend->num_and() << endl;
 
-    bool cheated = finalize_proxy_protocol<BoolIO<NetIO>>();
+    bool cheated = finalize_proxy_protocol();
     if (cheated)
         error("cheated\n");
 

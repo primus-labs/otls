@@ -15,12 +15,12 @@ inline void itmac_hom_add_check(Integer& res, Integer& pre_res, int party, block
     assert(res.size() == 128);
 
     if (party == BOB) {
-        block delta = ((ZKVerifier<IO>*)(ProtocolExecution::prot_exec))->ostriple->delta;
+        block delta = get_bool_delta();  // FULLPORT: upstream verifier-only Δ accessor (ZKBoolVerifier::delta)
         for (size_t i = 0; i < pre_res.size(); i++) {
             block tmp = set_bit(zero_block, i);
             block tmpx = tmp & blk;
             if (cmpBlock(&tmpx, &tmp, 1))
-                pre_res[i].bit = pre_res[i].bit ^ delta;
+                pre_res.bits[i].label = pre_res.bits[i].label ^ delta;
         }
     }
     check_zero<IO>(res ^ pre_res, party);
@@ -33,12 +33,12 @@ inline void itmac_hom_add_check(
     assert(pre_res.size() == (len * 8));
     assert(res.size() == (len * 8));
     if (party == BOB) {
-        block delta = ((ZKVerifier<IO>*)(ProtocolExecution::prot_exec))->ostriple->delta;
+        block delta = get_bool_delta();  // FULLPORT: upstream verifier-only Δ accessor (ZKBoolVerifier::delta)
         bool* data = new bool[len * 8];
         to_bool(data, share, len * 8);
         for (size_t i = 0; i < len * 8; i++) {
             if (data[i])
-                pre_res[i].bit = pre_res[i].bit ^ delta;
+                pre_res.bits[i].label = pre_res.bits[i].label ^ delta;
         }
         delete[] data;
     }

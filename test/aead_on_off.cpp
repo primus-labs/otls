@@ -27,7 +27,7 @@ void aead_encrypt_test_offline(bool sec_type = false) {
 }
 
 void aead_encrypt_test(
-  NetIO* io, NetIO* io_opt, COT<NetIO>* ot, int party, bool sec_type = false) {
+  NetIO* io, NetIO* io_opt, COT* ot, int party, bool sec_type = false) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
@@ -58,13 +58,13 @@ void aead_encrypt_test(
     unsigned char* ctxt = new unsigned char[msg_len];
     unsigned char tag[16];
 
-    auto comm = io->counter; 
+    auto comm = (io->send_counter + io->recv_counter); 
     AEAD<NetIO>* aead = new AEAD<NetIO>(io, io_opt, ot, key, fixed_iv);
-    cout << "constructor comm: " << io->counter - comm << endl;
+    cout << "constructor comm: " << (io->send_counter + io->recv_counter) - comm << endl;
 
-    comm = io->counter;
+    comm = (io->send_counter + io->recv_counter);
     aead->encrypt(io, ctxt, tag, msg, msg_len, aad, aad_len, iv + 4, iv_len - 4, party, sec_type);
-    cout << "encrypt comm: " << io->counter - comm << endl;
+    cout << "encrypt comm: " << (io->send_counter + io->recv_counter) - comm << endl;
 
     cout << "tag: ";
     for (int i = 0; i < 16; i++) {
@@ -117,7 +117,7 @@ void aead_decrypt_test_offline(bool sec_type = false) {
 }
 
 void aead_decrypt_test(
-  NetIO* io, NetIO* io_opt, COT<NetIO>* ot, int party, bool sec_type = false) {
+  NetIO* io, NetIO* io_opt, COT* ot, int party, bool sec_type = false) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
@@ -204,25 +204,24 @@ int main(int argc, char** argv) {
     NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     bool sec_type = false;
 
     auto start = emp::clock_start();
     auto comm = getComm(io, threads, io_opt);
-    setup_protocol(io[0], ios, threads, party, true);
+    setup_protocol(io[0], ios[0], party, true);
     aead_encrypt_test_offline(sec_type);
     aead_decrypt_test_offline(sec_type);
     cout << "offline time: " << emp::time_from(start) << " us" << endl;
 
     switch_to_online<NetIO>(party);
     cout << "offline comm: " << getComm(io, threads, io_opt) - comm << endl;
-    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
-    IKNP<NetIO>* cot = prot->ot;
+    IKNP* cot = gc_cot();  // FULLPORT: get the COT of the current GC backend
 
     comm = getComm(io, threads, io_opt);
     start = emp::clock_start();

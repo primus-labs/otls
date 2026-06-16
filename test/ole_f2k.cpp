@@ -16,8 +16,7 @@ int main(int argc, char** argv) {
 
     setup_backend(ios[0], party);
 
-    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
-    IKNP<NetIO>* cot = prot->ot;
+    IKNP* cot = gc_cot();  // FULLPORT: get the COT of the current GC backend
     vector<block> out;
     vector<block> in;
     in.resize(num_ole);

@@ -1,4 +1,6 @@
 #include "backend/commitment.h"
+#include <iostream>
+using namespace std;  // FULLPORT: endl/cout
 
 int main() {
     PRG prg;

@@ -3,6 +3,7 @@
 #include "emp-tool/emp-tool.h"
 #include "backend/ole.h"
 #include "backend/bn_utils.h"
+using namespace emp;  // FULLPORT: upstream emp lives entirely within namespace emp
 
 template <typename IO>
 class E2F {
@@ -20,7 +21,7 @@ class E2F {
     BIGNUM* r;
     BIGNUM* r2;
 
-    E2F(IO* io, IO* io_opt, COT<IO>* ot, BIGNUM* q2, size_t bit_length)
+    E2F(IO* io, IO* io_opt, COT* ot, BIGNUM* q2, size_t bit_length)  // FULLPORT: COT is not a template
         : io(io), bit_length(bit_length) {
         ole = new OLE<IO>(io, ot, q2, bit_length);
         this->io_opt = io_opt;

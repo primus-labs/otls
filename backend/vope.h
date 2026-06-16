@@ -4,14 +4,15 @@
 #include "backend/bn_utils.h"
 #include "cipher/utils.h"
 #include <iostream>
+using namespace emp;  // FULLPORT: upstream emp is entirely inside namespace emp
 template <typename IO>
 class VOPE {
    public:
     IO* io;
-    COT<IO>* ot;
+    COT* ot;   // FULLPORT: upstream COT is a non-template base class
     CCRH ccrh;
     GaloisFieldPacking pack;
-    VOPE(IO* io, COT<IO>* ot) : io(io), ot(ot) {}
+    VOPE(IO* io, COT* ot) : io(io), ot(ot) {}
 
     ~VOPE() {}
 

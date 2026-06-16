@@ -41,16 +41,17 @@ void full_protocol_offline() {
     RecordOffline* rd_offline = new RecordOffline();
 
     hs_offline->encrypt_client_finished_msg(aead_c_offline, 12);
-    hs_offline->decrypt_server_finished_msg(aead_s_offline, 12);
+    hs_offline->encrypt_client_finished_msg(aead_s_offline, 12);  // FULLPORT: server-finished (was decrypt placeholder)
 
     rd_offline->encrypt(aead_c_offline, QUERY_BYTE_LEN);
+    rd_offline->encrypt(aead_s_offline, RESPONSE_BYTE_LEN);  // FULLPORT: offline server response
 
     delete hs_offline;
     delete aead_c_offline;
     delete aead_s_offline;
 }
 template <typename IO>
-void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int party) {
+void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT* cot, int party) {
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
 
     EC_POINT* V = EC_POINT_new(group);
@@ -116,15 +117,16 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     Record<IO>* rd = new Record<IO>;
     unsigned char* finc_ctxt = new unsigned char[finished_msg_length];
     unsigned char* finc_tag = new unsigned char[tag_length];
-    unsigned char* msg = new unsigned char[finished_msg_length];
+    unsigned char* fins_ctxt = new unsigned char[finished_msg_length];
+    unsigned char* fins_tag  = new unsigned char[tag_length];
 
     // Use correct message instead of hs->client_ufin!
     hs->encrypt_client_finished_msg(aead_c, finc_ctxt, finc_tag, hs->client_ufin, 12, aad,
                                     aad_len, iv_c_oct, 8, party);
 
     // Use correct ciphertext instead of finc_ctxt!
-    hs->decrypt_server_finished_msg(aead_s, msg, finc_ctxt, finished_msg_length, finc_tag, aad,
-                                    aad_len, iv_s_oct, 8, party);
+    hs->encrypt_client_finished_msg(aead_s, fins_ctxt, fins_tag, hs->server_ufin, 12, aad,
+                                    aad_len, iv_s_oct, 8, party);  // FULLPORT: real server-finished
 
     unsigned char* cctxt = new unsigned char[QUERY_BYTE_LEN];
     unsigned char* ctag = new unsigned char[tag_length];
@@ -135,6 +137,7 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
 
     // the client encrypts the first message, and sends to the server.
     rd->encrypt(aead_c, io, cctxt, ctag, cmsg, QUERY_BYTE_LEN, aad, aad_len, iv_c_oct, 8, party);
+    rd->encrypt(aead_s, io, sctxt, stag, smsg, RESPONSE_BYTE_LEN, aad, aad_len, iv_s_oct, 8, party);  // FULLPORT: real server response
     // prove handshake in post-record phase.
     start = emp::clock_start();
     switch_to_zk();
@@ -144,16 +147,17 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     prd->prove_and_check_handshake_step1(rc, 32, rs, 32, tau_c, 32, tau_s, 32, rc, 32, true);
     prd->prove_and_check_handshake_step2(finc_ctxt, finished_msg_length,
                                          iv_c_oct, 8);
-    prd->prove_and_check_handshake_step3(finc_ctxt, finished_msg_length,
+    prd->prove_and_check_handshake_step3(fins_ctxt, finished_msg_length,
                                          iv_s_oct, 8);
     Integer prd_cmsg, prd_cmsg2, prd_smsg, prd_smsg2, prd_cz0, prd_c2z0, prd_sz0, prd_s2z0;
     prd->prove_record_client(prd_cmsg, prd_cz0, cctxt, QUERY_BYTE_LEN, iv_c_oct, 8);
-    prd->prove_record_server_last(prd_smsg2, prd_s2z0, cctxt, RESPONSE_BYTE_LEN, iv_s_oct, 8);
+    prd->prove_record_server_last(prd_smsg2, prd_s2z0, sctxt, RESPONSE_BYTE_LEN, iv_s_oct, 8);
 
     // Use correct finc_ctxt and fins_ctxt!
-    prd->finalize_check(finc_ctxt, finc_tag, 12, aad, finc_ctxt, finc_tag, 12, aad, {prd_cz0},
-                        {cctxt}, {ctag}, {QUERY_BYTE_LEN}, {aad}, 1, {prd_sz0}, {sctxt},
+    bool fin_ok = prd->finalize_check(finc_ctxt, finc_tag, 12, aad, fins_ctxt, fins_tag, 12, aad, {prd_cz0},
+                        {cctxt}, {ctag}, {QUERY_BYTE_LEN}, {aad}, 1, {prd_s2z0}, {sctxt},
                         {stag}, {RESPONSE_BYTE_LEN}, {aad}, 1, aad_len);
+    if (!fin_ok) error("finalize_check: AEAD GCM tag verification failed!\n");  // FULLPORT: gate on tag-verify
 
     sync_zk_gc<IO>();
     switch_to_gc();
@@ -173,7 +177,8 @@ void full_protocol(HandShake<IO>* hs, IO* io, IO* io_opt, COT<IO>* cot, int part
     delete[] tau_s;
     delete[] finc_ctxt;
     delete[] finc_tag;
-    delete[] msg;
+    delete[] fins_ctxt;
+    delete[] fins_tag;
     delete[] cmsg;
     delete[] smsg;
 
@@ -190,17 +195,17 @@ int main(int argc, char** argv) {
     NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
 
     auto start = emp::clock_start();
     auto comm = getComm(io, threads, io_opt);
-    setup_protocol<NetIO>(io[0], ios, threads, party, true);
+    setup_protocol<NetIO>(io[0], ios[0], party, true);
     // setup_protocol<NetIO>(io, ios, threads, party);
 
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
@@ -209,8 +214,7 @@ int main(int argc, char** argv) {
     start = clock_start();
     comm = getComm(io, threads, io_opt);
 
-    auto prot = (PrimusParty<NetIO>*)(gc_prot_buf);
-    IKNP<NetIO>* cot = prot->ot;
+    IKNP* cot = gc_cot();  // FULLPORT: get the COT of the current GC backend
     HandShake<NetIO>* hs = new HandShake<NetIO>(io[0], io_opt, cot, group);
 
     full_protocol_offline();
@@ -226,8 +230,8 @@ int main(int argc, char** argv) {
     cout << "online time: " << emp::time_from(start) << " us" << endl;
     cout << "online comm: " << getComm(io, threads, io_opt) - comm << endl;
 
-    cout << "gc AND gates: " << dec << gc_circ_buf->num_and() << endl;
-    cout << "zk AND gates: " << dec << zk_circ_buf->num_and() << endl;
+    cout << "gc AND gates: " << dec << gc_backend_buf->num_and() << endl;
+    cout << "zk AND gates: " << dec << zk_backend_buf->num_and() << endl;
     finalize_protocol();
 
     bool cheat = CheatRecord::cheated();

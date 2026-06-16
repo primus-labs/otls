@@ -8,7 +8,7 @@ using namespace std;
 using namespace emp;
 
 template <typename IO>
-void ole_test(IO* io, COT<IO>* cot, int party) {
+void ole_test(IO* io, COT* cot, int party) {
     const int num_ole = 6;
     vector<BIGNUM*> in, out;
     in.resize(num_ole);
@@ -71,18 +71,17 @@ int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     auto start = emp::clock_start();
-    setup_protocol<NetIO>(io[0], ios, threads, party);
+    setup_protocol<NetIO>(io[0], ios[0], party);
     cout << "protocol setup: " << emp::time_from(start) << " us" << endl;
 
-    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
-    IKNP<NetIO>* cot = prot->ot;
+    IKNP* cot = gc_cot();  // FULLPORT: get the COT of the current GC backend
     ole_test<NetIO>(io[0], cot, party);
 
     finalize_protocol();

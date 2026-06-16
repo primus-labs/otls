@@ -88,7 +88,7 @@ class ComConv {
     OLE<IO>* ole;
     vector<BIGNUM*> exp;
 
-    ComConv(IO* io, COT<IO>* ot, BIGNUM* q2, block bDelta) : io(io) {
+    ComConv(IO* io, COT* ot, BIGNUM* q2, block bDelta) : io(io) {
         q = BN_new();
         BN_copy(this->q, q2);
         ctx = BN_CTX_new();

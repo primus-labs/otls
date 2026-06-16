@@ -41,7 +41,7 @@ class AEAD {
     OLEF2K<IO>* ole = nullptr;
     // `key` and `iv` are client(server) write key and iv respectively derived from master secret.
     // Note the length of `key` is 16-bytes and the length of `iv` is 4-bytes.
-    AEAD(IO* io, IO* io_opt, COT<IO>* ot, Integer& key, Integer& iv) {
+    AEAD(IO* io, IO* io_opt, COT* ot, Integer& key, Integer& iv) {  // FULLPORT: COT is not a template
         ole = new OLEF2K<IO>(io, ot);
         this->io_opt = io_opt;
         this->fixed_iv = iv;
@@ -211,7 +211,7 @@ class AEAD {
         unsigned char* z = new unsigned char[msg_len];
         if (!sec_type) {
             // message is public
-            Z.reveal<unsigned char>((unsigned char*)z, PUBLIC);
+            Z.reveal((unsigned char*)z, PUBLIC);
 
             // store opened z for consistency check
             open_z.push_back(nullptr);
@@ -354,7 +354,7 @@ class AEAD {
 
         if (!sec_type) {
             // message is public
-            Z.reveal<unsigned char>((unsigned char*)z, PUBLIC);
+            Z.reveal((unsigned char*)z, PUBLIC);
 
             // store opened z for consistency check
             // In our protocol, the parties use different instance to encrypt and decrypt.
@@ -620,7 +620,7 @@ class AEADOffline {
             // message is public
             unsigned char* z = new unsigned char[msg_len];
             memset(z, 0x00, msg_len);
-            Z.reveal<unsigned char>((unsigned char*)z, PUBLIC);
+            Z.reveal((unsigned char*)z, PUBLIC);
             delete[] z;
         }
     }
@@ -639,7 +639,7 @@ class AEADOffline {
         if (!sec_type) {
             unsigned char* z = new unsigned char[ctxt_len];
             memset(z, 0x00, ctxt_len);
-            Z.reveal<unsigned char>((unsigned char*)z, PUBLIC);
+            Z.reveal((unsigned char*)z, PUBLIC);
             delete[] z;
         }
     }

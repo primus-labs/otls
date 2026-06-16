@@ -11,28 +11,75 @@
 #include "emp-tool/emp-tool.h"
 #include "cipher/utils.h"
 
-// FULLPORT: 上游 emp-zk-bool 是单 IO/单线程: setup_zk_bool(BoolIO*, party).
-// fork 的 (ios[], threads) 多通道架构在首版迁移收敛为单 BoolIO（接受单线程）。
-// USE_PRIMUS_EMP/FunctionWrapperV3 是 fork 专有, 删除, 用普通 try/catch。
-inline void setup_proxy_protocol(emp::BoolIO* io, int party) {
+// FULLPORT (session API): the global backend / setup_zk_bool / finalize_zk_bool
+// are gone upstream. setup_proxy_protocol now constructs the single proof-wide
+// ZKBoolSession (owned here) and installs it as the active session g_zk that the
+// Integer/circuit shim reaches. `expected_cots` sizes the SilentFerret prepay
+// (0 = per-round streaming; pass ~AES ANDs to make the proof's COT draws
+// wire-free). Single-IO/single-threaded migration (accepted).
+// Build the ZK proof engine (SilentFerret + QuickSilver) and install its
+// emp::Backend adapter as the global backend (via the keystone setup_zk_bool), so
+// the shared Integer/circuit code runs in ZK. `expected_cots` sizes the prepay.
+inline void setup_proxy_protocol(emp::BoolIO* io, int party, int64_t expected_cots = 0) {
     init_files();
-    try {
-        setup_zk_bool(io, party);
-    }
-    catch(std::exception& e) {
-        throw std::runtime_error(e.what());
-    }
-    catch(...) {
-        throw std::runtime_error("unknow error");
-    }
+    emp::setup_zk_bool(io, party, expected_cots);
 }
 
-// 上游 finalize_zk_bool() 返回 void; 作弊检测在 teardown 经 MAC digest 比对/AND 批检查,
-// 失败时上游 error()→exit(1)（= reject, soundness/I1 保留）。到这里即未作弊。
+// OPTION-A optimization (single-session proxytls): estimate the SilentFerret COT
+// draw so the caller can size the prepay (begin(expected_cots)) and keep the
+// proving phase wire-free. Without it (expected_cots = 0) the proof streams COTs
+// and pays ~1 blocking round-trip per ~15M-COT refresh, so the proving-phase RTT
+// GROWS with record size (measured: 64KB->5, 256KB->29, 1MB->117 proof rounds).
+// Passing this estimate concentrates all that COT-correction traffic into ONE
+// begin() prepay, collapsing the proving-phase refresh round-trips to ~0 (measured:
+// ->1 regardless of size). Soundness-neutral: it does NOT change the proven
+// relation (I3) or any invariant — it only re-times when the (identical) COT
+// bytes are exchanged. Measured: total comm is essentially unchanged (proof uplink
+// identical; downlink can be a few % more, see the upper-bound note below).
+//
+// TWO usages (same function, different argument semantics):
+//
+//  (1) ONLINE / per-request EXACT sizing — pass the ACTUAL total ciphertext bytes
+//      this proof covers. Setup is then DATA-DEPENDENT (it must know the size),
+//      so it canNOT be a generic data-independent offline phase. Minimal waste.
+//
+//  (2) OFFLINE / data-independent UPPER BOUND — use estimate_proxy_cots_bound()
+//      and pass the MAX request size you provision for, BEFORE the data is known.
+//      COT is data-independent in nature (random correlations; only the COUNT is
+//      data-dependent), so a fixed bound keeps setup data-independent. Online stays
+//      wire-free for any request <= bound (measured: prove 64KB under a 1MB-bound
+//      prepay still gives proof rounds=1); requests > bound roll over to streaming
+//      for the excess. COST: the (bound - actual) gap is extra COT generated in
+//      SETUP only (measured: setup downlink 0.9MB -> 9.2MB when over-provisioning
+//      64KB to a 1MB bound), entirely OFF the online critical path. Tune the bound
+//      to your request-size distribution. (Provisioning ONE pool and amortizing it
+//      across many requests instead of per-request is the persistent-COT-state
+//      design, which needs an emp-zk lifetime change — out of scope here.)
+//
+//   bytes = ciphertext bytes (Finished messages + record ciphertexts); the fixed
+//   PRF / handshake cost is added on top via fixed_base.
+inline int64_t estimate_proxy_cots(size_t total_record_bytes) {
+    const int64_t per_byte   = 512;          // generous AES-GCM ZK ANDs/byte (1 COT per AND)
+    const int64_t fixed_base = 4'000'000;    // PRF + client/server Finished + AEAD + check overhead
+    return (int64_t)total_record_bytes * per_byte + fixed_base;
+}
+
+// OFFLINE / data-independent prepay sizing (usage 2 above): pass an UPPER BOUND on
+// the request ciphertext bytes you provision for, ahead of the actual data. Keeps
+// setup data-independent; online is wire-free for any request <= this bound and
+// degrades to streaming only for the excess. Identical math to estimate_proxy_cots
+// — the distinct name documents the data-independent / over-provision intent.
+inline int64_t estimate_proxy_cots_bound(size_t max_record_bytes) {
+    return estimate_proxy_cots(max_record_bytes);
+}
+
+// finalize_zk_bool() runs the closing MAC-digest / AND-batch checks; on a cheating
+// prover upstream aborts via error()→exit(1) (= reject, soundness/I1 preserved).
+// Reaching past finalize means no cheating occurred → cheated flag false.
 inline bool finalize_proxy_protocol() {
-    finalize_zk_bool();
+    emp::finalize_zk_bool();
     uninit_files();
-    return true;
+    return false;
 }
 
 // The counter blocks infomation to be proved and the length of each counter block is 16 bytes.
@@ -202,7 +249,7 @@ class AESProver {
 
         unsigned char* expected = new unsigned char[msg_len];
 
-        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: 上游 reveal(void*,party) 非模板
+        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: upstream reveal(void*,party) is not a template
         bool res = memcmp(expected, c_xor_m, msg_len) == 0;
 
         delete[] c_xor_m;
@@ -225,7 +272,7 @@ class AESProver {
 
         unsigned char* expected = new unsigned char[msg_len];
 
-        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: 上游 reveal(void*,party) 非模板
+        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: upstream reveal(void*,party) is not a template
         reverse(expected, expected + msg_len);
         bool res = memcmp(expected, ctxts, msg_len) == 0;
 
@@ -250,7 +297,7 @@ class AESProver {
 
         unsigned char* expected = new unsigned char[msg_len];
 
-        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: 上游 reveal(void*,party) 非模板
+        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: upstream reveal(void*,party) is not a template
         bool res = memcmp(expected, c_xor_m, msg_len) == 0;
 
         delete[] c_xor_m;
@@ -274,7 +321,7 @@ class AESProver {
 
         unsigned char* expected = new unsigned char[msg_len];
 
-        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: 上游 reveal(void*,party) 非模板
+        c.reveal((unsigned char*)expected, PUBLIC);  // FULLPORT: upstream reveal(void*,party) is not a template
         reverse(expected, expected + msg_len);
         bool res = memcmp(expected, ctxts, msg_len) == 0;
 

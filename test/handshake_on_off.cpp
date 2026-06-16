@@ -35,7 +35,7 @@ void handshake_test_offline(bool ENABLE_ROUNDS_OPT = false) {
 }
 template <typename IO>
 void handshake_test(
-  IO* io, IO* io_opt, COT<IO>* cot, int party, bool ENABLE_ROUNDS_OPT = false) {
+  IO* io, IO* io_opt, COT* cot, int party, bool ENABLE_ROUNDS_OPT = false) {
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
     HandShake<NetIO>* hs = new HandShake<NetIO>(io, io_opt, cot, group, ENABLE_ROUNDS_OPT);
 
@@ -208,15 +208,15 @@ int main(int argc, char** argv) {
     NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     auto start = emp::clock_start();
     auto comm = getComm(io, threads, io_opt); 
-    setup_protocol<NetIO>(io[0], ios, threads, party, true);
+    setup_protocol<NetIO>(io[0], ios[0], party, true);
     cout << "setup time: " << dec << emp::time_from(start) << endl;
     cout << "setup comm: " << getComm(io, threads, io_opt) << endl;
 
@@ -231,8 +231,7 @@ int main(int argc, char** argv) {
     comm = getComm(io, threads, io_opt);
 
     start = emp::clock_start();
-    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
-    IKNP<NetIO>* cot = prot->ot;
+    IKNP* cot = gc_cot();  // FULLPORT: get the COT of the current GC backend
     handshake_test<NetIO>(io[0], io_opt, cot, party, ENABLE_ROUNDS_OPT);
     cout << "online time: " << dec << emp::time_from(start) << endl;
     cout << "online comm: " << getComm(io, threads, io_opt) - comm << endl;

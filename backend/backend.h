@@ -1,85 +1,60 @@
 #ifndef PRIMUS_BACKEND_H__
 #define PRIMUS_BACKEND_H__
+// FULLPORT: upstream emp merges the fork's two singletons CircuitExecution::circ_exec
+// + ProtocolExecution::prot_exec into a single `emp::backend`. The original
+// backend.h setup_{,offline_,online_}backend each new'd two objects (circ+prot)
+// and assigned the two singletons -> now we new a single merged Backend subclass
+// (see upstream_gc.h: Primus/Offline/Online {Gen,Eva}Backend) and assign the single `backend`.
 #include "emp-tool/emp-tool.h"
-#include "backend/opt_hg_gen.h"
-#include "backend/opt_hg_eva.h"
-#include "backend/offline_hg_gen.h"
-#include "backend/online_hg_gen.h"
-#include "backend/online_hg_eva.h"
-#include "backend/primus_gen.h"
-#include "backend/primus_eva.h"
-#include "backend/offline_primus_gen.h"
-#include "backend/offline_primus_eva.h"
-#include "backend/online_primus_gen.h"
-#include "backend/online_primus_eva.h"
-#include "backend/offline_primus_party.h"
+#include "backend/upstream_gc.h"
 using namespace emp;
 
-/* Initialize the offline backend of two parties */
+// FULLPORT: the old tests/upper layers obtained the GC's IKNP COT via `(PrimusParty<IO>*)prot_exec->ot`.
+// After the upstream merge, Gen/Eva are different types (both containing `IKNP* ot`); we expose the
+// in-process active cot recorded at setup time in a uniform way, avoiding party-based casts.
+// The arithmetic OT in OLE/E2F/VOPE/AEAD all use it.
+inline emp::IKNP*& gc_active_cot() { static thread_local emp::IKNP* c = nullptr; return c; }
+inline emp::IKNP* gc_cot() { return gc_active_cot(); }
+
+/* Offline backend: garble the whole circuit (input-independent) */
 template <typename IO>
-inline OfflinePrimusParty* setup_offline_backend(IO* io, int party) {
-    if (party == ALICE) {
-        OfflineHalfGateGen<IO>* t = new OfflineHalfGateGen<IO>(io);
-        CircuitExecution::circ_exec = t;
-        ProtocolExecution::prot_exec = new OfflinePrimusGen<IO>(io, t);
-    } else {
-        OfflineHalfGateEva<IO>* t = new OfflineHalfGateEva<IO>(io);
-        CircuitExecution::circ_exec = t;
-        ProtocolExecution::prot_exec = new OfflinePrimusEva<IO>(io, t);
-    }
-    return (OfflinePrimusParty*)ProtocolExecution::prot_exec;
+inline Backend* setup_offline_backend(IO* io, int party) {
+    backend = (party == ALICE) ? (Backend*)new otls_gc::OfflineGenBackend(io)
+                               : (Backend*)new otls_gc::OfflineEvaBackend(io);
+    return backend;
 }
 
-/* Sync the offline information with online backend */
+/* Online backend: evaluate with real inputs (aligned with the offline garble) */
 template <typename IO>
-inline void sync_offline_online(OfflinePrimusParty* offline, PrimusParty<IO>* online, int party) {
+inline Backend* setup_online_backend(IO* io, int party) {
     if (party == ALICE) {
-        OfflinePrimusGen<IO>* off_gen = (OfflinePrimusGen<IO>*)offline;
-        OnlinePrimusGen<IO>* on_gen = (OnlinePrimusGen<IO>*)online;
-        on_gen->set_seed(off_gen->seed);
-        on_gen->gc->set_delta(off_gen->gc->delta);
-        on_gen->gc->out_labels = off_gen->gc->out_labels;
+        auto* b = new otls_gc::OnlineGenBackend(io);
+        gc_active_cot() = b->ot; backend = (Backend*)b;
     } else {
-        OfflinePrimusEva<IO>* off_eva = (OfflinePrimusEva<IO>*)offline;
-        OnlinePrimusEva<IO>* on_eva = (OnlinePrimusEva<IO>*)online;
-        on_eva->gc->GC = off_eva->gc->GC;
-        on_eva->pub_values = off_eva->pub_values;
+        auto* b = new otls_gc::OnlineEvaBackend(io);
+        gc_active_cot() = b->ot; backend = (Backend*)b;
     }
+    return backend;
 }
 
-/* Initialize the online backend */
+/* Single-phase backend (no offline/online split, simplest) */
 template <typename IO>
-inline PrimusParty<IO>* setup_online_backend(IO* io, int party) {
+inline Backend* setup_backend(IO* io, int party) {
     if (party == ALICE) {
-        OnlineHalfGateGen<IO>* t = new OnlineHalfGateGen<IO>();
-        CircuitExecution::circ_exec = t;
-        ProtocolExecution::prot_exec = new OnlinePrimusGen<IO>(io, t);
+        auto* b = new otls_gc::PrimusGenBackend(io);
+        gc_active_cot() = b->ot; backend = (Backend*)b;
     } else {
-        OnlineHalfGateEva<IO>* t = new OnlineHalfGateEva<IO>();
-        CircuitExecution::circ_exec = t;
-        ProtocolExecution::prot_exec = new OnlinePrimusEva<IO>(io, t);
+        auto* b = new otls_gc::PrimusEvaBackend(io);
+        gc_active_cot() = b->ot; backend = (Backend*)b;
     }
-    return (PrimusParty<IO>*)ProtocolExecution::prot_exec;
+    return backend;
 }
 
-/* Initialize the protocol backend, only online phase enabled, no offline */
-template <typename IO>
-inline PrimusParty<IO>* setup_backend(IO* io, int party) {
-    if (party == ALICE) {
-        OptHalfGateGen<IO>* t = new OptHalfGateGen<IO>(io);
-        CircuitExecution::circ_exec = t;
-        ProtocolExecution::prot_exec = new PrimusGen<IO>(io, t);
-    } else {
-        OptHalfGateEva<IO>* t = new OptHalfGateEva<IO>(io);
-        CircuitExecution::circ_exec = t;
-        ProtocolExecution::prot_exec = new PrimusEva<IO>(io, t);
-    }
-    return (PrimusParty<IO>*)ProtocolExecution::prot_exec;
-}
+/* Sync offline information into the online backend (seed/delta/out_labels | GC/pub_values) */
+using otls_gc::sync_offline_online;
 
-/* Finalize the backend and delete all the pointers */
 inline void finalize_backend() {
-    delete CircuitExecution::circ_exec;
-    delete ProtocolExecution::prot_exec;
+    delete backend;
+    backend = nullptr;
 }
 #endif

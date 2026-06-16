@@ -10,7 +10,12 @@
 
 #include "emp-tool/emp-tool.h"
 #include "cipher/utils.h"
-#include "protocol/handshake.h"
+// FULLPORT (session API): prove_prf is pure-ZK (HMAC_SHA256 + PRF over Integer)
+// and does NOT need handshake.h's GC/mpctls machinery (e2f / backend/switch.h /
+// aead*.h). Include only the SHA/HMAC/PRF circuits + the PRF labels directly.
+#include "cipher/hmac_sha256.h"
+#include "cipher/prf.h"
+#include "protocol/tls_labels.h"
 
 /*
  * The PRF Prover

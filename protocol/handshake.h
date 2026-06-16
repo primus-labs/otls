@@ -12,28 +12,10 @@
 using namespace emp;
 using namespace std;
 
-static unsigned char master_key_label[] = {"master secret"};
-static unsigned char key_expansion_label[] = {"key expansion"};
-static unsigned char client_finished_label[] = {"client finished"};
-static unsigned char server_finished_label[] = {"server finished"};
-static unsigned char extended_master_key_label[] = {"extended master secret"};
-
-static size_t master_key_label_length = sizeof(master_key_label) - 1;
-static size_t key_expansion_label_length = sizeof(key_expansion_label) - 1;
-static size_t client_finished_label_length = sizeof(client_finished_label) - 1;
-static size_t server_finished_label_length = sizeof(server_finished_label) - 1;
-static size_t extended_master_key_label_length = sizeof(extended_master_key_label) - 1;
-
-static const size_t master_key_length = 384 / 8;
-static const size_t expansion_key_length = 320 / 8;
-static const size_t finished_msg_length = 96 / 8;
-static const size_t tag_length = 16;
-static const size_t iv_length = 4;
-static const size_t key_length = 128 / 8;
-static const size_t extended_master_key_length = 384 / 8;
-
-static const size_t random_length = 256 / 8;
-static const size_t session_hash_length = 256 / 8;
+// FULLPORT: the TLS-PRF label/length constants live in tls_labels.h (single source).
+// Previously duplicated here AND in tls_labels.h, which collided when one TU pulled
+// both this header and prove_prf.h->tls_labels.h (the pado layer does exactly that).
+#include "protocol/tls_labels.h"
 
 template <typename IO>
 class HandShake {
@@ -64,7 +46,7 @@ class HandShake {
     unsigned char client_ufin[finished_msg_length];
     unsigned char server_ufin[finished_msg_length];
     bool ENABLE_ROUNDS_OPT = false;
-    HandShake(IO* io, IO* io_opt, COT<IO>* ot, EC_GROUP* group, bool ENABLE_ROUNDS_OPT = false)
+    HandShake(IO* io, IO* io_opt, COT* ot, EC_GROUP* group, bool ENABLE_ROUNDS_OPT = false)  // FULLPORT: COT is not a template
         : io(io) {
         this->io_opt = io_opt;
         ctx = BN_CTX_new();
@@ -301,7 +283,7 @@ class HandShake {
             prf.opt_rounds_compute(hmac, ufin_int, finished_msg_length * 8, master_key, label,
                                    label_len, tau, tau_len, true, true);
         }
-        ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
+        ufin_int.reveal((unsigned char*)client_ufin, PUBLIC);
     }
 
     inline void compute_server_finished_msg(const unsigned char* label,
@@ -316,7 +298,7 @@ class HandShake {
             prf.opt_rounds_compute(hmac, ufin_int, finished_msg_length * 8, master_key, label,
                                    label_len, tau, tau_len, true, true);
         }
-        ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
+        ufin_int.reveal((unsigned char*)server_ufin, PUBLIC);
     }
 
     inline void encrypt_client_finished_msg(AEAD<IO>* aead_c,
@@ -625,7 +607,7 @@ class HandShakeOffline {
                                    client_finished_label_length + session_hash_length, true,
                                    true);
         }
-        ufin_int.reveal<unsigned char>((unsigned char*)client_ufin, PUBLIC);
+        ufin_int.reveal((unsigned char*)client_ufin, PUBLIC);
     }
 
     inline void compute_server_finished_msg() {
@@ -637,7 +619,7 @@ class HandShakeOffline {
                                    server_finished_label_length + session_hash_length, true,
                                    true);
         }
-        ufin_int.reveal<unsigned char>((unsigned char*)server_ufin, PUBLIC);
+        ufin_int.reveal((unsigned char*)server_ufin, PUBLIC);
     }
 
     inline void encrypt_client_finished_msg(AEADOffline* aead_c_offline, size_t ufinc_len) {

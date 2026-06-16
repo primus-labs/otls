@@ -41,10 +41,10 @@ int main(int argc, char** argv) {
 
     start = emp::clock_start();
     auto online = setup_online_backend<NetIO>(io, party);
-    sync_offline_online<NetIO>(offline, online, party);
+    sync_offline_online(offline, online, party);
 
     test_sort(party, true);
-    cout << "gates: " << CircuitExecution::circ_exec->num_and() << endl;
+    cout << "gates: " << backend->num_and() << endl;
     finalize_backend();
     cout << "online:" << emp::time_from(start) << endl;
 

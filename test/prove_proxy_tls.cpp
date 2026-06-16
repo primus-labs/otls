@@ -18,6 +18,11 @@
 using namespace std;
 using namespace emp;
 
+// Sum of every record ciphertext this proof covers (client Finished 16 +
+// server Finished 16 + http record 51). Used to size the single-session COT
+// prepay so the proving phase stays wire-free (OPTION-A optimization).
+static const size_t PROXY_TOTAL_RECORD_BYTES = 16 + 16 + 51;
+
 bool prove_proxy_tls(int party) {
     bool res = false;
     unsigned char pms_buf[] = {0xe4, 0x2b, 0xf7, 0x1c, 0x75, 0x85, 0x21, 0x79, 0x57, 0xe7, 0x48, 0x37, 0xd8, 0xb9, 0x1a, 0xda, 0xce, 0x31, 0x1b, 0x48, 0x4d, 0xfb, 0x5c, 0x1c, 0x65, 0x10, 0x10, 0xb0, 0x77, 0x64, 0x27, 0x7f};
@@ -95,16 +100,19 @@ int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     auto start = emp::clock_start();
     auto comm = getComm(io, threads, nullptr);
 
-    setup_proxy_protocol(ios, threads, party);
+    // OPTION-A: size the single-session COT prepay to the whole proof's draw so
+    // the proving phase pays no per-round streaming refresh (expected_cots=0 would
+    // stream). Over-estimating is safe; see estimate_proxy_cots in prove_aes.h.
+    setup_proxy_protocol(ios[0], party, estimate_proxy_cots(PROXY_TOTAL_RECORD_BYTES));
 
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
     cout << "setup comm: " << (getComm(io, threads, nullptr) - comm) * 1.0 / 1024 << " Kbytes" << endl;
@@ -117,9 +125,9 @@ int main(int argc, char** argv) {
         error("prove error:\n");
     }
 
-    cout << "zk AND gates: " << CircuitExecution::circ_exec->num_and() << endl;
+    cout << "zk AND gates: " << emp::num_and() << endl;  // FULLPORT: session-API num_and() (no global backend)
 
-    bool cheated = finalize_proxy_protocol<BoolIO<NetIO>>();
+    bool cheated = finalize_proxy_protocol();
     if (cheated)
         error("cheated\n");
 

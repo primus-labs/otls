@@ -10,7 +10,7 @@ using namespace emp;
 
 template <typename IO>
 void com_conv_test(
-  IO* io, COT<IO>* cot, block Delta, int party, Integer& input, size_t array_len) {
+  IO* io, COT* cot, block Delta, int party, Integer& input, size_t array_len) {
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
     BIGNUM* q = BN_new();
     BN_CTX* ctx = BN_CTX_new();
@@ -34,7 +34,7 @@ void com_conv_test(
 
     vector<block> raw(array_len);
     for (size_t i = 0; i < raw.size(); i++)
-        raw[i] = input[i].bit;
+        raw[i] = input[i].w.label;
 
     size_t batch_size = 255;
     size_t chunk_len = (array_len + batch_size - 1) / batch_size;
@@ -48,7 +48,7 @@ void com_conv_test(
         coms[i] = EC_POINT_new(group);
         rnds[i] = BN_new();
     }
-    size_t comm = io->counter;
+    size_t comm = (io->send_counter + io->recv_counter);
     ComConv<IO> conv(io, cot, q, Delta);
     PedersenComm pc(h, group);
 
@@ -61,7 +61,7 @@ void com_conv_test(
             cout << "BOB check failed" << endl;
         }
         cout << "BOB time: " << emp::time_from(start) << " us" << endl;
-        cout << "BOB comm: " << io->counter - comm << " bytes" << endl;
+        cout << "BOB comm: " << (io->send_counter + io->recv_counter) - comm << " bytes" << endl;
     } else {
         auto start = emp::clock_start();
         bool res = conv.compute_com_recv(coms, rnds, raw, pc, batch_size);
@@ -71,7 +71,7 @@ void com_conv_test(
             cout << "ALICE check failed" << endl;
         }
         cout << "ALICE time: " << emp::time_from(start) << " us" << endl;
-        cout << "ALICE comms: " << io->counter - comm << " bytes" << endl;
+        cout << "ALICE comms: " << (io->send_counter + io->recv_counter) - comm << " bytes" << endl;
     }
 
     for (size_t i = 0; i < chunk_len; i++) {
@@ -85,23 +85,19 @@ int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
-    setup_protocol<NetIO>(io[0], ios, threads, party);
+    setup_protocol<NetIO>(io[0], ios[0], party);
 
     switch_to_zk();
 
-    IKNP<NetIO>* cot = ((PrimusParty<NetIO>*)(gc_prot_buf))->ot;
-    FerretCOT<NetIO>* fcot;
-    if (party == ALICE) {
-        fcot = ((ZKProver<NetIO>*)(zk_prot_buf))->ostriple->ferret;
-    } else {
-        fcot = ((ZKVerifier<NetIO>*)(zk_prot_buf))->ostriple->ferret;
-    }
+    IKNP* cot = gc_cot();  // FULLPORT: COT of the current GC backend
+    // FULLPORT: upstream ZKBoolBase::ferret (Ferret : public COT, holds Delta), shared by prover/verifier, no party branch.
+    Ferret* fcot = get_bool_backend()->ferret;
 
     size_t array_len = 4 * 1024 * 8;
     PRG prg;

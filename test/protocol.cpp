@@ -27,7 +27,7 @@ const size_t RESPONSE_BYTE_LEN = 2 * 1024;
 const int threads = 1;
 
 template <typename IO>
-void full_protocol(IO* io, IO* io_opt, COT<IO>* cot, int party) {
+void full_protocol(IO* io, IO* io_opt, COT* cot, int party) {
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
     HandShake<NetIO>* hs = new HandShake<NetIO>(io, io_opt, cot, group);
 
@@ -99,14 +99,15 @@ void full_protocol(IO* io, IO* io_opt, COT<IO>* cot, int party) {
 
     unsigned char* finc_ctxt = new unsigned char[finished_msg_length];
     unsigned char* finc_tag = new unsigned char[tag_length];
-    unsigned char* msg = new unsigned char[finished_msg_length];
+    unsigned char* fins_ctxt = new unsigned char[finished_msg_length];
+    unsigned char* fins_tag  = new unsigned char[tag_length];
 
     // Use correct message instead of hs->client_ufin!
     hs->encrypt_client_finished_msg(aead_c, finc_ctxt, finc_tag, hs->client_ufin, 12, aad,
                                     aad_len, iv_c_oct, 8, party);
 
-    // Use correct ciphertext instead of finc_ctxt!
-    hs->decrypt_server_finished_msg(aead_s, msg, finc_ctxt, finished_msg_length, finc_tag, aad,
+    // FULLPORT: encrypt the REAL server-finished message under aead_s (was a finc placeholder).
+    hs->encrypt_client_finished_msg(aead_s, fins_ctxt, fins_tag, hs->server_ufin, 12, aad,
                                     aad_len, iv_s_oct, 8, party);
     cout << "handshake time: " << emp::time_from(start) << " us" << endl;
 
@@ -119,6 +120,7 @@ void full_protocol(IO* io, IO* io_opt, COT<IO>* cot, int party) {
 
     // the client encrypts the first message, and sends to the server.
     rd->encrypt(aead_c, io, cctxt, ctag, cmsg, QUERY_BYTE_LEN, aad, aad_len, iv_c_oct, 8, party);
+    rd->encrypt(aead_s, io, sctxt, stag, smsg, RESPONSE_BYTE_LEN, aad, aad_len, iv_s_oct, 8, party);  // FULLPORT: real server response
     cout << "record time: " << emp::time_from(start) << " us" << endl;
     // prove handshake in post-record phase.
     start = emp::clock_start();
@@ -130,16 +132,17 @@ void full_protocol(IO* io, IO* io_opt, COT<IO>* cot, int party) {
                                          rc, 32, true);
     prd->prove_and_check_handshake_step2(finc_ctxt, finished_msg_length, 
                                          iv_c_oct, 8);
-    prd->prove_and_check_handshake_step3(finc_ctxt, finished_msg_length,
+    prd->prove_and_check_handshake_step3(fins_ctxt, finished_msg_length,
                                          iv_s_oct, 8);
     Integer prd_cmsg, prd_cmsg2, prd_smsg, prd_smsg2, prd_cz0, prd_c2z0, prd_sz0, prd_s2z0;
     prd->prove_record_client(prd_cmsg, prd_cz0, cctxt, QUERY_BYTE_LEN, iv_c_oct, 8);
-    prd->prove_record_server_last(prd_smsg2, prd_s2z0, cctxt, RESPONSE_BYTE_LEN, iv_s_oct, 8);
+    prd->prove_record_server_last(prd_smsg2, prd_s2z0, sctxt, RESPONSE_BYTE_LEN, iv_s_oct, 8);
 
     // Use correct finc_ctxt and fins_ctxt!
-    prd->finalize_check(finc_ctxt, finc_tag, 12, aad, finc_ctxt, finc_tag, 12, aad, {prd_cz0},
-                        {cctxt}, {ctag}, {QUERY_BYTE_LEN}, {aad}, 1, {prd_sz0}, {sctxt},
+    bool fin_ok = prd->finalize_check(finc_ctxt, finc_tag, 12, aad, fins_ctxt, fins_tag, 12, aad, {prd_cz0},
+                        {cctxt}, {ctag}, {QUERY_BYTE_LEN}, {aad}, 1, {prd_s2z0}, {sctxt},
                         {stag}, {RESPONSE_BYTE_LEN}, {aad}, 1, aad_len);
+    if (!fin_ok) error("finalize_check: AEAD GCM tag verification failed!\n");  // FULLPORT: gate on the tag-verify result
 
     sync_zk_gc<IO>();
     switch_to_gc();
@@ -161,7 +164,8 @@ void full_protocol(IO* io, IO* io_opt, COT<IO>* cot, int party) {
     delete[] tau_s;
     delete[] finc_ctxt;
     delete[] finc_tag;
-    delete[] msg;
+    delete[] fins_ctxt;
+    delete[] fins_tag;
     delete[] cmsg;
     delete[] smsg;
 
@@ -178,22 +182,21 @@ int main(int argc, char** argv) {
     NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     auto start = emp::clock_start();
-    setup_protocol<NetIO>(io[0], ios, threads, party);
+    setup_protocol<NetIO>(io[0], ios[0], party);
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
-    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
-    IKNP<NetIO>* cot = prot->ot;
+    IKNP* cot = gc_cot();  // FULLPORT: get the COT of the current GC backend
     full_protocol<NetIO>(io[0], io_opt, cot, party);
     cout << "total time: " << emp::time_from(start) << " us" << endl;
 
-    cout << "gc AND gates: " << dec << gc_circ_buf->num_and() << endl;
-    cout << "zk AND gates: " << dec << zk_circ_buf->num_and() << endl;
+    cout << "gc AND gates: " << dec << gc_backend_buf->num_and() << endl;
+    cout << "zk AND gates: " << dec << zk_backend_buf->num_and() << endl;
     finalize_protocol();
 
     bool cheat = CheatRecord::cheated();

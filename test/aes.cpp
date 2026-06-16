@@ -1,3 +1,4 @@
+#include "cipher/utils.h"
 #include <typeinfo>
 #include "backend/backend.h"
 using namespace emp;
@@ -15,17 +16,17 @@ int main(int argc, char** argv) {
 	Integer b (128, 0, BOB);
 	Integer o (128, 0, PUBLIC);
 	BristolFormat bf((circuit_file_location+"AES-non-expanded.txt").c_str());
-	bf.compute(o.bits.data(), a.bits.data(), b.bits.data());
+	bristol_run(bf, o, a, b);
 	cout << o.reveal<string>()<<endl;
 
 
 	Integer a2 (256, 0, ALICE);
 	Integer o2 (128, 0, PUBLIC);
 	BristolFashion bf2((circuit_file_location2+"aes_128.txt").c_str());
-	bf2.compute(o2.bits.data(), a2.bits.data());
+	bristol_run(bf2, o2, a2);
 	cout << o2.reveal<string>()<<endl;
 
-	cout << io->counter<<endl;
+	cout << (io->send_counter + io->recv_counter)<<endl;
 
 	finalize_backend();
 	delete io;

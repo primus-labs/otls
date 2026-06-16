@@ -10,10 +10,10 @@ int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
     BN_CTX* ctx = BN_CTX_new();
     EC_GROUP_get_curve(group, q, NULL, NULL, ctx);
 
-    setup_protocol(io[0], ios, threads, party, true);
+    setup_protocol(io[0], ios[0], party, true);
 
     Integer a(BN_num_bytes(q) * 8, 0, ALICE);
     Integer b(BN_num_bytes(q) * 8, 0, BOB);
@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
     else
         cout << "test failed!" << endl;
 
-    cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and() << endl;
+    cout << "AND gates: " << dec << backend->num_and() << endl;
 
     delete[] bchar;
     delete[] achar;

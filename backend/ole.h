@@ -3,19 +3,22 @@
 #include "emp-ot/emp-ot.h"
 #include "backend/bn_utils.h"
 #include <iostream>
+#include <vector>
+using namespace emp;  // FULLPORT: upstream emp is entirely inside namespace emp
+using std::vector;  // FULLPORT: upstream no longer transitively `using namespace std`
 
 /* Define the OLE protocol with prime fields */
 template <typename IO>
 class OLE {
    public:
     IO* io;
-    COT<IO>* ot;
+    COT* ot;   // FULLPORT: upstream COT is a non-template base class (send_cot/recv_cot/send_rot/recv_rot/Delta)
     BN_CTX* ctx = nullptr;
     vector<BIGNUM*> exp;
     CCRH ccrh;
     size_t bit_length;
     BIGNUM* q;
-    OLE(IO* io, COT<IO>* ot, BIGNUM* q2, size_t bit_length)
+    OLE(IO* io, COT* ot, BIGNUM* q2, size_t bit_length)
         : io(io), ot(ot), bit_length(bit_length) {
         ctx = BN_CTX_new();
         q = BN_new();

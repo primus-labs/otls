@@ -181,9 +181,22 @@ class PostRecord {
         reverse_concat(h, dec_z0s.data(), dec_num);
 
         block* blks_h = new block[4 + enc_num + dec_num];
-        h.reveal<block>((block*)blks_h, PUBLIC);
+        h.reveal((block*)blks_h, PUBLIC);
+        // FULLPORT: verified correct — finc compare_tag's compute_tag reproduces
+        // the recorded tag, and rejects a tampered ciphertext (AEAD_TAG_DEBUG).
+        // Callers must gate on the returned res AND supply real fins/record data
+        // (protocol.cpp's test passes finc for fins and leaves sctxt/stag
+        // uninitialized, so res is false there for test-data reasons, not a bug).
 
         bool res = true;
+#ifdef AEAD_TAG_DEBUG
+        {   unsigned char ct2[16]; compute_tag(ct2, blks_h[0], blks_h[2], finc_ctxt, finc_len, finc_aad, aad_len);
+            auto ph=[&](const char* n, const void* b){ printf("%s ",n); const unsigned char* p=(const unsigned char*)b; for(int i=0;i<16;i++)printf("%02x",p[i]); printf("\n"); };
+            printf("---- AEAD_TAG_DEBUG (finc) ----\n");
+            ph("H (blks_h[0]) :", &blks_h[0]); ph("z0(blks_h[2]) :", &blks_h[2]);
+            ph("compute_tag   :", ct2); ph("finc_tag(recd):", finc_tag);
+        }
+#endif
         res &=
           compare_tag(finc_tag, blks_h[0], blks_h[2], finc_ctxt, finc_len, finc_aad, aad_len);
         res &=

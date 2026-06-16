@@ -1,5 +1,8 @@
 #ifndef __SWITCH_H__
 #define __SWITCH_H__
+// FULLPORT: GC/ZK/offline phase switching under the upstream single-`emp::backend` model.
+// Old model: two singletons CircuitExecution::circ_exec + ProtocolExecution::prot_exec, two pointers cached per phase.
+// New model: a single `backend`, one Backend* cached per phase, switch = write the corresponding cache back into `backend`.
 #include "emp-tool/emp-tool.h"
 #include "backend/backend.h"
 #include "emp-zk/emp-zk.h"
@@ -7,159 +10,78 @@
 
 using namespace emp;
 
+// Per-phase Backend* cache (single pointer, replacing the old circ+prot dual cache)
 #ifndef THREADING
-extern CircuitExecution* gc_circ_buf;
-extern ProtocolExecution* gc_prot_buf;
-extern CircuitExecution* zk_circ_buf;
-extern ProtocolExecution* zk_prot_buf;
-extern CircuitExecution* offline_gc_circ_buf;
-extern ProtocolExecution* offline_gc_prot_buf;
+extern Backend* gc_backend_buf;
+extern Backend* zk_backend_buf;
+extern Backend* offline_gc_backend_buf;
 extern bool enable_offline;
 #else
-extern __thread CircuitExecution* gc_circ_buf;
-extern __thread ProtocolExecution* gc_prot_buf;
-extern __thread CircuitExecution* zk_circ_buf;
-extern __thread ProtocolExecution* zk_prot_buf;
-extern __thread CircuitExecution* offline_gc_circ_buf;
-extern __thread ProtocolExecution* offline_gc_prot_buf;
+extern __thread Backend* gc_backend_buf;
+extern __thread Backend* zk_backend_buf;
+extern __thread Backend* offline_gc_backend_buf;
 extern __thread bool enable_offline;
 #endif
 
-inline void reset_prot_ptr() {
-    CircuitExecution::circ_exec = nullptr;
-    ProtocolExecution::prot_exec = nullptr;
-}
+// setup_* has already written the newly created backend into `backend`; here we store it into the corresponding phase cache.
+inline void backup_gc()      { gc_backend_buf = backend; }
+inline void backup_zk()      { zk_backend_buf = backend; }
+inline void backup_offline() { offline_gc_backend_buf = backend; }
 
-inline void delete_prot_ptr() {
-    if (CircuitExecution::circ_exec != nullptr) {
-        delete CircuitExecution::circ_exec;
-    }
-    if (ProtocolExecution::prot_exec != nullptr) {
-        delete ProtocolExecution::prot_exec;
-    }
-    reset_prot_ptr();
-}
+inline void switch_to_zk() { backend = zk_backend_buf; }
+inline void switch_to_gc() { backend = gc_backend_buf; }
 
-inline void backup_gc_ptr() {
-    gc_circ_buf = CircuitExecution::circ_exec;
-    gc_prot_buf = ProtocolExecution::prot_exec;
-}
-
-inline void reset_gc_ptr() {
-    gc_circ_buf = nullptr;
-    gc_prot_buf = nullptr;
-}
-
-inline void backup_zk_ptr() {
-    zk_circ_buf = CircuitExecution::circ_exec;
-    zk_prot_buf = ProtocolExecution::prot_exec;
-}
-
-inline void reset_zk_ptr() {
-    zk_circ_buf = nullptr;
-    zk_prot_buf = nullptr;
-}
-
-inline void backup_offline_ptr() {
-    offline_gc_circ_buf = CircuitExecution::circ_exec;
-    offline_gc_prot_buf = ProtocolExecution::prot_exec;
-}
-
-inline void reset_offline_ptr() {
-    offline_gc_circ_buf = nullptr;
-    offline_gc_prot_buf = nullptr;
-}
-
-inline void safe_setup_protocol(std::function<void()> setupFn,
-                                std::function<void()> backupFn,
-                                std::function<void()> resetFn) {
-#if USE_PRIMUS_EMP
-    FunctionWrapperV3(
-      [&setupFn, &backupFn]() {
-          reset_prot_ptr();
-          setupFn();
-          backupFn();
-      },
-      [&resetFn](const char* e) {
-          delete_prot_ptr();
-          resetFn();
-          throw std::runtime_error(e);
-      })();
-
-    CHECK_INITIALIZE_EXCEPTION();
-#else
-    try {
-        reset_prot_ptr();
-        setupFn();
-        backupFn();
-    }
-    catch(std::exception& e) {
-        delete_prot_ptr();
-        resetFn();
-        throw std::runtime_error(e.what());
-    }
-    catch(...) {
-        delete_prot_ptr();
-        resetFn();
-        throw std::runtime_error("unknow error");
-    }
-#endif
-}
+// The upstream sync_zk_bool() is non-template (only flushes the ZK io); the template signature is kept for source compatibility with handshake/aead.
+template <typename IO>
+void sync_zk_gc() { sync_zk_bool(); }
 
 template <typename IO>
-void setup_protocol(
-  IO* io, BoolIO<IO>** ios, int threads, int party, bool ENABLE_OFFLINE_ONLINE = false) {
+void switch_to_online(int party) {
+    sync_offline_online(offline_gc_backend_buf, gc_backend_buf, party);
+    switch_to_gc();
+}
+
+// Single ZK BoolIO + single GC io (first version is single-threaded; the old multi-IO array + threads have been removed).
+template <typename IO>
+void setup_protocol(IO* io, BoolIO* zk_io, int party, bool ENABLE_OFFLINE_ONLINE = false) {
     init_files();
-    safe_setup_protocol([ios, threads, party]() { setup_zk_bool(ios, threads, party); },
-                        backup_zk_ptr, reset_zk_ptr);
-
-    if (!ENABLE_OFFLINE_ONLINE) {
-        safe_setup_protocol([io, party]() { setup_backend(io, party); }, backup_gc_ptr,
-                            reset_gc_ptr);
-    } else {
-        safe_setup_protocol([io, party]() { setup_online_backend(io, party); }, backup_gc_ptr,
-                            reset_gc_ptr);
-
-        safe_setup_protocol([io, party]() { setup_offline_backend(io, party); },
-                            backup_offline_ptr, reset_offline_ptr);
+    try {
+        setup_zk_bool(zk_io, party);   // upstream: backend = ZKBool{Prover,Verifier}
+        backup_zk();
+        if (!ENABLE_OFFLINE_ONLINE) {
+            setup_backend(io, party);
+            backup_gc();
+        } else {
+            setup_online_backend(io, party);
+            backup_gc();
+            setup_offline_backend(io, party);
+            backup_offline();
+        }
+    } catch (std::exception& e) {
+        // clean up already-created backends, to prevent leaks + leftover state on the anti-cheat fallback path
+        if (gc_backend_buf) { delete gc_backend_buf; gc_backend_buf = nullptr; }
+        if (zk_backend_buf) { delete zk_backend_buf; zk_backend_buf = nullptr; }
+        if (offline_gc_backend_buf) { delete offline_gc_backend_buf; offline_gc_backend_buf = nullptr; }
+        backend = nullptr;
+        throw std::runtime_error(e.what());
     }
     enable_offline = ENABLE_OFFLINE_ONLINE;
 }
 
-inline void switch_to_zk() {
-    CircuitExecution::circ_exec = zk_circ_buf;
-    ProtocolExecution::prot_exec = zk_prot_buf;
-}
-
-template <typename IO>
-void sync_zk_gc() {
-    sync_zk_bool<BoolIO<IO>>();
-}
-
-inline void switch_to_gc() {
-    CircuitExecution::circ_exec = gc_circ_buf;
-    ProtocolExecution::prot_exec = gc_prot_buf;
-}
-
-template <typename IO>
-void switch_to_online(int party) {
-    auto offline = (OfflinePrimusParty*)offline_gc_prot_buf;
-    auto online = (PrimusParty<IO>*)gc_prot_buf;
-
-    sync_offline_online(offline, online, party);
-    switch_to_gc();
-}
-
 inline void finalize_protocol() {
-    delete gc_circ_buf;
-    delete gc_prot_buf;
-    delete zk_circ_buf;
-    delete zk_prot_buf;
-    if (enable_offline) {
-        delete offline_gc_circ_buf;
-        delete offline_gc_prot_buf; // delete in sync_offline_online
-    }
-
+    delete gc_backend_buf; gc_backend_buf = nullptr;
+    // FULLPORT FIX (fidelity audit): run the ZK closing SOUNDNESS checks — the
+    // QuickSilver leftover AND-batch check + f2k batch check + auth_hash output-MAC
+    // digest compare (error() on a cheating prover) + ferret final chi-fold — by
+    // finalizing the OWNED ZK session. These live in the engine dtor (~ZKBoolProver/
+    // ~ZKBoolVerifier), reached only via g_zk_owned->finalize(). Previously this fn
+    // deleted ONLY the ZKBackend adapter (zk_backend_buf), leaking the real engine
+    // un-finalized so the ZK proof's closing check NEVER RAN on the GC+ZK (mpctls)
+    // path. Mirrors the fork's `delete zk_prot_buf` (which IS the ZKVerifier).
+    if (g_zk_owned) { g_zk_owned->finalize(); delete g_zk_owned; g_zk_owned = nullptr; g_zk_engine = nullptr; }
+    delete zk_backend_buf; zk_backend_buf = nullptr;   // adapter only (owns nothing else)
+    if (enable_offline) { delete offline_gc_backend_buf; offline_gc_backend_buf = nullptr; }
+    backend = nullptr;
     uninit_files();
 }
 

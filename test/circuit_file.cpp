@@ -1,3 +1,4 @@
+#include "cipher/utils.h"
 #include "backend/backend.h"
 using namespace emp;
 using namespace std;
@@ -13,7 +14,7 @@ void test() {
 	Integer b(128, 3, BOB);
 	Integer c(128, 1, PUBLIC);
 	for(int i = 0; i < 10000; ++i) {
-			cf.compute((block*)c.bits.data(), (block*)a.bits.data(), (block*)b.bits.data());
+			bristol_run(cf, c, a, b);
 	}
 	cout << time_from(start)<<" "<<party<<" "<<c.reveal<string>(BOB)<<endl;
 

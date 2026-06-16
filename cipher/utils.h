@@ -2,7 +2,21 @@
 #define UTILS_H
 
 #include "emp-tool/emp-tool.h"
-#include "compat/primus_compat.h"  // FULLPORT: Integer = UnsignedInt_T<block>（上游 emp）
+// FULLPORT (session API): the new emp-tool layout shadows the legacy
+// core/constants.h (which defined GateType) with runtime/core/constants.h (same
+// include guard, no GateType), so BristolFormat's circuit_file.h sees AND_GATE/
+// XOR_GATE/NOT_GATE undefined. We keep the fork's ACTUAL aes128_ks /
+// aes128_with_ks Bristol circuits (strongest invariant I3 — identical gates AND
+// identical I/O bit convention, which the whole GCM pipeline + record-vector
+// tests depend on), so re-supply the enum here before circuit_file.h.
+namespace emp {
+#ifndef EMP_GATETYPE_DEFINED
+#define EMP_GATETYPE_DEFINED
+enum GateType : int { AND_GATE = 0, XOR_GATE = 1, NOT_GATE = 2 };
+#endif
+}
+#include "emp-tool/circuits/circuit_file.h"  // BristolFormat (uses GateType above)
+#include "compat/primus_compat.h"            // Integer wraps UInt_T<DynamicContext,0>
 #include <iostream>
 #include <vector>
 #include <string>
@@ -19,6 +33,25 @@ extern BristolFormat* aes_enc_ks;
 extern __thread BristolFormat* aes_ks;
 extern __thread BristolFormat* aes_enc_ks;
 #endif
+
+// FULLPORT: run a BristolFormat/BristolFashion circuit on Integer storage. The
+// new compute<Wire> takes Bit_T<DynamicContext>* (carries a ctx ptr), not the raw
+// ZKWire storage, so convert at the boundary.
+inline void bristol_run(BristolFormat& bf, Integer& out, Integer& in1, Integer& in2) {
+    DynamicContext& ctx = zk_ctx();
+    std::vector<Bit_T<DynamicContext>> ob(out.size()), a(in1.size()), b(in2.size());
+    for (int i = 0; i < in1.size(); ++i) a[i] = Bit_T<DynamicContext>(ctx, in1.bits[i]);
+    for (int i = 0; i < in2.size(); ++i) b[i] = Bit_T<DynamicContext>(ctx, in2.bits[i]);
+    bf.compute<DynamicContext>(ob.data(), a.data(), b.data());
+    for (int i = 0; i < out.size(); ++i) out.bits[i] = ob[i].w;
+}
+inline void bristol_run(BristolFashion& bf, Integer& out, Integer& in) {
+    DynamicContext& ctx = zk_ctx();
+    std::vector<Bit_T<DynamicContext>> ob(out.size()), a(in.size());
+    for (int i = 0; i < in.size(); ++i) a[i] = Bit_T<DynamicContext>(ctx, in.bits[i]);
+    bf.compute<DynamicContext>(ob.data(), a.data());
+    for (int i = 0; i < out.size(); ++i) out.bits[i] = ob[i].w;
+}
 
 /* Right rotation on Integer*/
 inline Integer rrot(const Integer& rhs, int sht) {
@@ -111,7 +144,7 @@ inline void intvec_to_int(Integer& out, Integer* in, size_t len) {
     out = Integer(s * len, 0, PUBLIC);
     Integer tmp = Integer(s * len, 0, PUBLIC);
     for (size_t i = 0; i < len; i++) {
-        in[i].resize(s * len);  // FULLPORT: 上游 resize 单参(零扩展); fork 第二参 false=零扩展, 语义等价
+        in[i].resize(s * len);  // FULLPORT: upstream resize takes a single arg (zero-extend); the fork's second arg false=zero-extend, semantically equivalent
         out ^= ((tmp ^ in[i]) << ((len - 1 - i) * s));
     }
 }
@@ -220,16 +253,29 @@ inline block ghash(block h, block* x, size_t m) {
 }
 
 /* Compute the key schedule circuit, will be reused */
+// FULLPORT (session API): the fork's BristolFormat::compute now operates on
+// Bit_T<Ctx> arrays (Ctx = DynamicContext), not raw block/Wire. We keep the SAME
+// aes128_ks Bristol circuit (identical gates AND I/O convention → invariant I3),
+// converting the Integer's ZKWire storage to/from Bit_T at the call boundary.
 inline Integer computeKS(Integer& key) {
     Integer o(1408, 0, PUBLIC);
-    aes_ks->compute<block>(o.bits.data(), key.bits.data(), nullptr);  // FULLPORT: 上游 BristolFormat::compute<Wire>, 显式 <block>
+    DynamicContext& ctx = zk_ctx();
+    std::vector<Bit_T<DynamicContext>> ob(1408), kb(128);
+    for (int i = 0; i < 128; ++i) kb[i] = Bit_T<DynamicContext>(ctx, key.bits[i]);
+    aes_ks->compute<DynamicContext>(ob.data(), kb.data(), nullptr);
+    for (int i = 0; i < 1408; ++i) o.bits[i] = ob[i].w;
     return o;
 }
 
 /* Compute the AES circuit, assuming KS is finished */
 inline Integer computeAES_KS(Integer& key, Integer& msg) {
     Integer o(128, 0, PUBLIC);
-    aes_enc_ks->compute<block>(o.bits.data(), key.bits.data(), msg.bits.data());  // FULLPORT: 显式 <block>
+    DynamicContext& ctx = zk_ctx();
+    std::vector<Bit_T<DynamicContext>> ob(128), kb(1408), mb(128);
+    for (int i = 0; i < 1408; ++i) kb[i] = Bit_T<DynamicContext>(ctx, key.bits[i]);
+    for (int i = 0; i < 128; ++i)  mb[i] = Bit_T<DynamicContext>(ctx, msg.bits[i]);
+    aes_enc_ks->compute<DynamicContext>(ob.data(), kb.data(), mb.data());
+    for (int i = 0; i < 128; ++i) o.bits[i] = ob[i].w;
     reverse(o.bits.begin(), o.bits.end());
     return o;
 }
@@ -242,10 +288,10 @@ inline block integer_to_block(Integer& in) {
     block b = zero_block;
     uint64_t one = 1; /*ujnss typefix: must be 64 bit */
     for (int i = 0; i < 64; i++) {
-        if (getLSB(in[i].bit))
+        if (getLSB(in[i].w.label))  // FULLPORT: operator[] now returns Bit_T<Ctx>; .w.label is the wire's block
             b = b ^ makeBlock(0, one << i);
 
-        if (getLSB(in[i + 64].bit))
+        if (getLSB(in[i + 64].w.label))
             b = b ^ makeBlock(one << i, 0);
     }
     return b;
@@ -276,7 +322,7 @@ inline void integer_to_chars(unsigned char* out, Integer& in) {
     for (size_t i = 0; i < in.size(); i += 8) {
         size_t tmp = 0;
         for (size_t j = 0; j < 8; j++) {
-            if (getLSB(ins.bits[i + j].bit)) {
+            if (getLSB(ins.bits[i + j].label)) {  // FULLPORT: .bits[k] is now a ZKWire; .label is its block
                 tmp ^= (1 << (7 - j));
             }
         }

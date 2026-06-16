@@ -43,13 +43,13 @@ int main(int argc, char** argv) {
     int party, port;
     parse_party_and_port(argv, &party, &port);
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
-    setup_protocol<NetIO>(io[0], ios, threads, party);
+    setup_protocol<NetIO>(io[0], ios[0], party);
     gc_zk_check_test<NetIO>(party);
     switch_to_zk();
     check_zero_test<NetIO>(party);

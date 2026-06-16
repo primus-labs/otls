@@ -8,7 +8,7 @@ void convert(int party) {
     block* b = new block[2];
     if (party == ALICE) {
         for (int i = 0; i < 256; i++) {
-            cout << getLSB(a[i].bit);
+            cout << getLSB(a[i].w.label);
         }
         cout << endl;
     }
@@ -31,7 +31,7 @@ void convert(int party) {
 }
 
 void aead_encrypt_test(
-  NetIO* io, NetIO* io_opt, COT<NetIO>* ot, int party, bool sec_type = false) {
+  NetIO* io, NetIO* io_opt, COT* ot, int party, bool sec_type = false) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
@@ -83,7 +83,7 @@ void aead_encrypt_test(
 }
 
 void aead_decrypt_test(
-  NetIO* io, NetIO* io_opt, COT<NetIO>* ot, int party, bool sec_type = false) {
+  NetIO* io, NetIO* io_opt, COT* ot, int party, bool sec_type = false) {
     unsigned char keyc[] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
                             0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
     reverse(keyc, keyc + 16);
@@ -155,26 +155,25 @@ int main(int argc, char** argv) {
     NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
-    setup_protocol(io[0], ios, threads, party);
-    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
-    IKNP<NetIO>* cot = prot->ot;
+    setup_protocol(io[0], ios[0], party);
+    IKNP* cot = gc_cot();  // FULLPORT: get the COT of the current GC backend
 
     aead_encrypt_test(io[0], io_opt, cot, party);
     aead_decrypt_test(io[0], io_opt, cot, party, true);
     convert(party);
-    cout << "AND gates: " << dec << CircuitExecution::circ_exec->num_and() << endl;
+    cout << "AND gates: " << dec << backend->num_and() << endl;
     finalize_protocol();
     size_t totalCounter = 0;
     for (int i = 0; i < threads; i++) {
-        totalCounter += io[i]->counter;
+        totalCounter += (io[i]->send_counter + io[i]->recv_counter);
     }
-    totalCounter += io_opt->counter;
+    totalCounter += (io_opt->send_counter + io_opt->recv_counter);
     cout << totalCounter << endl;
 
     bool cheat = CheatRecord::cheated();

@@ -2,33 +2,31 @@
 #define _CHECK_ZERO_H
 #include "emp-tool/emp-tool.h"
 #include "emp-zk/emp-zk.h"
+#include "compat/primus_compat.h"  // FULLPORT: Integer alias + getLSB/from_bool
 
 using namespace emp;
 
+// FULLPORT: the old fork absorbed the MAC/key block of the authenticated-bit to be
+// proven zero into ZKProver/Verifier's `ostriple->auth_helper->hash` (the output MAC
+// accumulator); at finalize the prover sends the digest, the verifier compares, and on
+// mismatch it rejects. The upstream emp-zk-bool folds this into
+// ZKBoolBase::auth_hash -- prover/verifier share the same field, and it is exactly the
+// transcript checked by verify_output/finalize_macs (zk_bool_{prover,verifier}.h:
+// mismatch -> error()).
+// So both sides uniformly call `get_bool_backend()->auth_hash.put_block(...)`, with no party branch.
+// Security I5/I2: zero wire MAC==key (val=0) -> digest matches; non-zero wire MAC=key^Delta -> digest mismatches -> hard reject.
+
 template <typename IO>
 inline void check_zero(const block* blk, size_t length, int party) {
-    if (party == ALICE) {
-        (((ZKProver<IO>*)(ProtocolExecution::prot_exec))->ostriple->auth_helper->hash)
-          .put_block(blk, length);
-    } else {
-        (((ZKVerifier<IO>*)(ProtocolExecution::prot_exec))->ostriple->auth_helper->hash)
-          .put_block(blk, length);
-    }
+    get_bool_backend()->auth_hash.put_block(blk, length);
 }
 
 template <typename IO>
 inline void check_zero(const Integer& input, int party) {
-    if (party == ALICE) {
-        for (size_t i = 0; i < input.size(); i++) {
-            (((ZKProver<IO>*)(ProtocolExecution::prot_exec))->ostriple->auth_helper->hash)
-              .put_block(&input[i].bit, 1);
-        }
-    } else {
-        for (size_t i = 0; i < input.size(); i++) {
-            (((ZKVerifier<IO>*)(ProtocolExecution::prot_exec))->ostriple->auth_helper->hash)
-              .put_block(&input[i].bit, 1);
-        }
-    }
+    // FULLPORT: input[i] (operator[]) now returns a Bit_T temporary; take the
+    // address of the wire block from the .bits storage (a stable lvalue) instead.
+    for (size_t i = 0; i < (size_t)input.size(); i++)
+        get_bool_backend()->auth_hash.put_block(&input.bits[i].label, 1);
 }
 
 /* For the caller, must ensure that T is a fixed size */
@@ -39,8 +37,8 @@ inline void check_zero(const Integer& input, const T* data, size_t len, int part
         error("inconsistent length!\n");
     bool* tmp = new bool[input.size()];
     if (party == ALICE) {
-        for (size_t i = 0; i < input.size(); i++)
-            tmp[i] = getLSB(input[i].bit);
+        for (size_t i = 0; i < (size_t)input.size(); i++)
+            tmp[i] = getLSB(input.bits[i].label);
 
         T* expected_data = new T[len];
         from_bool(tmp, expected_data, len * sizeof(T) * 8);

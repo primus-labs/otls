@@ -33,10 +33,10 @@ void prf_test() {
     reverse(label_u.begin(), label_u.end());
     reverse(output_u.begin(), output_u.end());
 
-    Integer secret(128, secret_u.data());
-    Integer seed(128, seed_u.data());
-    Integer label(80, label_u.data());
-    Integer output(800, output_u.data());
+    Integer secret(128, secret_u.data(), PUBLIC);
+    Integer seed(128, seed_u.data(), PUBLIC);
+    Integer label(80, label_u.data(), PUBLIC);
+    Integer output(800, output_u.data(), PUBLIC);
 
     Integer res;
     PRF prf;
@@ -80,7 +80,7 @@ void opt_prf_test() {
     unsigned char* seed = seed_u.data();
     unsigned char* label = label_u.data();
 
-    Integer output(56 * 8, output_u.data());
+    Integer output(56 * 8, output_u.data(), PUBLIC);
 
     Integer res;
     PRF prf;
@@ -259,24 +259,24 @@ void nopt_handshake_prf_circ_test() {
     Integer ms;
     auto start = emp::clock_start();
     prf.init(hmac, pms);
-    Integer mk_label_int(mk_label, PUBLIC);
-    Integer mk_seed_int(mk_seed, PUBLIC);
+    Integer mk_label_int(8, mk_label, PUBLIC);
+    Integer mk_seed_int(8, mk_seed, PUBLIC);
     prf.compute(hmac, ms, 384, pms, mk_label_int, mk_seed_int);
 
     Integer sk;
     prf.init(hmac, ms);
-    Integer ke_label_int(ke_label, PUBLIC);
-    Integer ke_seed_int(ke_seed, PUBLIC);
+    Integer ke_label_int(8, ke_label, PUBLIC);
+    Integer ke_seed_int(8, ke_seed, PUBLIC);
     prf.compute(hmac, sk, 448, ms, ke_label_int, ke_seed_int);
 
     Integer ucfin;
-    Integer cfin_label_int(cfin_label, PUBLIC);
-    Integer cfin_seed_int(ctau, PUBLIC);
+    Integer cfin_label_int(8, cfin_label, PUBLIC);
+    Integer cfin_seed_int(8, ctau, PUBLIC);
     prf.compute(hmac, ucfin, 96, ms, cfin_label_int, cfin_seed_int);
 
     Integer usfin;
-    Integer sfin_label_int(sfin_label, PUBLIC);
-    Integer sfin_seed_int(stau, PUBLIC);
+    Integer sfin_label_int(8, sfin_label, PUBLIC);
+    Integer sfin_seed_int(8, stau, PUBLIC);
     prf.compute(hmac, usfin, 96, ms, sfin_label_int, sfin_seed_int);
 
     cout << "time: " << emp::time_from(start) << " us" << endl;
@@ -308,7 +308,7 @@ void zk_gc_prf_test(int party) {
     unsigned char* seed = seed_u.data();
     unsigned char* label = label_u.data();
 
-    Integer output(800, output_u.data());
+    Integer output(800, output_u.data(), PUBLIC);
 
     Integer res;
     PRF prf;
@@ -326,7 +326,7 @@ void zk_gc_prf_test(int party) {
     switch_to_zk();
     res = Integer();
     secret = Integer(128, secret_u.data(), ALICE);
-    output = Integer(800, output_u.data());
+    output = Integer(800, output_u.data(), PUBLIC);
     prf.init(hmac, secret);
     prf.opt_rounds_compute(hmac, res, 800, secret, label, label_u.size(), seed, seed_u.size(),
                            true, true, true);
@@ -348,13 +348,13 @@ int main(int argc, char** argv) {
     int port, party;
     parse_party_and_port(argv, &party, &port);
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
-    setup_protocol(io[0], ios, threads, party);
+    setup_protocol(io[0], ios[0], party);
     zk_gc_prf_test(party);
     finalize_protocol();
 

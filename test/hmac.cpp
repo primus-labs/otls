@@ -14,7 +14,7 @@ using namespace std;
 using namespace emp;
 
 void sha256test() {
-    SHA256 sha;
+    class SHA256 sha;
     Integer* dig = new Integer[sha.DIGLEN];
     vector<uint32_t> outhex;
 
@@ -32,7 +32,7 @@ void sha256test() {
 }
 
 void optsha256test() {
-    SHA256 sha;
+    class SHA256 sha;
     uint32_t* dig = new uint32_t[sha.DIGLEN];
     string sec = "0123456789012345678901234567890123456789012345678901234567890123";
     Integer sec_input = str_to_int(sec, PUBLIC);
@@ -133,7 +133,7 @@ void opt_hmac_sha256circ() {
 }
 
 void sha256_compressiontest() {
-    SHA256 sha;
+    class SHA256 sha;
     Integer* input = new Integer[sha.DIGLEN];
 
     for (int i = 0; i < sha.DIGLEN; i++) {
@@ -179,13 +179,13 @@ int main(int argc, char** argv) {
     parse_party_and_port(argv, &party, &port);
 
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
-    setup_protocol(io[0], ios, threads, party);
+    setup_protocol(io[0], ios[0], party);
     zk_gc_hmac_test();
     hmac_sha256test();
     finalize_protocol();

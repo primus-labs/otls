@@ -93,7 +93,7 @@ class PRF {
 
             if (!zk_flag) {
                 // in the gc setting, store the revealed M values.
-                tmpInt.reveal<uint32_t>((uint32_t*)tmpd, PUBLIC);
+                tmpInt.reveal((uint32_t*)tmpd, PUBLIC);
 
                 pub_M.push_back(nullptr);
                 pub_M.back() = new uint32_t[hmac.DIGLEN];
@@ -262,7 +262,7 @@ class PRFOffline {
             // in the gc setting, store the revealed M values.
             Integer tmpInt;
             reverse_concat(tmpInt, tmp, hmac.DIGLEN);
-            tmpInt.reveal<uint32_t>((uint32_t*)tmpd, PUBLIC);
+            tmpInt.reveal((uint32_t*)tmpd, PUBLIC);
 
             hmac.opt_hmac_sha256(tmp, reuse_in_hash_flag, reuse_out_hash_flag);
             hmac_calls_num++;

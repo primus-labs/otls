@@ -6,7 +6,7 @@
 using namespace emp;
 
 template <typename IO>
-void post_record_test(IO* io, IO* io_opt, COT<IO>* cot, int party) {
+void post_record_test(IO* io, IO* io_opt, COT* cot, int party) {
     EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
     HandShake<NetIO>* hs = new HandShake<NetIO>(io, io_opt, cot, group);
 
@@ -197,17 +197,16 @@ int main(int argc, char** argv) {
     NetIO* io_opt = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + threads);
 
     NetIO* io[threads];
-    BoolIO<NetIO>* ios[threads];
+    BoolIO* ios[threads];
     for (int i = 0; i < threads; i++) {
         io[i] = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i);
-        ios[i] = new BoolIO<NetIO>(io[i], party == ALICE);
+        ios[i] = new BoolIO(io[i], party == ALICE);
     }
 
     auto start = emp::clock_start();
-    setup_protocol<NetIO>(io[0], ios, threads, party);
+    setup_protocol<NetIO>(io[0], ios[0], party);
     cout << "setup time: " << emp::time_from(start) << " us" << endl;
-    auto prot = (PrimusParty<NetIO>*)(ProtocolExecution::prot_exec);
-    IKNP<NetIO>* cot = prot->ot;
+    IKNP* cot = gc_cot();  // FULLPORT: get the COT of the current GC backend
     start = emp::clock_start();
     post_record_test<NetIO>(io[0], io_opt, cot, party);
     cout << "post_record time: " << emp::time_from(start) << " us" << endl;
