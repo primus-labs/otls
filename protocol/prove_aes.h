@@ -9,6 +9,7 @@
 #define _AESPROVER_
 
 #include "emp-tool/emp-tool.h"
+#include "emp-ot/emp-ot.h"
 #include "cipher/utils.h"
 
 template <typename IO>
