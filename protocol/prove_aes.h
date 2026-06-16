@@ -11,6 +11,7 @@
 #include "emp-tool/emp-tool.h"
 #include "emp-ot/emp-ot.h"
 #include "cipher/utils.h"
+using namespace emp;
 
 template <typename IO>
 void setup_proxy_protocol(BoolIO<IO>** ios, int threads, int party, const PrimalLPNParameter* lpn_param = &ferret_b10) {
