@@ -30,7 +30,10 @@
 #include <string>
 #include <cstdint>
 #include <memory>
+#include <functional>
 #include <type_traits>
+#include <cmath>       // ceil, log2 — fork secret-shift loop bound (integer.hpp:317/324)
+#include <algorithm>   // std::min — fork secret-shift loop bound
 
 namespace emp {
 
@@ -85,6 +88,104 @@ struct ZKBackend : public Backend {
 // FULLPORT: fork get_bool_delta() -> the active ZK engine's Δ (ZKBoolBase::delta;
 // verifier-side global secret). Used by aead_izk's verifier path. ZK only.
 inline block get_bool_delta() { return g_zk_engine ? g_zk_engine->delta : zero_block; }
+
+// FULLPORT: fork emp-tool FunctionWrapperV3 (emp-tool/utils/function_wrapper.{h,cpp}).
+// Upstream emp-tool dropped function_wrapper, so reproduce its EXACT control flow here.
+// Fork FunctionSafeRun did:
+//   try { execute(); }                              // execute() == tryFn()
+//   catch (std::exception& e) { catchException(e.what()); }    // catchException(m)==catchFn(m)
+//   catch (...)                { catchException("[OtherError]unknown reason"); }
+// catchFn is invoked from INSIDE the active catch handler, so a bare `throw;` inside the
+// caller's catch lambda re-propagates the ORIGINAL exception (parser.cpp:658/:709 rethrow
+// unless the message contains "[FindKeyError]"). Byte-identical control flow & messages.
+struct FunctionWrapperV3 {
+    std::function<void()>            tryFn;
+    std::function<void(const char*)> catchFn;
+    FunctionWrapperV3(std::function<void()> t, std::function<void(const char*)> c)
+        : tryFn(std::move(t)), catchFn(std::move(c)) {}
+    void operator()() {
+        try {
+            tryFn();
+        } catch (std::exception& e) {
+            catchFn(e.what());
+        } catch (...) {
+            catchFn("[OtherError]unknown reason");
+        }
+    }
+};
+
+// FULLPORT: fork emp-tool FunctionWrapperV2 (emp-tool/utils/function_wrapper.h:38-82
+// + static member def function_wrapper.cpp:4 + FunctionSafeRun function_wrapper.cpp:9-20).
+// STATEFUL exception-capturing wrapper used by mpc_tls finalize path:
+//   * execute(): runs fn() ONLY if no prior exception message was recorded.
+//   * catchException(): records the message (does NOT rethrow).
+//   * operator(): try{execute()} catch(std::exception&e){catchException(e.what())}
+//                 catch(...){catchException("[OtherError]unknown reason")}  (FunctionSafeRun inlined).
+//   * static getExceptionMsg(): reads the recorded message; check_exception_msg() lazily
+//     new std::string("") so the pointer is never null.
+// Native port is single-threaded (no THREADING) -> plain inline static (not __thread).
+// Static member defined inline so it links without the dropped function_wrapper.cpp.
+// (Like the V3 shim above, this is a plain struct: upstream dropped AbstractFunctionWrapper,
+//  so operator() inlines FunctionSafeRun's try/catch directly instead of virtual dispatch.)
+struct FunctionWrapperV2 {
+   public:
+    FunctionWrapperV2(std::function<void()> f) { fn = f; }
+    void operator()() {
+        try {
+            execute();
+        } catch (std::exception& e) {
+            catchException(e.what());
+        } catch (...) {
+            catchException("[OtherError]unknown reason");
+        }
+    }
+
+    void execute() {
+        check_exception_msg();
+        if (this->exceptionMsg->empty()) {
+            fn();
+        }
+    }
+
+    void catchException(const char* e) {
+        check_exception_msg();
+        *exceptionMsg = e;
+    }
+
+    static std::string getExceptionMsg() {
+        check_exception_msg();
+        return *exceptionMsg;
+    }
+    static void setExceptionMsgPtr(std::string* ptr) { exceptionMsg = ptr; }
+
+   private:
+    static void check_exception_msg() {
+        if (exceptionMsg == nullptr) {
+            exceptionMsg = new std::string("");
+        }
+    }
+
+    std::function<void()> fn;
+    static inline std::string* exceptionMsg = nullptr;
+};
+
+#define SET_FINALIZE_IO_EXCEPTION(exceptionMsg)                                 \
+    do {                                                                        \
+        FunctionWrapperV2([](){}).catchException(exceptionMsg);                 \
+    } while(false);
+
+// FULLPORT: fork emp-tool CHECK_FINALIZE_IO_EXCEPTION (function_wrapper.h:125-131).
+// Reads the FunctionWrapperV2 static exception message and rethrows it as a
+// runtime_error if non-empty (the finalize-path error surfacing pado.cpp:182 /
+// client.cpp:1123 / client_api.cpp:43 use). Byte-identical control flow; std::-
+// qualified so it does not depend on a `using namespace std` at the call site.
+#define CHECK_FINALIZE_IO_EXCEPTION()                                           \
+    do {                                                                        \
+        std::string exceptionMsg = FunctionWrapperV2::getExceptionMsg();        \
+        if (!exceptionMsg.empty()) {                                            \
+            throw std::runtime_error(exceptionMsg);                             \
+        }                                                                       \
+    } while(false)
 
 // ZK backend lifecycle shims (the removed emp-zk setup_zk_bool/finalize_zk_bool/
 // sync_zk_bool). setup installs the ZKBackend as the global backend; switch.h and
@@ -166,18 +267,27 @@ class Integer : public UInt_T<DynamicContext, 0> {
     Integer& operator=(Integer&& o) noexcept { Base::operator=(std::move(static_cast<Base&>(o))); return *this; }
     Integer& operator=(const Base& b) { Base::operator=(b); return *this; }
 
-    // (width, integer value, party): value is LSB-first, zero-extended past bit 63.
-    // Integral-constrained so a literal `0` is NOT ambiguous with the byte-pointer
-    // ctor (a pointer arg SFINAEs out of here and selects that one instead).
-    template <class T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
-    Integer(int width, T value, int party) : Base(zk_ctx(), width), bits(w) {
+    // (width, arithmetic value, party=PUBLIC): value taken LSB-first, zero-extended
+    // past bit 63. Accepts integral AND floating-point: the fork ctor is
+    // `Integer(int,int64_t,party=PUBLIC)` and fork call sites pass doubles (e.g.
+    // `Integer scale(64, pow(10,p))`) that truncate to int64_t — we mirror that exact
+    // double→int64_t truncation so the bit pattern is fork-identical (I3). The party
+    // default matches the fork. Arithmetic-constrained so a pointer arg SFINAEs out of
+    // here and a literal `0` (an int, not a pointer) selects THIS ctor, never the
+    // byte-pointer one below (whose `const T*` fails deduction on `0`).
+    template <class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+    Integer(int width, T value, int party = PUBLIC) : Base(zk_ctx(), width), bits(w) {
+        const unsigned long long uv = (unsigned long long)(long long)value;   // fork: double/int → int64_t
         auto b = std::make_unique<bool[]>((size_t)width);
         for (int i = 0; i < width; ++i)
-            b[(size_t)i] = (i < 64) ? ((((unsigned long long)value) >> i) & 1) != 0 : false;
+            b[(size_t)i] = (i < 64) ? ((uv >> i) & 1) != 0 : false;
         feed_into_(*this, party, b.get(), width);
     }
-    // (width, byte buffer, party): LSB-first within each byte (fork to_bool order).
-    Integer(int width, const void* bytes, int party) : Base(zk_ctx(), width), bits(w) {
+    // (width, byte buffer, party=PUBLIC): LSB-first within each byte (fork to_bool order).
+    // Templated on the pointee (mirrors fork `Integer(int,T*,party=PUBLIC)`) so a literal
+    // `0` fails `const T*` deduction and drops out, leaving the arithmetic ctor.
+    template <class T>
+    Integer(int width, const T* bytes, int party = PUBLIC) : Base(zk_ctx(), width), bits(w) {
         const uint8_t* p = (const uint8_t*)bytes;
         auto b = std::make_unique<bool[]>((size_t)width);
         for (int i = 0; i < width; ++i) b[(size_t)i] = (p[i / 8] >> (i % 8)) & 1;
@@ -217,8 +327,38 @@ class Integer : public UInt_T<DynamicContext, 0> {
     Integer operator~()              const { return Integer(Base::operator~()); }
     Integer operator<<(int s)        const { return Integer(Base::operator<<(s)); }
     Integer operator>>(int s)        const { return Integer(Base::operator>>(s)); }
+    // SECRET-amount shifts (fork emp-tool integer.hpp:315-327). Upstream's
+    // UInt_T::operator<<(const UInt_T&)/>>(const UInt_T&) are `requires (N>0)`
+    // (unsigned_int.h:118-135) — DISABLED for our runtime-width N=0 Integer — and
+    // additionally zero the result on overflow (an `overflow` mux the fork lacks),
+    // which would CHANGE the proven relation. So we replicate the FORK exactly:
+    // a log-depth barrel over only the low min(ceil(log2(size())), shamt_w-1) bits
+    // of shamt, with NO overflow-zeroing. select(cond,t) is `cond ? t : res`
+    // (keystone select -> Base::select -> kernel::mux = sel?t:f, byte-identical to
+    // the fork's Bit::select picking the ARGUMENT on cond-true: bit.hpp:7-12,
+    // integer.hpp:164-170), so the shift direction is NOT inverted (I3).
+    Integer operator<<(const Base& shamt) const {
+        Integer res(*this);
+        const size_t shamt_w = shamt.w.size();                               // fork shamt.size()
+        const size_t bound = std::min((size_t)std::ceil(std::log2((double)size())), shamt_w - 1);
+        for (size_t i = 0; i < bound; ++i)
+            res = res.select(shamt[(int)i], res << (1 << i));                 // shamt[i] -> Bit_T<DynamicContext>
+        return res;
+    }
+    Integer operator>>(const Base& shamt) const {
+        Integer res(*this);
+        const size_t shamt_w = shamt.w.size();                               // fork shamt.size()
+        const size_t bound = std::min((size_t)std::ceil(std::log2((double)size())), shamt_w - 1);
+        for (size_t i = 0; i < bound; ++i)
+            res = res.select(shamt[(int)i], res >> (1 << i));
+        return res;
+    }
     Bit     operator<(const Base& o) const { return Bit(static_cast<const Base&>(*this).as_signed() < o.as_signed()); }  // SIGNED (fork Integer semantics)
     Bit     operator==(const Base& o)const { return Bit(Base::operator==(o)); }
+    // Explicit != (returns Bit, like fork). REQUIRED: C++20 will not synthesize `!=`
+    // from a rewritten `==` because our `operator==` returns Bit, not bool — without
+    // this, `a != b` is a hard error ("return type ... not 'bool'").
+    Bit     operator!=(const Base& o)const { return !operator==(o); }
     Integer select(const Bit_T<DynamicContext>& sel, const Base& t) const { return Integer(Base::select(sel, t)); }
 
     // Open to `party`, writing clear bytes LSB-first (fork from_bool order).
@@ -231,6 +371,13 @@ class Integer : public UInt_T<DynamicContext, 0> {
         for (int i = 0; i < nbytes; ++i) p[i] = 0;
         for (int i = 0; i < n; ++i) p[i / 8] |= (uint8_t)(b[(size_t)i] ? 1 : 0) << (i % 8);
     }
+    // Templated BUFFER reveal (fork Integer::reveal<T>(T* output, party)): write the full
+    // ceil(width/8) clear bytes LSB-first into `output`. Delegates to the void* packer so
+    // the byte layout is byte-identical to the fork (I3). Distinct from the value-returning
+    // overload below: this one takes a pointer arg, so `reveal<uchar>(buf, party)` (2 args)
+    // binds here while `reveal<uint32_t>()` / `reveal<uint32_t>(party)` binds below.
+    template <typename T>
+    void reveal(T* output, int party = PUBLIC) const { reveal((void*)output, party); }
     // Templated clear reveal (fork Integer::reveal<T>()): low min(width,bits(T)) bits, LSB-first.
     template <typename T>
     T reveal(int party = PUBLIC) const {
