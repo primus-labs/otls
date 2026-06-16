@@ -12,12 +12,12 @@
 #include "cipher/utils.h"
 
 template <typename IO>
-void setup_proxy_protocol(BoolIO<IO>** ios, int threads, int party) {
+void setup_proxy_protocol(BoolIO<IO>** ios, int threads, int party, const PrimalLPNParameter* lpn_param = &ferret_b10) {
     init_files();
 #if USE_PRIMUS_EMP
     FunctionWrapperV3(
-      [ios, threads, party]() {
-          setup_zk_bool<BoolIO<IO>>(ios, threads, party);
+      [ios, threads, party, lpn_param]() {
+          setup_zk_bool<BoolIO<IO>>(ios, threads, party, nullptr, lpn_param);
       },
       [](const char* e) {
           throw std::runtime_error(e);
@@ -26,7 +26,7 @@ void setup_proxy_protocol(BoolIO<IO>** ios, int threads, int party) {
     CHECK_INITIALIZE_EXCEPTION();
 #else
     try {
-        setup_zk_bool<BoolIO<IO>>(ios, threads, party);
+        setup_zk_bool<BoolIO<IO>>(ios, threads, party, nullptr, lpn_param);
     }
     catch(std::exception& e) {
         throw std::runtime_error(e.what());
