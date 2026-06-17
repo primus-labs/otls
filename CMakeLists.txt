@@ -24,6 +24,13 @@ IF(DEFINED EMP_UPSTREAM_ROOT)
   set(EMP-ZK_LIBRARIES   ${EMP_UPSTREAM_ROOT}/lib/libemp-zk.a)
   set(EMP-OT_LIBRARIES   ${EMP_UPSTREAM_ROOT}/lib/libemp-ot.a)
   set(EMP-TOOL_LIBRARIES ${EMP_UPSTREAM_ROOT}/lib/libemp-tool.a ${OPENSSL_LIBRARIES})
+  # FULLPORT: replicate emp-tool's PUBLIC SIMD arch floor (we consume emp via explicit
+  # paths, not the cmake target). x86_64/g++ otherwise can't inline emp's AES-NI/SSSE3
+  # always_inline intrinsics. arm64/clang needs none. See pado/CMakeLists.txt for detail.
+  add_compile_options(-Wno-ignored-attributes)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64|AMD64|i.86)")
+    add_compile_options(-march=native)
+  endif()
 ELSEIF(ENABLE_WASM)
   set(CMAKE_FOLDER ${CMAKE_INSTALL_PREFIX})
   include(${CMAKE_FOLDER}/cmake/emp-base.cmake)

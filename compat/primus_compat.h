@@ -123,7 +123,15 @@ struct FunctionWrapperV3 {
 //                 catch(...){catchException("[OtherError]unknown reason")}  (FunctionSafeRun inlined).
 //   * static getExceptionMsg(): reads the recorded message; check_exception_msg() lazily
 //     new std::string("") so the pointer is never null.
-// Native port is single-threaded (no THREADING) -> plain inline static (not __thread).
+// THREAD-LOCAL (FULLPORT FIX): the fork declares this `static __thread std::string*`
+// under THREADING (function_wrapper.h:80). The native pado client runs do_offline and
+// do_online on TWO concurrent std::threads (client.cpp:1176-1177), each of which calls
+// setExceptionMsgPtr(g_exception_msg) where g_exception_msg is itself __thread. With a
+// SHARED `inline static` pointer the two threads race on it: when the online thread's
+// ThreadVariableWrapper string is freed at thread exit, the shared pointer dangles and
+// the offline thread reads freed memory (observed: a spurious "0" leaks into the finalize
+// exception, skipping ecdsa_sign -> get_signature desync -> [OtherError]0). `thread_local`
+// gives each thread its own pointer (matching the fork's __thread), so no cross-thread leak.
 // Static member defined inline so it links without the dropped function_wrapper.cpp.
 // (Like the V3 shim above, this is a plain struct: upstream dropped AbstractFunctionWrapper,
 //  so operator() inlines FunctionSafeRun's try/catch directly instead of virtual dispatch.)
@@ -166,7 +174,7 @@ struct FunctionWrapperV2 {
     }
 
     std::function<void()> fn;
-    static inline std::string* exceptionMsg = nullptr;
+    static inline thread_local std::string* exceptionMsg = nullptr;
 };
 
 #define SET_FINALIZE_IO_EXCEPTION(exceptionMsg)                                 \
