@@ -77,6 +77,20 @@ option(USE_PRIMUS_EMP "use primus emp" OFF)
 IF(USE_PRIMUS_EMP)
   add_definitions(-DUSE_PRIMUS_EMP=1)
 ENDIF()
+# FULLPORT (in-process concurrency): consume the THREADING cache var (passed as
+# -DTHREADING=ON by scripts/internal/compile_*.sh, previously UNCONSUMED on the
+# EMP_UPSTREAM_ROOT branch). When set, emp::backend, the switch.h phase buffers
+# (gc_backend_buf/zk_backend_buf/offline_gc_backend_buf/enable_offline) and
+# aes_ks/aes_enc_ks become __thread (thread-local) instead of plain process-globals
+# (see cipher/utils.cpp / backend/switch.cpp #ifndef THREADING splits). This lets the
+# thread-per-client attestor run overlapping proofs without racing on the global
+# backend pointer or use-after-free'ing the shared AES BristolFormat. ALL TUs that
+# include backend.h/switch.h MUST agree on this flag (ODR) -> also set in pado/CMakeLists.
+# Upstream emp libs neither define nor reference emp::backend (verified via nm), so the
+# flip is self-contained to otls+pado.
+IF(THREADING)
+  add_definitions(-DTHREADING)
+ENDIF()
 add_compile_options(-fPIC)
 IF(USE_PRIMUS_EMP)
 add_library(otls ${sources})
