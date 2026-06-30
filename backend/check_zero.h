@@ -38,21 +38,21 @@ inline void check_zero(const Integer& input, const T* data, size_t len, int part
     if (input.size() != len * sizeof(T) * 8)
         error("inconsistent length!\n");
     bool* tmp = new bool[input.size()];
+    std::unique_ptr<bool[]> p_tmp(tmp);
     if (party == ALICE) {
         for (size_t i = 0; i < input.size(); i++)
             tmp[i] = getLSB(input[i].bit);
 
         T* expected_data = new T[len];
+        std::unique_ptr<T[]> p_expected_data(expected_data);
         from_bool(tmp, expected_data, len * sizeof(T) * 8);
 
         if (memcmp(expected_data, data, len) != 0)
             error("opened data is not consistent in ALICE side!\n");
-        delete[] expected_data;
     }
 
     Integer expected_input(len * sizeof(T) * 8, data, PUBLIC);
     check_zero<IO>(expected_input ^ input, party);
 
-    delete[] tmp;
 }
 #endif

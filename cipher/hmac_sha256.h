@@ -29,13 +29,13 @@ class HMAC_SHA256 : public SHA256 {
 
         if (key.size() > CHUNKLEN) {
             Integer* tmp = new Integer[DIGLEN];
+            std::unique_ptr<Integer[]> p_tmp(tmp);
             digest(tmp, key);
             SHA256_call++;
             concat(pad_key, tmp, DIGLEN);
             Integer ZEROS = Integer(CHUNKLEN - DIGLEN * WORDLEN, 0, PUBLIC);
             concat(pad_key, &ZEROS, 1);
 
-            delete[] tmp;
         }
         if (key.size() <= CHUNKLEN) {
             pad_key = key;
@@ -61,6 +61,7 @@ class HMAC_SHA256 : public SHA256 {
         concat(i_msg, &msg, 1);
 
         Integer* tmp_dig = new Integer[DIGLEN];
+        std::unique_ptr<Integer[]> p_tmp_dig(tmp_dig);
         digest(tmp_dig, i_msg);
         SHA256_call++;
 
@@ -70,7 +71,6 @@ class HMAC_SHA256 : public SHA256 {
         digest(res, o_msg);
         SHA256_call++;
 
-        delete[] tmp_dig;
     }
 
     void opt_hmac_sha256(Integer* res,
@@ -80,10 +80,12 @@ class HMAC_SHA256 : public SHA256 {
                          bool reuse_out_hash_flag = false,
                          bool zk_flag = false) {
         uint32_t* dig = new uint32_t[DIGLEN];
+        std::unique_ptr<uint32_t[]> p_dig(dig);
 
         opt_digest(dig, i_key_pad, msg, len, reuse_in_hash_flag, zk_flag);
         SHA256_call++;
         Integer* o_msg = new Integer[DIGLEN];
+        std::unique_ptr<Integer[]> p_o_msg(o_msg);
         for (int i = 0; i < DIGLEN; i++) {
             // If not enable the offline-online model, use dig as public values.
             // o_msg[i] = Integer(32, dig[i], PUBLIC);
@@ -97,8 +99,6 @@ class HMAC_SHA256 : public SHA256 {
 
         digest(res, omsg, reuse_out_hash_flag);
         SHA256_call++;
-        delete[] dig;
-        delete[] o_msg;
     }
 
     /* This optimization is to save rounds, resulting in larger communication size. */
@@ -110,6 +110,7 @@ class HMAC_SHA256 : public SHA256 {
         concat(i_msg, &msg, 1);
 
         Integer* tmp_dig = new Integer[DIGLEN];
+        std::unique_ptr<Integer[]> p_tmp_dig(tmp_dig);
         opt_rounds_digest(tmp_dig, i_msg, reuse_in_hash_flag);
         SHA256_call++;
 
@@ -119,7 +120,6 @@ class HMAC_SHA256 : public SHA256 {
         digest(res, o_msg, reuse_out_hash_flag);
         SHA256_call++;
 
-        delete[] tmp_dig;
     }
 };
 
@@ -140,13 +140,13 @@ class HMAC_SHA256_Offline : public SHA256Offline {
 
         if (key.size() > CHUNKLEN) {
             Integer* tmp = new Integer[DIGLEN];
+            std::unique_ptr<Integer[]> p_tmp(tmp);
             digest(tmp, key);
             SHA256_call++;
             concat(pad_key, tmp, DIGLEN);
             Integer ZEROS = Integer(CHUNKLEN - DIGLEN * WORDLEN, 0, PUBLIC);
             concat(pad_key, &ZEROS, 1);
 
-            delete[] tmp;
         }
         if (key.size() <= CHUNKLEN) {
             pad_key = key;
@@ -171,11 +171,13 @@ class HMAC_SHA256_Offline : public SHA256Offline {
                          bool reuse_in_hash_flag = false,
                          bool reuse_out_hash_flag = false) {
         uint32_t* dig = new uint32_t[DIGLEN];
+        std::unique_ptr<uint32_t[]> p_dig(dig);
         memset(dig, 0x00, DIGLEN);
 
         opt_digest(i_key_pad, reuse_in_hash_flag);
         SHA256_call++;
         Integer* o_msg = new Integer[DIGLEN];
+        std::unique_ptr<Integer[]> p_o_msg(o_msg);
         for (int i = 0; i < DIGLEN; i++) {
             o_msg[i] = Integer(32, dig[i], ALICE);
         }
@@ -185,8 +187,6 @@ class HMAC_SHA256_Offline : public SHA256Offline {
 
         digest(res, omsg, reuse_out_hash_flag);
         SHA256_call++;
-        delete[] dig;
-        delete[] o_msg;
     }
     void opt_rounds_hmac_sha256(Integer* res,
                                 const Integer msg,
@@ -196,6 +196,7 @@ class HMAC_SHA256_Offline : public SHA256Offline {
         concat(i_msg, &msg, 1);
 
         Integer* tmp_dig = new Integer[DIGLEN];
+        std::unique_ptr<Integer[]> p_tmp_dig(tmp_dig);
         opt_rounds_digest(tmp_dig, i_msg, reuse_in_hash_flag);
         SHA256_call++;
 
@@ -205,7 +206,6 @@ class HMAC_SHA256_Offline : public SHA256Offline {
         digest(res, o_msg, reuse_out_hash_flag);
         SHA256_call++;
 
-        delete[] tmp_dig;
     }
 };
 #endif
