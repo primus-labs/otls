@@ -11,19 +11,21 @@ class PedersenComm {
    public:
     EC_GROUP* group = nullptr;
     EC_POINT* h;
+    UniquePoint p_h;
     BN_CTX* ctx;
+    UniqueCtx p_ctx;
 
     // h should be chosen very carefully, without any trapdoor.
     PedersenComm(EC_POINT* h, EC_GROUP* group) {
         ctx = BN_CTX_new();
+        p_ctx.reset(ctx);
         this->group = group;
         this->h = EC_POINT_new(group);
+        p_h.reset(this->h);
         EC_POINT_copy(this->h, h);
     }
 
     ~PedersenComm() {
-        EC_POINT_free(h);
-        BN_CTX_free(ctx);
     }
 
     inline void commit(EC_POINT* com, BIGNUM* rnd, const BIGNUM* msg) {
@@ -33,9 +35,9 @@ class PedersenComm {
 
     inline bool open_check(const EC_POINT* com, const BIGNUM* rnd, const BIGNUM* msg) {
         EC_POINT* expected_com = EC_POINT_new(group);
+        UniquePoint p_expected_com(expected_com);
         EC_POINT_mul(group, expected_com, msg, h, rnd, ctx);
         bool res = (EC_POINT_cmp(group, com, expected_com, ctx) == 0);
-        EC_POINT_free(expected_com);
 
         return res;
     }
@@ -46,12 +48,12 @@ class PedersenComm {
         assert(coms.size() == coef.size());
         EC_POINT_set_to_infinity(group, res);
         EC_POINT* tmp = EC_POINT_new(group);
+        UniquePoint p_tmp(tmp);
         for (size_t i = 0; i < coef.size(); i++) {
             EC_POINT_mul(group, tmp, NULL, coms[i], coef[i], ctx);
             EC_POINT_add(group, res, res, tmp, ctx);
         }
 
-        EC_POINT_free(tmp);
     }
 
     inline void linear_comb_rand(BIGNUM* res,
@@ -59,13 +61,13 @@ class PedersenComm {
                                  const vector<BIGNUM*>& coef) {
         assert(rnds.size() == coef.size());
         BIGNUM* tmp = BN_new();
+        UniqueBN p_tmp(tmp);
         BN_set_word(res, 0);
         for (size_t i = 0; i < coef.size(); i++) {
             BN_mod_mul(tmp, rnds[i], coef[i], EC_GROUP_get0_order(group), ctx);
             BN_mod_add(res, res, tmp, EC_GROUP_get0_order(group), ctx);
         }
 
-        BN_free(tmp);
     }
 };
 
@@ -76,43 +78,44 @@ class ComConv {
     IO* io;
     block bDelta = zero_block;
     BIGNUM* aDelta = nullptr;
+    UniqueBN p_aDelta;
     CCRH ccrh;
     unsigned char com[Hash::DIGEST_SIZE];
     unsigned char msg_com[Hash::DIGEST_SIZE];
     Hash chi_hash;
     // q is the order of the ECC group.
     BIGNUM* q;
+    UniqueBN p_q;
     BN_CTX* ctx;
+    UniqueCtx p_ctx;
     BIGNUM* r = nullptr;
+    UniqueBN p_r;
     block com_seed;
     OLE<IO>* ole;
+    std::unique_ptr<OLE<IO>> p_ole;
     vector<BIGNUM*> exp;
+    vector<UniqueBN> p_exp;
 
     ComConv(IO* io, COT<IO>* ot, BIGNUM* q2, block bDelta) : io(io) {
         q = BN_new();
+        p_q.reset(q);
         BN_copy(this->q, q2);
         ctx = BN_CTX_new();
+        p_ctx.reset(ctx);
         ole = new OLE<IO>(io, ot, q2, BN_num_bits(q2));
+        p_ole.reset(ole);
 
         exp.resize(BN_num_bits(q2));
+        p_exp.resize(BN_num_bits(q2));
         for (int i = 0; i < BN_num_bits(q2); ++i) {
             exp[i] = BN_new();
+            p_exp[i].reset(exp[i]);
             BN_set_bit(exp[i], i);
             BN_mod(exp[i], exp[i], q, ctx);
         }
         this->bDelta = bDelta;
     }
     ~ComConv() {
-        if (aDelta != nullptr)
-            BN_free(aDelta);
-        if (r != nullptr)
-            BN_free(r);
-        BN_CTX_free(ctx);
-
-        for (int i = 0; i < BN_num_bits(q); ++i)
-            BN_free(exp[i]);
-        BN_free(q);
-        delete ole;
     }
 
     void compute_hash(unsigned char res[Hash::DIGEST_SIZE],
@@ -136,6 +139,7 @@ class ComConv {
             compute_hash(com, com_seed, bDelta, aDelta);
             io->send_data(com, Hash::DIGEST_SIZE);
             this->aDelta = BN_new();
+            p_aDelta.reset(this->aDelta);
             BN_copy(this->aDelta, aDelta);
             chi_hash.put(com, Hash::DIGEST_SIZE);
         } else {
@@ -147,9 +151,12 @@ class ComConv {
     void convert_recv(vector<BIGNUM*>& aMACs, vector<block>& bMACs) {
         Hash hash;
         vector<BIGNUM*> msg;
+        vector<UniqueBN> p_msg;
         msg.resize(bMACs.size());
+        p_msg.resize(bMACs.size());
         for (size_t i = 0; i < bMACs.size(); ++i) {
             msg[i] = BN_new();
+            p_msg[i].reset(msg[i]);
             recv_bn(io, msg[i], &hash);
         }
         hash.digest(msg_com);
@@ -162,16 +169,18 @@ class ComConv {
                 BN_mod_add(aMACs[i], aMACs[i], q, q, ctx);
             }
         }
-        for (size_t i = 0; i < bMACs.size(); ++i)
-            BN_free(msg[i]);
     }
 
     void convert_send(vector<BIGNUM*>& aKEYs, vector<block>& bKEYs) {
         Hash hash;
         vector<BIGNUM*> msg;
+        vector<UniqueBN> p_msg;
         msg.resize(bKEYs.size());
-        for (size_t i = 0; i < bKEYs.size(); ++i)
+        p_msg.resize(bKEYs.size());
+        for (size_t i = 0; i < bKEYs.size(); ++i) {
             msg[i] = BN_new();
+            p_msg[i].reset(msg[i]);
+        }
 
         convert(msg, aKEYs, bKEYs, bDelta, aDelta);
         for (size_t i = 0; i < msg.size(); ++i)
@@ -180,8 +189,6 @@ class ComConv {
         hash.digest(msg_com);
         chi_hash.put(msg_com, Hash::DIGEST_SIZE);
 
-        for (size_t i = 0; i < bKEYs.size(); ++i)
-            BN_free(msg[i]);
     }
 
     void convert(vector<BIGNUM*>& msg,
@@ -207,6 +214,7 @@ class ComConv {
         bool ret = true;
         block tmp_seed, tmp_bDelta;
         BIGNUM* tmp_aDelta = BN_new();
+        UniqueBN p_tmp_aDelta(tmp_aDelta);
         io->recv_data(&tmp_seed, sizeof(block));
         io->recv_data(&tmp_bDelta, sizeof(block));
         recv_bn(io, tmp_aDelta);
@@ -215,13 +223,19 @@ class ComConv {
         ret = ret and (std::strncmp((char*)tmp_com, (char*)com, Hash::DIGEST_SIZE) == 0);
 
         vector<BIGNUM*> msg;
+        vector<UniqueBN> p_msg;
         msg.resize(bMACs.size());
+        p_msg.resize(bMACs.size());
         vector<BIGNUM*> tmp_akeys;
+        vector<UniqueBN> p_tmp_akeys;
         tmp_akeys.resize(bMACs.size());
+        p_tmp_akeys.resize(bMACs.size());
         vector<block> tmp_bkeys(bMACs);
         for (size_t i = 0; i < bMACs.size(); ++i) {
             tmp_akeys[i] = BN_new();
+            p_tmp_akeys[i].reset(tmp_akeys[i]);
             msg[i] = BN_new();
+            p_msg[i].reset(msg[i]);
             if (getLSB(tmp_bkeys[i]))
                 tmp_bkeys[i] = tmp_bkeys[i] ^ tmp_bDelta;
         }
@@ -233,12 +247,6 @@ class ComConv {
             hash.put(arr, length);
         }
         hash.digest(tmp_com);
-
-        BN_free(tmp_aDelta);
-        for (size_t i = 0; i < bMACs.size(); ++i) {
-            BN_free(tmp_akeys[i]);
-            BN_free(msg[i]);
-        }
 
         ret = ret and (std::strncmp((char*)tmp_com, (char*)msg_com, Hash::DIGEST_SIZE) == 0);
         return ret;
@@ -276,7 +284,9 @@ class ComConv {
                           PedersenComm& pc,
                           uint64_t batch_size) {
         BIGNUM* bs_int = BN_new();
+        UniqueBN p_bs_int(bs_int);
         BIGNUM* ONE = BN_new();
+        UniqueBN p_ONE(ONE);
 
         BN_set_bit(bs_int, batch_size);
         BN_set_word(ONE, 1);
@@ -286,32 +296,35 @@ class ComConv {
         if (check != -1)
             error("batch size is too large!\n");
 
-        BN_free(bs_int);
-        BN_free(ONE);
-
         bool res = true;
         // choose random arithmetic Delta (aDelta), commit bDelta and aDelta.
         BIGNUM* Delta = BN_new();
+        UniqueBN p_Delta(Delta);
         BN_rand_range(Delta, this->q);
         commitDelta(Delta);
-        BN_free(Delta);
 
         // generate IT-MAC key for random r;
         BIGNUM* rKEY = BN_new();
+        UniqueBN p_rKEY(rKEY);
         mask_key(rKEY);
 
         // convert boolean IT-MAC key to arithmetic IT-MAC key.
         vector<BIGNUM*> aKEYs(bKEYs.size());
+        vector<UniqueBN> p_aKEYs(bKEYs.size());
         for (size_t i = 0; i < aKEYs.size(); i++) {
             aKEYs[i] = BN_new();
+            p_aKEYs[i].reset(aKEYs[i]);
         }
         convert_send(aKEYs, bKEYs);
         //  separate input bits into chunks with batch_size bits each.
         size_t chunk_len = (bKEYs.size() + batch_size - 1) / batch_size;
         BIGNUM* tmp = BN_new();
+        UniqueBN p_tmp(tmp);
         vector<BIGNUM*> batch_aKEYs(chunk_len);
+        vector<UniqueBN> p_batch_aKEYs(chunk_len);
         for (size_t i = 0; i < chunk_len; i++) {
             batch_aKEYs[i] = BN_new();
+            p_batch_aKEYs[i].reset(batch_aKEYs[i]);
             BN_set_word(batch_aKEYs[i], 0);
         }
 
@@ -321,11 +334,11 @@ class ComConv {
                 BN_mod_add(batch_aKEYs[i], batch_aKEYs[i], tmp, q, ctx);
             }
         }
-        BN_free(tmp);
 
         // receive commitments of chunks from Pb.
         // could use compressed point.
         unsigned char* buf = new unsigned char[65];
+        std::unique_ptr<unsigned char[]> p_buf(buf);
         for (size_t i = 0; i < chunk_len; i++) {
             io->recv_data(buf, 65);
             chi_hash.put(buf, 65);
@@ -333,14 +346,17 @@ class ComConv {
         }
         // receive commitment of r.
         EC_POINT* comm_r = EC_POINT_new(pc.group);
+        UniquePoint p_comm_r(comm_r);
         io->recv_data(buf, 65);
         chi_hash.put(buf, 65);
         EC_POINT_oct2point(pc.group, comm_r, buf, 65, ctx);
-        delete[] buf;
         // generate and send chi's.
         vector<BIGNUM*> chi(chunk_len);
-        for (size_t i = 0; i < chunk_len; i++)
+        vector<UniqueBN> p_chi(chunk_len);
+        for (size_t i = 0; i < chunk_len; i++) {
             chi[i] = BN_new();
+            p_chi[i].reset(chi[i]);
+        }
 
         unsigned char chi_digest[Hash::DIGEST_SIZE];
         chi_hash.digest(chi_digest);
@@ -351,11 +367,11 @@ class ComConv {
         // generate linear combination of IT-MAC keys.
         BIGNUM* yKEY = rKEY;
         BIGNUM* tmpm = BN_new();
+        UniqueBN p_tmpm(tmpm);
         for (size_t i = 0; i < chunk_len; i++) {
             BN_mod_mul(tmpm, chi[i], batch_aKEYs[i], q, ctx);
             BN_mod_add(yKEY, yKEY, tmpm, q, ctx);
         }
-        BN_free(tmpm);
 
         // generate com_y
         vector<EC_POINT*> comms(com);
@@ -363,10 +379,12 @@ class ComConv {
 
         vector<BIGNUM*> scales(chi);
         BIGNUM* one = BN_new();
+        UniqueBN p_one(one);
         BN_set_word(one, 1);
         scales.push_back(one);
 
         EC_POINT* com_y = EC_POINT_new(pc.group);
+        UniquePoint p_com_y(com_y);
 
         pc.linear_comb_com(com_y, comms, scales);
 
@@ -376,7 +394,9 @@ class ComConv {
 
         // receive opening of com_y;
         BIGNUM* rnd_y = BN_new();
+        UniqueBN p_rnd_y(rnd_y);
         BIGNUM* msg_y = BN_new();
+        UniqueBN p_msg_y(msg_y);
         recv_bn(io, rnd_y);
         recv_bn(io, msg_y);
 
@@ -388,6 +408,7 @@ class ComConv {
         block yMAC_seed = zero_block;
         io->recv_block(&yMAC_seed, 1);
         BIGNUM* yMAC = BN_new();
+        UniqueBN p_yMAC(yMAC);
         recv_bn(io, yMAC);
 
         unsigned char yMAC_com_comp[Hash::DIGEST_SIZE];
@@ -406,20 +427,6 @@ class ComConv {
 
         res = res and (BN_cmp(yMAC, yKEY) == 0);
 
-        BN_free(yMAC);
-        EC_POINT_free(com_y);
-        for (size_t i = 0; i < chunk_len; i++) {
-            BN_free(batch_aKEYs[i]);
-            BN_free(chi[i]);
-        }
-        BN_free(rnd_y);
-        BN_free(msg_y);
-        BN_free(one);
-        EC_POINT_free(comm_r);
-        BN_free(rKEY);
-        for (size_t i = 0; i < aKEYs.size(); i++) {
-            BN_free(aKEYs[i]);
-        }
         return res;
     }
 
@@ -429,7 +436,9 @@ class ComConv {
                           PedersenComm& pc,
                           uint64_t batch_size) {
         BIGNUM* bs_int = BN_new();
+        UniqueBN p_bs_int(bs_int);
         BIGNUM* ONE = BN_new();
+        UniqueBN p_ONE(ONE);
 
         BN_set_bit(bs_int, batch_size);
         BN_set_word(ONE, 1);
@@ -439,20 +448,21 @@ class ComConv {
         if (check != -1)
             error("batch size is too large!\n");
 
-        BN_free(bs_int);
-        BN_free(ONE);
         bool res = true;
         // receive commitment of bDelta and aDelta.
         commitDelta();
 
         // generate IT-MAC mac for random r;
         BIGNUM* rMAC = BN_new();
+        UniqueBN p_rMAC(rMAC);
         mask_mac(rMAC);
 
         // convert boolean IT-MAC mac to arithmetic IT-MAC mac.
         vector<BIGNUM*> aMACs(bMACs.size());
+        vector<UniqueBN> p_aMACs(bMACs.size());
         for (size_t i = 0; i < aMACs.size(); i++) {
             aMACs[i] = BN_new();
+            p_aMACs[i].reset(aMACs[i]);
         }
         convert_recv(aMACs, bMACs);
         //  separate input bits into chunks with batch_size bits each.
@@ -460,15 +470,20 @@ class ComConv {
 
         // compute commitment and randomness of chunks.
         vector<BIGNUM*> msg(chunk_len);
+        vector<UniqueBN> p_msg(chunk_len);
         vector<BIGNUM*> batch_aMACs(chunk_len);
+        vector<UniqueBN> p_batch_aMACs(chunk_len);
         for (size_t i = 0; i < chunk_len; i++) {
             batch_aMACs[i] = BN_new();
+            p_batch_aMACs[i].reset(batch_aMACs[i]);
             msg[i] = BN_new();
+            p_msg[i].reset(msg[i]);
             BN_set_word(batch_aMACs[i], 0);
             BN_set_word(msg[i], 0);
         }
 
         BIGNUM* tmp = BN_new();
+        UniqueBN p_tmp(tmp);
         for (size_t i = 0; i < chunk_len; i++) {
             for (size_t j = 0; (j < batch_size) && (i * batch_size + j < bMACs.size()); j++) {
                 if (getLSB(bMACs[i * batch_size + j]))
@@ -480,16 +495,18 @@ class ComConv {
             pc.commit(com[i], rnds[i], msg[i]);
         }
 
-        BN_free(tmp);
 
         // compute commitment and randomness of r.
         EC_POINT* comm_r = EC_POINT_new(pc.group);
+        UniquePoint p_comm_r(comm_r);
         BIGNUM* rnd_r = BN_new();
+        UniqueBN p_rnd_r(rnd_r);
         pc.commit(comm_r, rnd_r, this->r);
 
         // send commitments of chunks to Pa.
         // could use compressed point.
         unsigned char* buf = new unsigned char[65];
+        std::unique_ptr<unsigned char[]> p_buf(buf);
         for (size_t i = 0; i < chunk_len; i++) {
             EC_POINT_point2oct(pc.group, com[i], POINT_CONVERSION_UNCOMPRESSED, buf, 65, ctx);
             io->send_data(buf, 65);
@@ -500,12 +517,14 @@ class ComConv {
         EC_POINT_point2oct(pc.group, comm_r, POINT_CONVERSION_UNCOMPRESSED, buf, 65, ctx);
         io->send_data(buf, 65);
         chi_hash.put(buf, 65);
-        delete[] buf;
 
         // receive chi's.
         vector<BIGNUM*> chi(chunk_len);
-        for (size_t i = 0; i < chunk_len; i++)
+        vector<UniqueBN> p_chi(chunk_len);
+        for (size_t i = 0; i < chunk_len; i++) {
             chi[i] = BN_new();
+            p_chi[i].reset(chi[i]);
+        }
 
         unsigned char chi_digest[Hash::DIGEST_SIZE];
         chi_hash.digest(chi_digest);
@@ -517,11 +536,11 @@ class ComConv {
         // generate linear combination of IT-MAC macs.
         BIGNUM* yMAC = rMAC;
         BIGNUM* tmpm = BN_new();
+        UniqueBN p_tmpm(tmpm);
         for (size_t i = 0; i < chunk_len; i++) {
             BN_mod_mul(tmpm, chi[i], batch_aMACs[i], q, ctx);
             BN_mod_add(yMAC, yMAC, tmpm, q, ctx);
         }
-        BN_free(tmpm);
 
         // compute linear combination of randomness and message.
         vector<BIGNUM*> scales(chi);
@@ -530,11 +549,14 @@ class ComConv {
         crnds.push_back(rnd_r);
         msgs.push_back(this->r);
         BIGNUM* one = BN_new();
+        UniqueBN p_one(one);
         BN_set_word(one, 1);
         scales.push_back(one);
 
         BIGNUM* rnd_y = BN_new();
+        UniqueBN p_rnd_y(rnd_y);
         BIGNUM* msg_y = BN_new();
+        UniqueBN p_msg_y(msg_y);
         pc.linear_comb_rand(rnd_y, crnds, scales);
         pc.linear_comb_rand(msg_y, msgs, scales);
 
@@ -560,23 +582,6 @@ class ComConv {
 
         io->send_block(&yMAC_seed, 1);
         send_bn(io, yMAC);
-
-        for (size_t i = 0; i < chunk_len; i++) {
-            BN_free(batch_aMACs[i]);
-            BN_free(chi[i]);
-            BN_free(msg[i]);
-        }
-
-        BN_free(rnd_y);
-        BN_free(msg_y);
-        BN_free(one);
-        BN_free(rnd_r);
-        EC_POINT_free(comm_r);
-
-        BN_free(rMAC);
-        for (size_t i = 0; i < aMACs.size(); i++) {
-            BN_free(aMACs[i]);
-        }
 
         return res;
     }

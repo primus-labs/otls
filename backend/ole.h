@@ -11,15 +11,15 @@ class OLE {
     IO* io;
     COT<IO>* ot;
     BN_CTX* ctx = nullptr;
-    std::unique_ptr<BN_CTX, void(*)(BN_CTX*)> p_ctx;
+    UniqueCtx p_ctx;
     vector<BIGNUM*> exp;
-    vector<std::shared_ptr<BIGNUM>> p_exp;
+    vector<UniqueBN> p_exp;
     CCRH ccrh;
     size_t bit_length;
     BIGNUM* q;
-    std::unique_ptr<BIGNUM, void(*)(BIGNUM*)> p_q;
+    UniqueBN p_q;
     OLE(IO* io, COT<IO>* ot, BIGNUM* q2, size_t bit_length)
-        : io(io), ot(ot), bit_length(bit_length), p_ctx(nullptr, BN_CTX_free), p_q(nullptr, BN_free) {
+        : io(io), ot(ot), bit_length(bit_length) {
         ctx = BN_CTX_new();
         p_ctx.reset(ctx);
         q = BN_new();
@@ -29,7 +29,7 @@ class OLE {
         p_exp.resize(bit_length);
         for (size_t i = 0; i < bit_length; ++i) {
             exp[i] = BN_new();
-            p_exp[i] = std::shared_ptr<BIGNUM>(exp[i], BN_free);
+            p_exp[i].reset(exp[i]);
             BN_set_bit(exp[i], i);
             BN_mod(exp[i], exp[i], q, ctx);
         }
@@ -43,10 +43,10 @@ class OLE {
     void compute(vector<BIGNUM*>& out, const vector<BIGNUM*>& in) {
         assert(out.size() == in.size());
         BIGNUM *pad1 = BN_new(), *pad2 = BN_new(), *msg = BN_new(), *tmp = BN_new();
-        std::unique_ptr<BIGNUM, void(*)(BIGNUM*)> p_pad1(pad1, BN_free);
-        std::unique_ptr<BIGNUM, void(*)(BIGNUM*)> p_pad2(pad2, BN_free);
-        std::unique_ptr<BIGNUM, void(*)(BIGNUM*)> p_msg(msg, BN_free);
-        std::unique_ptr<BIGNUM, void(*)(BIGNUM*)> p_tmp(tmp, BN_free);
+        UniqueBN p_pad1(pad1);
+        UniqueBN p_pad2(pad2);
+        UniqueBN p_msg(msg);
+        UniqueBN p_tmp(tmp);
         block* raw = new block[out.size() * bit_length];
         std::unique_ptr<block[]> p_raw(raw);
         if (!cmpBlock(&ot->Delta, &zero_block, 1)) {

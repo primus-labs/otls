@@ -20,8 +20,11 @@ class PRFProver {
     HMAC_SHA256 hmac;
     PRF prf;
     EC_GROUP* group = nullptr;
+    UniqueGroup p_group;
     BIGNUM* q;
+    UniqueBN p_q;
     BN_CTX* ctx;
+    UniqueCtx p_ctx;
     bool reuse_in_hash_flag = true;
     bool reuse_out_hash_flag = true;
     bool zk_flag = false;
@@ -29,13 +32,13 @@ class PRFProver {
     PRFProver() {
         group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
         q = BN_new();
+        p_q.reset(q);
         ctx = BN_CTX_new();
+        p_ctx.reset(ctx);
         EC_GROUP_get_curve(group, q, NULL, NULL, ctx);
+        p_group.reset(group);
     }
     ~PRFProver() {
-        EC_GROUP_free(group);
-        BN_free(q);
-        BN_CTX_free(ctx);
     }
 
     // ALICE knows pms, which is the entire value, not a share.
@@ -48,6 +51,7 @@ class PRFProver {
                                  int party) {
         size_t len = BN_num_bytes(q);
         unsigned char* buf = new unsigned char[len];
+        std::unique_ptr<unsigned char[]> p_buf(buf);
         memset(buf, 0, len);
 
         if (party == ALICE) {
@@ -59,6 +63,7 @@ class PRFProver {
 
         size_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
+        std::unique_ptr<unsigned char[]> p_seed(seed);
         memcpy(seed, rc, rc_len);
         memcpy(seed + rc_len, rs, rs_len);
 
@@ -67,8 +72,6 @@ class PRFProver {
                         master_key_label_length, seed, seed_len, reuse_in_hash_flag,
                         reuse_out_hash_flag, zk_flag);
 
-        delete[] seed;
-        delete[] buf;
     }
 
     // ALICE knows pms, which is the entire value, not a share.
@@ -79,6 +82,7 @@ class PRFProver {
                                           int party) {
         size_t len = BN_num_bytes(q);
         unsigned char* buf = new unsigned char[len];
+        std::unique_ptr<unsigned char[]> p_buf(buf);
         memset(buf, 0, len);
 
         if (party == ALICE) {
@@ -94,7 +98,6 @@ class PRFProver {
                         session_hash, hash_len, reuse_in_hash_flag, reuse_out_hash_flag,
                         zk_flag);
 
-        delete[] buf;
     }
 
     inline void prove_expansion_keys(Integer& key_c,
@@ -109,6 +112,7 @@ class PRFProver {
                                      int party) {
         size_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
+        std::unique_ptr<unsigned char[]> p_seed(seed);
         memcpy(seed, rs, rs_len);
         memcpy(seed + rs_len, rc, rc_len);
 
@@ -124,7 +128,6 @@ class PRFProver {
         extract_integer(iv_c, key, key_length * 8 * 2, iv_length * 8);
         extract_integer(iv_s, key, key_length * 8 * 2 + iv_length * 8, iv_length * 8);
 
-        delete[] seed;
     }
 
     inline void prove_client_finished_msg(

@@ -10,44 +10,51 @@ class E2F {
     IO* io;
     IO* io_opt;
     OLE<IO>* ole = nullptr;
+    std::unique_ptr<OLE<IO>> p_ole;
     size_t bit_length;
 
     BIGNUM* a;
+    UniqueBN p_a;
     BIGNUM* b;
+    UniqueBN p_b;
     BIGNUM* c;
+    UniqueBN p_c;
     BIGNUM* bp;
+    UniqueBN p_bp;
     BIGNUM* cp;
+    UniqueBN p_cp;
     BIGNUM* r;
+    UniqueBN p_r;
     BIGNUM* r2;
+    UniqueBN p_r2;
 
     E2F(IO* io, IO* io_opt, COT<IO>* ot, BIGNUM* q2, size_t bit_length)
         : io(io), bit_length(bit_length) {
         ole = new OLE<IO>(io, ot, q2, bit_length);
+        p_ole.reset(ole);
         this->io_opt = io_opt;
         a = BN_new();
+        p_a.reset(a);
         b = BN_new();
+        p_b.reset(b);
         c = BN_new();
+        p_c.reset(c);
         bp = BN_new();
+        p_bp.reset(bp);
         cp = BN_new();
+        p_cp.reset(cp);
         r = BN_new();
+        p_r.reset(r);
         r2 = BN_new();
+        p_r2.reset(r2);
     }
 
     ~E2F() {
-        BN_free(a);
-        BN_free(b);
-        BN_free(c);
-        BN_free(bp);
-        BN_free(cp);
-        BN_free(r);
-        BN_free(r2);
-        if (ole != nullptr) {
-            delete ole;
-        }
     }
 
     inline void open(BIGNUM* value[], int party) {
         BIGNUM* tmp = BN_new();
+        UniqueBN p_tmp(tmp);
         if (party == ALICE) {
             for (size_t i = 0; value[i] != nullptr; i++)
                 send_bn(io, value[i]);
@@ -65,7 +72,6 @@ class E2F {
                 BN_mod_add(value[i], value[i], tmp, ole->q, ole->ctx);
             }
         }
-        BN_free(tmp);
     }
 
     inline void open(BIGNUM* value, int party) {
@@ -85,10 +91,13 @@ class E2F {
 
         vector<BIGNUM*> in;
         vector<BIGNUM*> out;
+        vector<UniqueBN> p_out;
 
         out.resize(5);
+        p_out.resize(5);
         for (int i = 0; i < 5; i++) {
             out[i] = BN_new();
+            p_out[i].reset(out[i]);
         }
 
         if (party == ALICE) {
@@ -119,14 +128,13 @@ class E2F {
         BN_mod_add(r2, r2, out[4], ole->q, ole->ctx);
         BN_mod_add(r2, r2, out[4], ole->q, ole->ctx);
 
-        for (int i = 0; i < 5; i++) {
-            BN_free(out[i]);
-        }
     }
 
     void compute_online(BIGNUM* out, const BIGNUM* x, const BIGNUM* y, int party) {
         BIGNUM* xbma = BN_new();
+        UniqueBN p_xbma(xbma);
         BIGNUM* ybma = BN_new();
+        UniqueBN p_ybma(ybma);
 
         if (party == ALICE) {
             BN_sub(xbma, ole->q, x);
@@ -136,9 +144,11 @@ class E2F {
             BN_copy(ybma, y);
         }
         BIGNUM* w = BN_new();
+        UniqueBN p_w(w);
         BN_mod_sub(w, xbma, b, ole->q, ole->ctx); // epsilon1 = open(xb-xa-b)
 
         BIGNUM* eta = BN_new();
+        UniqueBN p_eta(eta);
         BN_mod_sub(eta, ybma, bp, ole->q, ole->ctx); // epsilon2 = open(yb-ya-bp)
 
         BIGNUM* open_vec[] = {w, eta, nullptr};
@@ -173,10 +183,6 @@ class E2F {
         // epsilon3^2 + 2epsilon3*[r] + [r^2] - [xb]-[xa]
         BN_mod_add(out, out, ybma, ole->q, ole->ctx);
 
-        BN_free(xbma);
-        BN_free(ybma);
-        BN_free(w);
-        BN_free(eta);
     }
 };
 

@@ -27,13 +27,14 @@ inline void addmod(Integer& res, const Integer& a, const Integer& b, Integer& Q)
 /* Compute the (a+b) mod q circuit */
 inline void addmod(Integer& res, const Integer& a, const Integer& b, BIGNUM* q) {
     unsigned char* intq = new unsigned char[BN_num_bytes(q)];
+    std::unique_ptr<unsigned char[]> p_intq(intq);
+
     BN_bn2bin(q, intq);
     reverse(intq, intq + BN_num_bytes(q));
 
     Integer Q(BN_num_bytes(q) * 8, intq, PUBLIC);
     addmod(res, a, b, Q);
 
-    delete[] intq;
 }
 
 #endif
