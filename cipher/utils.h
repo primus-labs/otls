@@ -6,6 +6,12 @@
 #include <vector>
 #include <string>
 
+// `uint` is a POSIX/glibc typedef (via <sys/types.h>); MinGW-w64 provides
+// `u_int` but not `uint`, so define it on Windows.
+#ifdef _WIN32
+typedef unsigned int uint;
+#endif
+
 using namespace std;
 using namespace emp;
 using std::string;
