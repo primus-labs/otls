@@ -34,6 +34,7 @@ class SHA256 {
     //uint32_t iv_in_hash[DIGLEN];
 
     vector<uint32_t*> iv_in_hashes;
+    vector<std::shared_ptr<uint32_t>> p_iv_in_hashes;
 
     // iv_out_hash stores the outer secret value (shares).
     Integer iv_out_hash[DIGLEN];
@@ -104,10 +105,6 @@ class SHA256 {
 
     SHA256() {};
     ~SHA256() {
-        for (size_t i = 0; i < iv_in_hashes.size(); i++) {
-            if (iv_in_hashes[i] != nullptr)
-                delete[] iv_in_hashes[i];
-        }
     };
 
     inline void refresh() {
@@ -226,6 +223,7 @@ class SHA256 {
             dig[i] = sha256_h[i];
 
         Integer* tmp_block = new Integer[CHUNKLEN / WORDLEN]; //CHUNKLEN/WORDLEN=16
+        std::unique_ptr<Integer[]> p_tmp_block(tmp_block);
         for (int j = 0; j < CHUNKLEN / WORDLEN; j++) {
             tmp_block[j] = input_data[j];
         }
@@ -252,7 +250,6 @@ class SHA256 {
             }
             chunk_compress(dig, tmp_block);
         }
-        delete[] tmp_block;
     }
 
     void opt_update(uint32_t* plain_dig,
@@ -277,6 +274,7 @@ class SHA256 {
                 // if iv_in_hash is empty, compute the gc shares, open it and store the value in iv_in_hash.
                 if (gc_in_open_flag == false) {
                     Integer* dig = new Integer[VALLEN];
+                    std::unique_ptr<Integer[]> p_dig(dig);
                     for (int i = 0; i < VALLEN; i++)
                         dig[i] = sha256_h[i];
                     chunk_compress(dig, input_data.data());
@@ -286,12 +284,12 @@ class SHA256 {
 
                     iv_in_hashes.push_back(nullptr);
                     iv_in_hashes.back() = new uint32_t[DIGLEN];
+                    p_iv_in_hashes.push_back(std::shared_ptr<uint32_t>(iv_in_hashes.back()));
                     memcpy(iv_in_hashes.back(), plain_dig, DIGLEN * sizeof(uint32_t));
 
                     gc_in_open_flag = true;
                     pos++;
 
-                    delete[] dig;
 
                 } else {
                     //if iv_in_hash is stored,reuse it.
@@ -304,6 +302,7 @@ class SHA256 {
                 // Only compute and check once.
                 if (zk_in_open_flag == false) {
                     Integer* dig = new Integer[VALLEN];
+                    std::unique_ptr<Integer[]> p_dig(dig);
                     for (int i = 0; i < VALLEN; i++)
                         dig[i] = sha256_h[i];
                     chunk_compress(dig, input_data.data());
@@ -315,7 +314,6 @@ class SHA256 {
                     zk_in_open_flag = true;
                     zpos++;
 
-                    delete[] dig;
                 }
                 // reuse the stored value anyway.
                 memcpy(plain_dig, iv_in_hashes[zpos], DIGLEN * sizeof(uint32_t));
@@ -323,6 +321,7 @@ class SHA256 {
         } else {
             // Do not enable the reuse optimization, but still open the inner hash as an optimization.
             Integer* dig = new Integer[VALLEN];
+            std::unique_ptr<Integer[]> p_dig(dig);
             for (int i = 0; i < VALLEN; i++)
                 dig[i] = sha256_h[i];
 
@@ -331,11 +330,11 @@ class SHA256 {
             reverse_concat(tmpInt, dig, VALLEN);
             tmpInt.reveal<uint32_t>((uint32_t*)plain_dig, PUBLIC);
 
-            delete[] dig;
         }
 
         // compute the following part in plain, not in mpc.
         unsigned char* data = new unsigned char[KLEN];
+        std::unique_ptr<unsigned char[]> p_data(data);
         uint64_t datalen = 0, bitlen = 512;
 
         for (size_t i = 0; i < pub_len; i++) {
@@ -373,7 +372,6 @@ class SHA256 {
         data[56] = bitlen >> 56;
         plain_chunk_compress(plain_dig, data);
 
-        delete[] data;
     }
 
     void opt_rounds_update(Integer* dig,
@@ -393,6 +391,7 @@ class SHA256 {
             dig[i] = sha256_h[i];
 
         Integer* tmp_block = new Integer[CHUNKLEN / WORDLEN]; //CHUNKLEN/WORDLEN=16
+        std::unique_ptr<Integer[]> p_tmp_block(tmp_block);
         for (int j = 0; j < CHUNKLEN / WORDLEN; j++) {
             tmp_block[j] = input_data[j];
         }
@@ -418,12 +417,12 @@ class SHA256 {
             }
             chunk_compress(dig, tmp_block);
         }
-        delete[] tmp_block;
     }
 
     void chunk_compress(Integer* input_h, Integer* chunk) {
         compression_calls_num++;
         Integer* w = new Integer[KLEN];
+        std::unique_ptr<Integer[]> p_w(w);
         for (int i = 0; i < CHUNKLEN / WORDLEN; i++) //initiate w
             w[i] = chunk[i];
         for (int i = 16; i < KLEN; i++) {
@@ -465,11 +464,11 @@ class SHA256 {
         input_h[6] = g + input_h[6];
         input_h[7] = h + input_h[7];
 
-        delete[] w;
     }
 
     void plain_chunk_compress(uint32_t* input_h, unsigned char* chunk) {
         uint32_t* w = new uint32_t[KLEN];
+        std::unique_ptr<uint32_t[]> p_w(w);
         for (int i = 0, j = 0; i < 16; i++, j += 4) //initiate w
             w[i] =
               (chunk[j] << 24) | (chunk[j + 1] << 16) | (chunk[j + 2] << 8) | chunk[j + 3];
@@ -512,7 +511,6 @@ class SHA256 {
         input_h[5] = f + input_h[5];
         input_h[6] = g + input_h[6];
         input_h[7] = h + input_h[7];
-        delete[] w;
     }
 
     inline void digest(Integer* res, Integer input, bool reuse_out_hash_flag = false) {
@@ -543,12 +541,12 @@ class SHA256 {
     template <typename IO>
     inline void sha256_check(int party) {
         uint32_t* tmp = new uint32_t[DIGLEN];
+        std::unique_ptr<uint32_t[]> p_tmp(tmp);
         for (size_t i = 0; i < iv_in_hashes.size(); i++) {
             memcpy(tmp, iv_in_hashes[i], DIGLEN * sizeof(uint32_t));
             reverse(tmp, tmp + DIGLEN);
             check_zero<IO>(zk_iv_in_hashes[i], tmp, DIGLEN, party);
         }
-        delete[] tmp;
     }
 };
 
@@ -656,6 +654,7 @@ class SHA256Offline {
             dig[i] = sha256_h[i];
 
         Integer* tmp_block = new Integer[CHUNKLEN / WORDLEN]; //CHUNKLEN/WORDLEN=16
+        std::unique_ptr<Integer[]> p_tmp_block(tmp_block);
         for (int j = 0; j < CHUNKLEN / WORDLEN; j++) {
             tmp_block[j] = input_data[j];
         }
@@ -682,7 +681,6 @@ class SHA256Offline {
             }
             chunk_compress(dig, tmp_block);
         }
-        delete[] tmp_block;
     }
 
     void opt_update(const Integer sec_input, bool reuse_in_hash_flag = false) {
@@ -744,6 +742,7 @@ class SHA256Offline {
             dig[i] = sha256_h[i];
 
         Integer* tmp_block = new Integer[CHUNKLEN / WORDLEN]; //CHUNKLEN/WORDLEN=16
+        std::unique_ptr<Integer[]> p_tmp_block(tmp_block);
         for (int j = 0; j < CHUNKLEN / WORDLEN; j++) {
             tmp_block[j] = input_data[j];
         }
@@ -769,12 +768,12 @@ class SHA256Offline {
             }
             chunk_compress(dig, tmp_block);
         }
-        delete[] tmp_block;
     }
 
     void chunk_compress(Integer* input_h, Integer* chunk) {
         compression_calls_num++;
         Integer* w = new Integer[KLEN];
+        std::unique_ptr<Integer[]> p_w(w);
         for (int i = 0; i < CHUNKLEN / WORDLEN; i++) //initiate w
             w[i] = chunk[i];
         for (int i = 16; i < KLEN; i++) {
@@ -816,7 +815,6 @@ class SHA256Offline {
         input_h[6] = g + input_h[6];
         input_h[7] = h + input_h[7];
 
-        delete[] w;
     }
 
     inline void digest(Integer* res, Integer input, bool reuse_out_hash_flag = false) {

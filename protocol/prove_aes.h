@@ -12,12 +12,12 @@
 #include "cipher/utils.h"
 
 template <typename IO>
-void setup_proxy_protocol(BoolIO<IO>** ios, int threads, int party) {
+void setup_proxy_protocol(BoolIO<IO>** ios, int threads, int party, const PrimalLPNParameter* lpn_param = &ferret_b10) {
     init_files();
 #if USE_PRIMUS_EMP
     FunctionWrapperV3(
-      [ios, threads, party]() {
-          setup_zk_bool<BoolIO<IO>>(ios, threads, party);
+      [ios, threads, party, lpn_param]() {
+          setup_zk_bool<BoolIO<IO>>(ios, threads, party, nullptr, lpn_param);
       },
       [](const char* e) {
           throw std::runtime_error(e);
@@ -26,7 +26,7 @@ void setup_proxy_protocol(BoolIO<IO>** ios, int threads, int party) {
     CHECK_INITIALIZE_EXCEPTION();
 #else
     try {
-        setup_zk_bool<BoolIO<IO>>(ios, threads, party);
+        setup_zk_bool<BoolIO<IO>>(ios, threads, party, nullptr, lpn_param);
     }
     catch(std::exception& e) {
         throw std::runtime_error(e.what());
@@ -88,14 +88,17 @@ class AESProver {
     }
 
     inline void gctr(Integer& res, size_t m) {
-        Integer tmp(128, 0, PUBLIC);
+        // Integer tmp(128, 0, PUBLIC);
+        vector<Integer> tmp;
+        tmp.resize(m);
         for (size_t i = 0; i < m; i++) {
             Integer content = nonce;
-            tmp = computeAES_KS(expanded_key, content);
+            tmp[i] = computeAES_KS(expanded_key, content);
 
-            concat(res, &tmp, 1);
+            // concat(res, &tmp, 1);
             nonce = inc(nonce, 32);
         }
+        concat_opt(res, tmp.data(), tmp.size());
     }
 
     inline void gctr_opt(vector<Integer>& res, const vector<size_t>& ids) {
@@ -125,11 +128,10 @@ class AESProver {
         assert(iv_len == 8);
 
         unsigned char* riv = new unsigned char[iv_len];
+        std::unique_ptr<unsigned char[]> p_riv(riv);
         memcpy(riv, iv, iv_len);
         reverse(riv, riv + iv_len);
         Integer variable_iv(64, riv, PUBLIC);
-
-        delete[] riv;
 
         Integer ONE = Integer(32, 1, PUBLIC);
 
@@ -162,9 +164,11 @@ class AESProver {
 
         vector<Integer> counters;
         set_nonce(iv, iv_len);
+        auto _start = emp::clock_start();
         gctr_opt(counters, ids);
 
         Integer izk_counter;
+        vector<Integer> vec;
         for (size_t i = 0; i < counterInfos.size(); i++) {
             const AESCounterInfo& c = counterInfos[i];
             const Integer& oneCounter = counters[i];
@@ -179,17 +183,24 @@ class AESProver {
                 }
                 else {
                     if (begin != -1) {
-                        izk_counter.bits.insert(izk_counter.bits.begin(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                        // izk_counter.bits.insert(izk_counter.bits.begin(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                        Integer tmp;
+                        tmp.bits.insert(tmp.bits.end(), oneCounter.bits.end() -j * 8, oneCounter.bits.end() - begin * 8);
+                        vec.push_back(tmp);
                         begin = -1;
                     }
                 }
             }
             if (begin != -1) {
-                izk_counter.bits.insert(izk_counter.bits.begin(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                // izk_counter.bits.insert(izk_counter.bits.begin(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                Integer tmp;
+                tmp.bits.insert(tmp.bits.end(), oneCounter.bits.end() - j * 8, oneCounter.bits.end() - begin * 8);
+                vec.push_back(tmp);
                 begin = -1;
             }
             
         }
+        concat_opt(izk_counter, vec.data(), vec.size());
 
         return izk_counter;
     }
@@ -205,17 +216,17 @@ class AESProver {
         Integer c = computeCounter(iv, iv_len, msg_len);
 
         unsigned char* c_xor_m = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_c_xor_m(c_xor_m);
         for (size_t i = 0; i < msg_len; ++i) {
             c_xor_m[msg_len - 1 - i] = msgs[i] ^ ctxts[i];
         }
 
         unsigned char* expected = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_expected(expected);
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
         bool res = memcmp(expected, c_xor_m, msg_len) == 0;
 
-        delete[] c_xor_m;
-        delete[] expected;
         return res;
     }
 
@@ -233,12 +244,12 @@ class AESProver {
         c ^= msgs;
 
         unsigned char* expected = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_expected(expected);
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
         reverse(expected, expected + msg_len);
         bool res = memcmp(expected, ctxts, msg_len) == 0;
 
-        delete[] expected;
         return res;
     }
 
@@ -253,17 +264,17 @@ class AESProver {
         Integer c = computeCounterOpt(counterInfos, iv, iv_len);
 
         unsigned char* c_xor_m = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_c_xor_m(c_xor_m);
         for (size_t i = 0; i < msg_len; ++i) {
             c_xor_m[msg_len - 1 - i] = msgs[i] ^ ctxts[i];
         }
 
         unsigned char* expected = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_expected(expected);
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
         bool res = memcmp(expected, c_xor_m, msg_len) == 0;
 
-        delete[] c_xor_m;
-        delete[] expected;
         return res;
     }
 
@@ -282,12 +293,12 @@ class AESProver {
         c ^= msgs;
 
         unsigned char* expected = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_expected(expected);
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
         reverse(expected, expected + msg_len);
         bool res = memcmp(expected, ctxts, msg_len) == 0;
 
-        delete[] expected;
         return res;
     }
 };

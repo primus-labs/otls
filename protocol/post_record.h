@@ -16,9 +16,12 @@ class PostRecord {
     AEAD<IO>* aead_c = nullptr;
     AEAD<IO>* aead_s = nullptr;
     AEAD_Proof<IO>* aead_proof_c = nullptr;
+    std::unique_ptr<AEAD_Proof<IO>> p_aead_proof_c;
     AEAD_Proof<IO>* aead_proof_s = nullptr;
+    std::unique_ptr<AEAD_Proof<IO>> p_aead_proof_s;
     Record<IO>* rd = nullptr;
     BIGNUM* pms;
+    UniqueBN p_pms;
     Integer master_key;
     Integer client_write_key;
     Integer server_write_key;
@@ -40,14 +43,10 @@ class PostRecord {
         this->rd = rd;
         this->party = party;
         pms = BN_new();
+        p_pms.reset(pms);
     }
 
     ~PostRecord() {
-        BN_free(pms);
-        if (aead_proof_c != nullptr)
-            delete aead_proof_c;
-        if (aead_proof_s != nullptr)
-            delete aead_proof_s;
     }
 
     inline void reveal_pms(EC_POINT* Ts) {
@@ -55,8 +54,10 @@ class PostRecord {
             send_bn(io, hs->ta_primus);
         } else {
             BIGNUM* t = BN_new();
+            UniqueBN p_t(t);
             recv_bn(io, t);
             EC_POINT* T = EC_POINT_new(hs->group);
+            UniquePoint p_T(T);
             EC_POINT_mul(hs->group, T, t, NULL, NULL, hs->ctx);
             // Check Ta = G^ta
             if (EC_POINT_cmp(hs->group, T, hs->Ta_client, hs->ctx))
@@ -67,8 +68,6 @@ class PostRecord {
             EC_POINT_mul(hs->group, T, NULL, Ts, t, hs->ctx);
             EC_POINT_get_affine_coordinates(hs->group, T, pms, NULL, hs->ctx);
 
-            BN_free(t);
-            EC_POINT_free(T);
         }
     }
 
@@ -98,7 +97,9 @@ class PostRecord {
                                       server_finished_label_length, tau_s, tau_s_len, party);
 
         aead_proof_c = new AEAD_Proof<IO>(aead_c, client_write_key, client_write_iv, party);
+        p_aead_proof_c.reset(aead_proof_c);
         aead_proof_s = new AEAD_Proof<IO>(aead_s, server_write_key, server_write_iv, party);
+        p_aead_proof_s.reset(aead_proof_s);
     }
 
     inline void prove_and_check_handshake_step2(const unsigned char* finc_ctxt,
@@ -181,6 +182,7 @@ class PostRecord {
         reverse_concat(h, dec_z0s.data(), dec_num);
 
         block* blks_h = new block[4 + enc_num + dec_num];
+        std::unique_ptr<block[]> p_blks_h(blks_h);
         h.reveal<block>((block*)blks_h, PUBLIC);
 
         bool res = true;
@@ -195,7 +197,6 @@ class PostRecord {
             res &= compare_tag(dec_tags[i], blks_h[1], blks_h[4 + enc_num + i], dec_ctxts[i],
                                dec_ctxts_len[i], dec_aads[i], aad_len);
 
-        delete[] blks_h;
         return res;
     }
 };

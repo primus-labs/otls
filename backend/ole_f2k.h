@@ -26,8 +26,10 @@ class OLEF2K {
     /* Compute the OLE protocol with inputs in, and put the output to out */
     void compute(block* out, const block* in, int length) {
         block* raw0 = new block[length * 128];
+        std::unique_ptr<block[]> p_raw0(raw0);
         if (!cmpBlock(&ot->Delta, &zero_block, 1)) {
             block* raw1 = new block[length * 128];
+            std::unique_ptr<block[]> p_raw1(raw1);
             ot->send_rot(raw0, raw1, length * 128);
             for (int i = 0; i < length; ++i) {
                 for (int j = 0; j < 128; ++j) {
@@ -36,9 +38,9 @@ class OLEF2K {
                 }
                 inner_prod(out + i, raw0 + i * 128, pack.base, 128);
             }
-            delete[] raw1;
         } else {
             bool* bits = new bool[length * 128];
+            std::unique_ptr<bool[]> p_bits(bits);
             for (int i = 0; i < length; ++i)
                 block_to_bool(bits + i * 128, in[i]);
 
@@ -54,9 +56,7 @@ class OLEF2K {
                 // pack.packing(out + i, raw0 + i * 128);
                 inner_prod(out + i, raw0 + i * 128, pack.base, 128);
             }
-            delete[] bits;
         }
-        delete[] raw0;
     }
 };
 #endif

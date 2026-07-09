@@ -28,21 +28,25 @@ class AEAD {
 
     // xor and zk share of z, for izk to check consistency
     deque<unsigned char*> gc_z;
+    deque<std::shared_ptr<unsigned char[]>> p_gc_z;
     deque<Integer> zk_z;
     deque<uint64_t> z_len;
 
     // opened z values and related length. Only for the case sec_type == false
     deque<unsigned char*> open_z;
+    deque<std::shared_ptr<unsigned char[]>> p_open_z;
     deque<uint64_t> open_len;
 
     // These are the multiplicative shares h^n for h = AES(key,0)
     vector<block> mul_hs;
 
     OLEF2K<IO>* ole = nullptr;
+    std::unique_ptr<OLEF2K<IO>> p_ole;
     // `key` and `iv` are client(server) write key and iv respectively derived from master secret.
     // Note the length of `key` is 16-bytes and the length of `iv` is 4-bytes.
     AEAD(IO* io, IO* io_opt, COT<IO>* ot, Integer& key, Integer& iv) {
         ole = new OLEF2K<IO>(io, ot);
+        p_ole.reset(ole);
         this->io_opt = io_opt;
         this->fixed_iv = iv;
         expanded_key = computeKS(key);
@@ -80,16 +84,6 @@ class AEAD {
         switch_to_gc();
     }
     ~AEAD() {
-        if (ole != nullptr)
-            delete ole;
-        for (size_t i = 0; i < gc_z.size(); i++) {
-            if (gc_z[i] != nullptr)
-                delete[] gc_z[i];
-        }
-        for (size_t i = 0; i < open_z.size(); i++) {
-            if (open_z[i] != nullptr)
-                delete[] open_z[i];
-        }
     }
 
     inline Integer computeH() {
@@ -130,6 +124,7 @@ class AEAD {
         assert(iv_len == 8);
 
         unsigned char* riv = new unsigned char[iv_len];
+        std::unique_ptr<unsigned char[]> p_riv(riv);
         memcpy(riv, iv, iv_len);
         reverse(riv, riv + iv_len);
         Integer variable_iv;
@@ -137,8 +132,6 @@ class AEAD {
             variable_iv = Integer(64, riv, ALICE);
         else
             variable_iv = Integer(64, riv, PUBLIC);
-
-        delete[] riv;
 
         Integer ONE = Integer(32, 1, PUBLIC);
 
@@ -209,6 +202,7 @@ class AEAD {
         Z.bits.erase(Z.bits.begin(), Z.bits.begin() + u);
 
         unsigned char* z = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_z(z);
         if (!sec_type) {
             // message is public
             Z.reveal<unsigned char>((unsigned char*)z, PUBLIC);
@@ -216,6 +210,7 @@ class AEAD {
             // store opened z for consistency check
             open_z.push_back(nullptr);
             open_z.back() = new unsigned char[msg_len];
+            p_open_z.push_back(std::shared_ptr<unsigned char[]>(open_z.back()));
             memcpy(open_z.back(), z, msg_len);
 
             // store the length of z for consistency check.
@@ -231,6 +226,7 @@ class AEAD {
             // store xor share of z
             gc_z.push_back(nullptr);
             gc_z.back() = new unsigned char[msg_len];
+            p_gc_z.push_back(std::shared_ptr<unsigned char[]>(gc_z.back()));
             memcpy(gc_z.back(), z, msg_len);
             reverse(gc_z.back(), gc_z.back() + msg_len);
             z_len.push_back(msg_len);
@@ -259,13 +255,13 @@ class AEAD {
                 io->send_data(ctxt, msg_len);
             }
         }
-        delete[] z;
 
         // Now compute the tag.
         size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
         size_t len = u / 8 + msg_len + v / 8 + aad_len + 16;
 
         unsigned char* x = new unsigned char[len];
+        std::unique_ptr<unsigned char[]> p_x(x);
 
         unsigned char ilen[8], mlen[8];
         for (int i = 0; i < 8; i++) {
@@ -307,7 +303,6 @@ class AEAD {
 
         memcpy(tag, (unsigned char*)&out, 16);
         reverse(tag, tag + 16);
-        delete[] x;
     }
 
     // AEAD decryption, sec_type indicates the input message is open (false) or secret (true).
@@ -351,6 +346,7 @@ class AEAD {
         Z.bits.erase(Z.bits.begin(), Z.bits.begin() + u);
 
         unsigned char* z = new unsigned char[ctxt_len];
+        std::unique_ptr<unsigned char[]> p_z(z);
 
         if (!sec_type) {
             // message is public
@@ -361,6 +357,7 @@ class AEAD {
             // We use the same buffer to store data in encryption and decryption.
             open_z.push_back(nullptr);
             open_z.back() = new unsigned char[ctxt_len];
+            p_open_z.push_back(std::shared_ptr<unsigned char[]>(open_z.back()));
             memcpy(open_z.back(), z, ctxt_len);
 
             // store the length of z for consistency check.
@@ -376,6 +373,7 @@ class AEAD {
             // store xor share of z
             gc_z.push_back(nullptr);
             gc_z.back() = new unsigned char[ctxt_len];
+            p_gc_z.push_back(std::shared_ptr<unsigned char[]>(gc_z.back()));
             memcpy(gc_z.back(), z, ctxt_len);
             reverse(gc_z.back(), gc_z.back() + ctxt_len);
             z_len.push_back(ctxt_len);
@@ -396,13 +394,13 @@ class AEAD {
                     msg[i] = msg[i] ^ z[i] ^ ctxt[i];
             }
         }
-        delete[] z;
 
         // Now compute the tag.
         size_t v = 128 * ((aad_len * 8 + 128 - 1) / 128) - aad_len * 8;
         size_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
 
         unsigned char* x = new unsigned char[len];
+        std::unique_ptr<unsigned char[]> p_x(x);
 
         unsigned char ilen[8], mlen[8];
         for (int i = 0; i < 8; i++) {
@@ -428,7 +426,9 @@ class AEAD {
 
         Commitment c;
         unsigned char* com = new unsigned char[c.output_length];
+        std::unique_ptr<unsigned char[]> p_com(com);
         unsigned char* rnd = new unsigned char[c.rand_length];
+        std::unique_ptr<unsigned char[]> p_rnd(rnd);
 
         if (party == ALICE) {
             // ALICE computes commitment of sigma_a, and sends it to BOB
@@ -460,6 +460,7 @@ class AEAD {
 
             // BOB receive commitment of sigma_a, stores it in coma;
             unsigned char* coma = new unsigned char[c.output_length];
+            std::unique_ptr<unsigned char[]> p_coma(coma);
             io->recv_data(coma, c.output_length);
 
             // BOB sends randomness and sigma_b to ALICE.
@@ -468,29 +469,25 @@ class AEAD {
             io_opt->flush();
             // BOB receives randomness and sigma_a
             unsigned char* rnda = new unsigned char[c.rand_length];
+            std::unique_ptr<unsigned char[]> p_rnda(rnda);
             block outa = zero_block;
             io->recv_block(&outa, 1);
             io->recv_data(rnda, c.rand_length);
 
             memcpy(com, coma, c.output_length);
             memcpy(rnd, rnda, c.rand_length);
-            delete[] coma;
-            delete[] rnda;
 
             if (c.open(com, rnd, (unsigned char*)&outa, sizeof(block)))
                 out = out ^ outa;
             else
                 return false;
         }
-        delete[] com;
-        delete[] rnd;
 
         unsigned char* tagc = (unsigned char*)&out;
         reverse(tagc, tagc + 16);
 
         res = (memcmp(tag, tagc, 16) == 0);
 
-        delete[] x;
         return res;
     }
 };
@@ -507,6 +504,7 @@ inline void compute_tag(unsigned char* tag,
     size_t len = u / 8 + ctxt_len + v / 8 + aad_len + 16;
 
     unsigned char* x = new unsigned char[len];
+    std::unique_ptr<unsigned char[]> p_x(x);
     unsigned char ilen[8], mlen[8];
     for (int i = 0; i < 8; i++) {
         /* must be 64 bits */
@@ -530,7 +528,6 @@ inline void compute_tag(unsigned char* tag,
     unsigned char* tagc = (unsigned char*)&t;
     reverse(tagc, tagc + 16);
     memcpy(tag, tagc, 16);
-    delete[] x;
 }
 
 inline bool compare_tag(const unsigned char* tag,
@@ -541,9 +538,9 @@ inline bool compare_tag(const unsigned char* tag,
                         const unsigned char* aad,
                         uint64_t aad_len) {
     unsigned char* ctag = new unsigned char[16];
+    std::unique_ptr<unsigned char[]> p_ctag(ctag);
     compute_tag(ctag, h, z0, ctxt, ctxt_len, aad, aad_len);
     bool res = (memcmp(tag, ctag, 16) == 0);
-    delete[] ctag;
 
     return res;
 }
@@ -619,9 +616,9 @@ class AEADOffline {
         if (!sec_type) {
             // message is public
             unsigned char* z = new unsigned char[msg_len];
+            std::unique_ptr<unsigned char[]> p_z(z);
             memset(z, 0x00, msg_len);
             Z.reveal<unsigned char>((unsigned char*)z, PUBLIC);
-            delete[] z;
         }
     }
 
@@ -638,9 +635,9 @@ class AEADOffline {
 
         if (!sec_type) {
             unsigned char* z = new unsigned char[ctxt_len];
+            std::unique_ptr<unsigned char[]> p_z(z);
             memset(z, 0x00, ctxt_len);
             Z.reveal<unsigned char>((unsigned char*)z, PUBLIC);
-            delete[] z;
         }
     }
 };

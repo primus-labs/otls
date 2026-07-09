@@ -130,4 +130,48 @@ inline void garble_gate_eval_halfgates(
     *out = W;
 }
 
+class UniqueBN {
+   private:
+    std::unique_ptr<BIGNUM, void(*)(BIGNUM*)> ptr;
+   public:
+    UniqueBN(): ptr(nullptr, BN_free) {}
+    UniqueBN(BIGNUM* p): ptr(p, BN_free) {}
+    void reset(BIGNUM* p) {
+        ptr.reset(p);
+    }
+};
+
+class UniquePoint {
+    private:
+      std::unique_ptr<EC_POINT, void(*)(EC_POINT*)> ptr;
+    public:
+      UniquePoint(): ptr(nullptr, EC_POINT_free) {}
+      UniquePoint(EC_POINT* p): ptr(nullptr, EC_POINT_free) {}
+      void reset(EC_POINT* p) {
+          ptr.reset(p);
+      }
+};
+
+class UniqueGroup {
+    private:
+      std::unique_ptr<EC_GROUP, void(*)(EC_GROUP*)> ptr;
+    public:
+      UniqueGroup(): ptr(nullptr, EC_GROUP_free) {}
+      UniqueGroup(EC_GROUP* p): ptr(p, EC_GROUP_free) {}
+      void reset(EC_GROUP* p) {
+          ptr.reset(p);
+      }
+};
+
+class UniqueCtx {
+    private:
+      std::unique_ptr<BN_CTX, void(*)(BN_CTX*)> ptr;
+    public:
+      UniqueCtx(): ptr(nullptr, BN_CTX_free) {}
+      UniqueCtx(BN_CTX* p): ptr(nullptr, BN_CTX_free) {}
+      void reset(BN_CTX* p) {
+          ptr.reset(p);
+      }
+};
+
 #endif // PRIMUS_BN_UTILS_H__

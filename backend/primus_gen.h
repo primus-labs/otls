@@ -41,6 +41,7 @@ class PrimusGen : public PrimusParty<IO> {
                 this->ot->send_cot(label, length);
             } else {
                 bool* tmp = new bool[length];
+                std::unique_ptr<bool[]> p_tmp(tmp);
                 if (length > this->batch_size - this->top) {
                     memcpy(label, this->buf + this->top,
                            (this->batch_size - this->top) * sizeof(block));
@@ -57,7 +58,6 @@ class PrimusGen : public PrimusParty<IO> {
                 for (int i = 0; i < length; ++i)
                     if (tmp[i])
                         label[i] = label[i] ^ gc->delta;
-                delete[] tmp;
             }
         }
     }

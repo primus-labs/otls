@@ -22,6 +22,7 @@ class OnlinePrimusGen : public PrimusParty<IO> {
 
     void feed(block* label, int party, const bool* b, int length) {
         block* label2 = new block[length];
+        std::unique_ptr<block[]> p_label2(label2);
         prg.random_block(label, length);
         for (int i = 0; i < length; ++i)
             label2[i] = label[i] ^ gc->delta;
@@ -36,7 +37,6 @@ class OnlinePrimusGen : public PrimusParty<IO> {
         } else {
             this->ot->send(label, label2, length);
         }
-        delete[] label2;
     }
 
     //reveal with check
