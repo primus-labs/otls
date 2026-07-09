@@ -28,13 +28,13 @@ class AEAD {
 
     // xor and zk share of z, for izk to check consistency
     deque<unsigned char*> gc_z;
-    deque<std::shared_ptr<unsigned char[]>> p_gc_z;
+    deque<UniqueBytes> p_gc_z;
     deque<Integer> zk_z;
     deque<uint64_t> z_len;
 
     // opened z values and related length. Only for the case sec_type == false
     deque<unsigned char*> open_z;
-    deque<std::shared_ptr<unsigned char[]>> p_open_z;
+    deque<UniqueBytes> p_open_z;
     deque<uint64_t> open_len;
 
     // These are the multiplicative shares h^n for h = AES(key,0)
@@ -210,7 +210,7 @@ class AEAD {
             // store opened z for consistency check
             open_z.push_back(nullptr);
             open_z.back() = new unsigned char[msg_len];
-            p_open_z.push_back(std::shared_ptr<unsigned char[]>(open_z.back()));
+            p_open_z.push_back(UniqueBytes(open_z.back()));
             memcpy(open_z.back(), z, msg_len);
 
             // store the length of z for consistency check.
@@ -226,7 +226,7 @@ class AEAD {
             // store xor share of z
             gc_z.push_back(nullptr);
             gc_z.back() = new unsigned char[msg_len];
-            p_gc_z.push_back(std::shared_ptr<unsigned char[]>(gc_z.back()));
+            p_gc_z.push_back(UniqueBytes(gc_z.back()));
             memcpy(gc_z.back(), z, msg_len);
             reverse(gc_z.back(), gc_z.back() + msg_len);
             z_len.push_back(msg_len);
@@ -357,7 +357,7 @@ class AEAD {
             // We use the same buffer to store data in encryption and decryption.
             open_z.push_back(nullptr);
             open_z.back() = new unsigned char[ctxt_len];
-            p_open_z.push_back(std::shared_ptr<unsigned char[]>(open_z.back()));
+            p_open_z.push_back(UniqueBytes(open_z.back()));
             memcpy(open_z.back(), z, ctxt_len);
 
             // store the length of z for consistency check.
@@ -373,7 +373,7 @@ class AEAD {
             // store xor share of z
             gc_z.push_back(nullptr);
             gc_z.back() = new unsigned char[ctxt_len];
-            p_gc_z.push_back(std::shared_ptr<unsigned char[]>(gc_z.back()));
+            p_gc_z.push_back(UniqueBytes(gc_z.back()));
             memcpy(gc_z.back(), z, ctxt_len);
             reverse(gc_z.back(), gc_z.back() + ctxt_len);
             z_len.push_back(ctxt_len);

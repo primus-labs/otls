@@ -174,4 +174,18 @@ class UniqueCtx {
       }
 };
 
+class UniqueBytes {
+    private:
+      std::unique_ptr<unsigned char[]> ptr;
+    public:
+      UniqueBytes(): ptr(nullptr) {}
+      UniqueBytes(unsigned char* p): ptr(p) {}
+      UniqueBytes(UniqueBytes&& p) {
+          ptr.reset(p.release());
+      }
+      unsigned char* release() {
+          return ptr.release();
+      }
+};
+
 #endif // PRIMUS_BN_UTILS_H__
