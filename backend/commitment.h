@@ -31,10 +31,10 @@ class Commitment {
         hash.put(rnd, rand_length);
 
         unsigned char* comm = new unsigned char[output_length];
+        std::unique_ptr<unsigned char[]> p_comm(comm);
         hash.digest(comm);
 
         bool res = (memcmp(com, comm, output_length) == 0);
-        delete[] comm;
         return res;
     }
 };

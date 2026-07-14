@@ -11,18 +11,13 @@ class PRF {
    public:
     PRF() {};
     ~PRF() {
-        for (size_t i = 0; i < pub_M.size(); i++) {
-            if (pub_M[i] != nullptr) {
-                delete[] pub_M[i];
-            }
-        }
-        pub_M.clear();
     };
     size_t hmac_calls_num = 0;
 
     // should check consistency of zk_sec_M and pub_M;
     vector<Integer> zk_sec_M;
     vector<uint32_t*> pub_M;
+    vector<std::shared_ptr<uint32_t>> p_pub_M;
     size_t zk_pos = 0;
 
     inline void init(HMAC_SHA256& hmac, const Integer secret) {
@@ -37,7 +32,9 @@ class PRF {
                       const Integer seed) {
         size_t blks = bitlen / (hmac.DIGLEN * hmac.WORDLEN) + 1;
         Integer* A = new Integer[blks + 1];
+        std::unique_ptr<Integer[]> p_A(A);
         Integer* tmp = new Integer[hmac.DIGLEN];
+        std::unique_ptr<Integer[]> p_tmp(tmp);
 
         A[0] = seed;
         for (size_t i = 1; i < blks + 1; i++) {
@@ -57,8 +54,6 @@ class PRF {
         res.bits.erase(res.bits.begin(),
                        res.bits.begin() + blks * (hmac.DIGLEN * hmac.WORDLEN) - bitlen);
 
-        delete[] A;
-        delete[] tmp;
     }
 
     inline void opt_phash(HMAC_SHA256& hmac,
@@ -72,21 +67,28 @@ class PRF {
                           bool zk_flag = false) {
         size_t blks = bitlen / (hmac.DIGLEN * hmac.WORDLEN) + 1;
         vector<unsigned char*> A;
+        vector<std::shared_ptr<unsigned char>> p_A;
         vector<size_t> hashlen;
         A.resize(blks + 1);
+        p_A.resize(blks + 1);
         A[0] = new unsigned char[seedlen];
+        p_A[0].reset(A[0]);
         memcpy(A[0], seed, seedlen);
         hashlen.push_back(seedlen);
 
         Integer* tmp = new Integer[hmac.DIGLEN];
+        std::unique_ptr<Integer[]> p_tmp(tmp);
         uint32_t* tmpd = new uint32_t[hmac.DIGLEN];
+        std::unique_ptr<uint32_t[]> p_tmpd(tmpd);
 
         unsigned char* As = new unsigned char[32 + seedlen];
+        std::unique_ptr<unsigned char[]> p_As(As);
         for (size_t i = 1; i < blks + 1; i++) {
             hmac.opt_hmac_sha256(tmp, A[i - 1], hashlen[i - 1], reuse_in_hash_flag,
                                  reuse_out_hash_flag, zk_flag);
             hmac_calls_num++;
             A[i] = new unsigned char[32];
+            p_A[i].reset(A[i]);
 
             Integer tmpInt;
             reverse_concat(tmpInt, tmp, hmac.DIGLEN);
@@ -97,6 +99,7 @@ class PRF {
 
                 pub_M.push_back(nullptr);
                 pub_M.back() = new uint32_t[hmac.DIGLEN];
+                p_pub_M.push_back(std::shared_ptr<uint32_t>(pub_M.back()));
                 memcpy(pub_M.back(), tmpd, hmac.DIGLEN * sizeof(uint32_t));
             } else {
                 // in the zk setting, store the zk shares of M. Reuse the stored public M value.
@@ -123,13 +126,7 @@ class PRF {
         res.bits.erase(res.bits.begin(),
                        res.bits.begin() + blks * (hmac.DIGLEN * hmac.WORDLEN) - bitlen);
 
-        for (size_t i = 0; i < blks + 1; i++) {
-            delete[] A[i];
-        }
 
-        delete[] As;
-        delete[] tmp;
-        delete[] tmpd;
     }
 
     inline void opt_rounds_phash(HMAC_SHA256& hmac,
@@ -143,8 +140,11 @@ class PRF {
                                  bool zk_flag = false) {
         size_t blks = bitlen / (hmac.DIGLEN * hmac.WORDLEN) + 1;
         Integer* A = new Integer[blks + 1];
+        std::unique_ptr<Integer[]> p_A(A);
         Integer* tmp = new Integer[hmac.DIGLEN];
+        std::unique_ptr<Integer[]> p_tmp(tmp);
         unsigned char* rseed = new unsigned char[seedlen];
+        std::unique_ptr<unsigned char[]> p_rseed(rseed);
         memcpy(rseed, seed, seedlen);
         reverse(rseed, rseed + seedlen);
         A[0] = Integer(8 * seedlen, rseed, ALICE);
@@ -167,9 +167,6 @@ class PRF {
         res.bits.erase(res.bits.begin(),
                        res.bits.begin() + blks * (hmac.DIGLEN * hmac.WORDLEN) - bitlen);
 
-        delete[] A;
-        delete[] tmp;
-        delete[] rseed;
     }
 
     inline void compute(HMAC_SHA256& hmac,
@@ -196,12 +193,12 @@ class PRF {
                             bool reuse_out_hash_flag = false,
                             bool zk_flag = false) {
         unsigned char* label_seed = new unsigned char[labellen + seedlen];
+        std::unique_ptr<unsigned char[]> p_label_seed(label_seed);
         memcpy(label_seed, label, labellen);
         memcpy(label_seed + labellen, seed, seedlen);
         opt_phash(hmac, res, bitlen, secret, label_seed, labellen + seedlen,
                   reuse_in_hash_flag, reuse_out_hash_flag, zk_flag);
 
-        delete[] label_seed;
     }
 
     inline void opt_rounds_compute(HMAC_SHA256& hmac,
@@ -216,6 +213,7 @@ class PRF {
                                    bool reuse_out_hash_flag = false,
                                    bool zk_flag = false) {
         unsigned char* label_seed = new unsigned char[labellen + seedlen];
+        std::unique_ptr<unsigned char[]> p_label_seed(label_seed);
         memcpy(label_seed, label, labellen);
         memcpy(label_seed + labellen, seed, seedlen);
         opt_rounds_phash(hmac, res, bitlen, secret, label_seed, labellen + seedlen,
@@ -253,7 +251,9 @@ class PRFOffline {
         size_t blks = bitlen / (hmac.DIGLEN * hmac.WORDLEN) + 1;
 
         Integer* tmp = new Integer[hmac.DIGLEN];
+        std::unique_ptr<Integer[]> p_tmp(tmp);
         uint32_t* tmpd = new uint32_t[hmac.DIGLEN];
+        std::unique_ptr<uint32_t[]> p_tmpd(tmpd);
 
         for (size_t i = 1; i < blks + 1; i++) {
             hmac.opt_hmac_sha256(tmp, reuse_in_hash_flag, reuse_out_hash_flag);
@@ -271,8 +271,6 @@ class PRFOffline {
         res.bits.erase(res.bits.begin(),
                        res.bits.begin() + blks * (hmac.DIGLEN * hmac.WORDLEN) - bitlen);
 
-        delete[] tmp;
-        delete[] tmpd;
     }
 
     inline void opt_rounds_phash(HMAC_SHA256_Offline& hmac,
@@ -284,9 +282,11 @@ class PRFOffline {
                                  bool reuse_out_hash_flag = false) {
         size_t blks = bitlen / (hmac.DIGLEN * hmac.WORDLEN) + 1;
         Integer* A = new Integer[blks + 1];
+        std::unique_ptr<Integer[]> p_A(A);
         A[0] = Integer(8 * seedlen, 0, ALICE);
 
         Integer* tmp = new Integer[hmac.DIGLEN];
+        std::unique_ptr<Integer[]> p_tmp(tmp);
 
         for (size_t i = 1; i < blks + 1; i++) {
             hmac.opt_rounds_hmac_sha256(tmp, A[i - 1], reuse_in_hash_flag,
@@ -306,8 +306,6 @@ class PRFOffline {
         res.bits.erase(res.bits.begin(),
                        res.bits.begin() + blks * (hmac.DIGLEN * hmac.WORDLEN) - bitlen);
 
-        delete[] A;
-        delete[] tmp;
     }
 
     inline void opt_compute(HMAC_SHA256_Offline& hmac,

@@ -18,7 +18,9 @@ class VOPE {
     void compute_recv(block* out, int length) {
         int oles = length * 2 - 1;
         block* M = new block[oles * 128];
+        std::unique_ptr<block[]> p_M(M);
         bool* bits = new bool[oles * 128];
+        std::unique_ptr<bool[]> p_bits(bits);
         PRG prg;
         prg.random_bool(bits, oles * 128);
         ot->recv_cot(M, bits, oles * 128);
@@ -52,12 +54,11 @@ class VOPE {
             out[0] ^= M[length + i - 1];
             out[1] ^= U[length + i - 1];
         }
-        delete[] M;
-        delete[] bits;
     }
     void compute_send(block* out, block h, int length) {
         int oles = length * 2 - 1;
         block* K = new block[oles * 128];
+        std::unique_ptr<block[]> p_K(K);
         ot->send_cot(K, oles * 128);
         block diff = h ^ ot->Delta;
         io->send_data(&diff, sizeof(block));
@@ -70,7 +71,6 @@ class VOPE {
             pack.packing(&tmp, K + (i + length - 1) * 128);
             *out = *out ^ tmp;
         }
-        delete[] K;
     }
 };
 

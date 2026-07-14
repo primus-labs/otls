@@ -35,12 +35,12 @@ inline void itmac_hom_add_check(
     if (party == BOB) {
         block delta = ((ZKVerifier<IO>*)(ProtocolExecution::prot_exec))->ostriple->delta;
         bool* data = new bool[len * 8];
+        std::unique_ptr<bool[]> p_data(data);
         to_bool(data, share, len * 8);
         for (size_t i = 0; i < len * 8; i++) {
             if (data[i])
                 pre_res[i].bit = pre_res[i].bit ^ delta;
         }
-        delete[] data;
     }
 
     check_zero<IO>(res ^ pre_res, party);
@@ -105,10 +105,10 @@ class AEAD_Proof {
         assert(iv_len == 8);
 
         unsigned char* riv = new unsigned char[iv_len];
+        std::unique_ptr<unsigned char[]> p_riv(riv);
         memcpy(riv, iv, iv_len);
         reverse(riv, riv + iv_len);
         Integer variable_iv(64, riv, PUBLIC);
-        delete[] riv;
 
         Integer ONE = Integer(32, 1, PUBLIC);
 
@@ -155,7 +155,7 @@ class AEAD_Proof {
 
             //remove the front elements in deque.
             aead->open_len.pop_front();
-            delete[] aead->open_z.front();
+            aead->p_open_z.pop_front();
             aead->open_z.pop_front();
         } else {
             assert(aead->gc_z0.size() != 0 && aead->zk_z0.size() != 0);
@@ -172,14 +172,14 @@ class AEAD_Proof {
             // remove the front elements in deque
             aead->z_len.pop_front();
             aead->zk_z.pop_front();
-            delete[] aead->gc_z.front();
+            aead->p_gc_z.pop_front();
             aead->gc_z.pop_front();
 
             unsigned char* rctxt = new unsigned char[ctxt_len];
+            std::unique_ptr<unsigned char[]> p_rctxt(rctxt);
             memcpy(rctxt, ctxt, ctxt_len);
             reverse(rctxt, rctxt + ctxt_len);
             msg = Z ^ (Integer(ctxt_len * 8, rctxt, PUBLIC));
-            delete[] rctxt;
         }
     }
 
@@ -208,10 +208,10 @@ class AEAD_Proof {
         Z.bits.erase(Z.bits.begin(), Z.bits.begin() + u);
 
         unsigned char* rctxt = new unsigned char[ctxt_len];
+        std::unique_ptr<unsigned char[]> p_rctxt(rctxt);
         memcpy(rctxt, ctxt, ctxt_len);
         reverse(rctxt, rctxt + ctxt_len);
         msg = Z ^ (Integer(ctxt_len * 8, rctxt, PUBLIC));
-        delete[] rctxt;
     }
 };
 

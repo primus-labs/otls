@@ -36,6 +36,7 @@ class PrimusEva : public PrimusParty<IO> {
                 this->ot->recv_cot(label, b, length);
             } else {
                 bool* tmp = new bool[length];
+                std::unique_ptr<bool[]> p_tmp(tmp);
                 if (length > this->batch_size - this->top) {
                     memcpy(label, this->buf + this->top,
                            (this->batch_size - this->top) * sizeof(block));
@@ -55,7 +56,6 @@ class PrimusEva : public PrimusParty<IO> {
                     tmp[i] = (tmp[i] != b[i]);
                 this->io->send_data(tmp, length);
 
-                delete[] tmp;
             }
         }
     }

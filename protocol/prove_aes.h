@@ -128,11 +128,10 @@ class AESProver {
         assert(iv_len == 8);
 
         unsigned char* riv = new unsigned char[iv_len];
+        std::unique_ptr<unsigned char[]> p_riv(riv);
         memcpy(riv, iv, iv_len);
         reverse(riv, riv + iv_len);
         Integer variable_iv(64, riv, PUBLIC);
-
-        delete[] riv;
 
         Integer ONE = Integer(32, 1, PUBLIC);
 
@@ -217,17 +216,17 @@ class AESProver {
         Integer c = computeCounter(iv, iv_len, msg_len);
 
         unsigned char* c_xor_m = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_c_xor_m(c_xor_m);
         for (size_t i = 0; i < msg_len; ++i) {
             c_xor_m[msg_len - 1 - i] = msgs[i] ^ ctxts[i];
         }
 
         unsigned char* expected = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_expected(expected);
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
         bool res = memcmp(expected, c_xor_m, msg_len) == 0;
 
-        delete[] c_xor_m;
-        delete[] expected;
         return res;
     }
 
@@ -245,12 +244,12 @@ class AESProver {
         c ^= msgs;
 
         unsigned char* expected = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_expected(expected);
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
         reverse(expected, expected + msg_len);
         bool res = memcmp(expected, ctxts, msg_len) == 0;
 
-        delete[] expected;
         return res;
     }
 
@@ -265,17 +264,17 @@ class AESProver {
         Integer c = computeCounterOpt(counterInfos, iv, iv_len);
 
         unsigned char* c_xor_m = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_c_xor_m(c_xor_m);
         for (size_t i = 0; i < msg_len; ++i) {
             c_xor_m[msg_len - 1 - i] = msgs[i] ^ ctxts[i];
         }
 
         unsigned char* expected = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_expected(expected);
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
         bool res = memcmp(expected, c_xor_m, msg_len) == 0;
 
-        delete[] c_xor_m;
-        delete[] expected;
         return res;
     }
 
@@ -294,12 +293,12 @@ class AESProver {
         c ^= msgs;
 
         unsigned char* expected = new unsigned char[msg_len];
+        std::unique_ptr<unsigned char[]> p_expected(expected);
 
         c.reveal<unsigned char>((unsigned char*)expected, PUBLIC);
         reverse(expected, expected + msg_len);
         bool res = memcmp(expected, ctxts, msg_len) == 0;
 
-        delete[] expected;
         return res;
     }
 };

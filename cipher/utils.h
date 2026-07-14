@@ -49,11 +49,11 @@ inline Integer str_to_int(string str, int party) {
     std::reverse(str.begin(), str.end());
 
     uint8_t* tmp = new uint8_t[str.length()];
+    std::unique_ptr<uint8_t[]> p_tmp(tmp);
     for (uint64_t i = 0; i < str.length(); i++) {
         tmp[i] = (int)str[i];
     }
     Integer res(mlen, tmp, party); // note that this line could increase roundtrip
-    delete[] tmp;
     return res;
 }
 
@@ -61,6 +61,7 @@ inline string int_to_hex(vector<uint32_t> vint) {
     string str;
     uint tmp_int;
     char* buffer = new char[3];
+    std::unique_ptr<char[]> p_buffer(buffer);
 
     for (uint64_t i = 0; i < vint.size(); i++) {
         for (int j = 3; j >= 0; j--) {
@@ -69,7 +70,6 @@ inline string int_to_hex(vector<uint32_t> vint) {
             str += buffer;
         }
     }
-    delete[] buffer;
 
     return str;
 }
@@ -78,6 +78,7 @@ inline string int_to_hex(vector<uint64_t> vint) {
     string str;
     uint tmp_int;
     char* buffer = new char[3];
+    std::unique_ptr<char[]> p_buffer(buffer);
 
     for (uint64_t i = 0; i < vint.size(); i++) {
         for (int j = 7; j >= 0; j--) {
@@ -86,7 +87,6 @@ inline string int_to_hex(vector<uint64_t> vint) {
             str += buffer;
         }
     }
-    delete[] buffer;
 
     return str;
 }
@@ -305,6 +305,7 @@ inline void integer_to_chars(unsigned char* out, Integer& in) {
 
 inline void block_to_hex(unsigned char* out, const block* in, size_t len) {
     block* ins = new block[len];
+    std::unique_ptr<block[]> p_ins(ins);
     memcpy(ins, in, len * 16);
 
     reverse(ins, ins + len);
@@ -312,13 +313,13 @@ inline void block_to_hex(unsigned char* out, const block* in, size_t len) {
     reverse(outs, outs + len * 16);
 
     memcpy(out, outs, len * 16);
-    delete[] ins;
 }
 
 inline void hex_to_block(block* out, const unsigned char* in, size_t len) {
     if (len % 16 != 0)
         error("the length of the bytes is incorrect!\n");
     unsigned char* ins = new unsigned char[len];
+    std::unique_ptr<unsigned char[]> p_ins(ins);
     memcpy(ins, in, len);
 
     reverse(ins, ins + len);
@@ -326,7 +327,6 @@ inline void hex_to_block(block* out, const unsigned char* in, size_t len) {
     reverse(outs, outs + len / 16);
 
     memcpy(out, outs, len);
-    delete[] ins;
 }
 
 inline void extract_integer(Integer& dst, const Integer& src, size_t offset, size_t size) {

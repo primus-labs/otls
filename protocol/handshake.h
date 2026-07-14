@@ -43,17 +43,25 @@ class HandShake {
     HMAC_SHA256 hmac;
     PRF prf;
     E2F<IO>* e2f = nullptr;
+    std::unique_ptr<E2F<IO>> p_e2f;
     EC_GROUP* group = nullptr;
     BIGNUM* q;
+    UniqueBN p_q;
     BN_CTX* ctx;
+    UniqueCtx p_ctx;
 
     BIGNUM* ta_primus;
+    UniqueBN p_ta_primus;
     BIGNUM* tb_client;
+    UniqueBN p_tb_client;
     EC_POINT* Ta_client;
+    UniquePoint p_Ta_client;
     EC_POINT* Ts;
+    UniquePoint p_Ts;
 
     Integer zk_pms;
     BIGNUM* bn_pms;
+    UniqueBN p_bn_pms;
 
     Integer master_key;
     Integer client_write_key;
@@ -68,28 +76,26 @@ class HandShake {
         : io(io) {
         this->io_opt = io_opt;
         ctx = BN_CTX_new();
+        p_ctx.reset(ctx);
         this->group = group;
         q = BN_new();
+        p_q.reset(q);
         bn_pms = BN_new();
+        p_bn_pms.reset(bn_pms);
         ta_primus = BN_new();
+        p_ta_primus.reset(ta_primus);
         tb_client = BN_new();
+        p_tb_client.reset(tb_client);
         Ta_client = EC_POINT_new(this->group);
+        p_Ta_client.reset(Ta_client);
         Ts = EC_POINT_new(this->group);
+        p_Ts.reset(Ts);
         EC_GROUP_get_curve(group, q, NULL, NULL, ctx);
         e2f = new E2F<IO>(io, io_opt, ot, q, BN_num_bits(q));
+        p_e2f.reset(e2f);
         this->ENABLE_ROUNDS_OPT = ENABLE_ROUNDS_OPT;
     }
     ~HandShake() {
-        BN_CTX_free(ctx);
-        BN_free(q);
-        BN_free(bn_pms);
-        BN_free(ta_primus);
-        BN_free(tb_client);
-        EC_POINT_free(Ta_client);
-        EC_POINT_free(Ts);
-        if (e2f != nullptr) {
-            delete e2f;
-        }
     }
 
     // The Ts value is received from the Server.
@@ -101,6 +107,7 @@ class HandShake {
         BN_rand_range(t, EC_GROUP_get0_order(group));
 
         EC_POINT* Ta = EC_POINT_new(group);
+        UniquePoint p_Ta(Ta);
         if (!EC_POINT_mul(group, Ta, t, NULL, NULL, ctx))
             error("error in computing TA!\n");
 
@@ -113,7 +120,6 @@ class HandShake {
         if (!EC_POINT_mul(group, Va, NULL, Ts, t, ctx))
             error("error in computing VA!\n");
 
-        EC_POINT_free(Ta);
     }
 
     // The Ts value is received from the Server.
@@ -121,6 +127,7 @@ class HandShake {
     inline void compute_client_VB(EC_POINT* Tc, EC_POINT* Vb, const EC_POINT* Ts) {
         BN_rand_range(tb_client, EC_GROUP_get0_order(group));
         EC_POINT* Tb = EC_POINT_new(group);
+        UniquePoint p_Tb(Tb);
         if (!EC_POINT_mul(group, Tb, tb_client, NULL, NULL, ctx))
             error("error in computing TB!\n");
 
@@ -135,17 +142,18 @@ class HandShake {
             error("error in computing VB!\n");
         EC_POINT_add(group, Tc, Ta_client, Tb, ctx);
 
-        EC_POINT_free(Tb);
     }
 
     inline void compute_client_VB(EC_POINT* Tc, EC_POINT* Vb, BIGNUM* t, const EC_POINT* Ts) {
         BN_rand_range(t, EC_GROUP_get0_order(group));
 
         EC_POINT* Tb = EC_POINT_new(group);
+        UniquePoint p_Tb(Tb);
         if (!EC_POINT_mul(group, Tb, t, NULL, NULL, ctx))
             error("error in computing TB!\n");
 
         EC_POINT* Ta = EC_POINT_new(group);
+        UniquePoint p_Ta(Ta);
 
         // size is 65 for secp256r1, should make it more general.
         unsigned char buf[65];
@@ -158,15 +166,15 @@ class HandShake {
             error("error in computing VB!\n");
         EC_POINT_add(group, Tc, Ta, Tb, ctx);
 
-        EC_POINT_free(Tb);
-        EC_POINT_free(Ta);
     }
 
     inline void compute_pms_offline(int party) { e2f->compute_offline(party); }
 
     inline void compute_pms_online(BIGNUM* pms, const EC_POINT* V, int party) {
         BIGNUM* x = BN_new();
+        UniqueBN p_x(x);
         BIGNUM* y = BN_new();
+        UniqueBN p_y(y);
 
         EC_POINT_get_affine_coordinates(group, V, x, y, ctx);
         e2f->compute_online(pms, x, y, party);
@@ -174,8 +182,6 @@ class HandShake {
         // store arithmetic shares of pms;
         BN_copy(bn_pms, pms);
 
-        BN_free(x);
-        BN_free(y);
     }
 
     inline void compute_master_key(const BIGNUM* pms,
@@ -186,6 +192,7 @@ class HandShake {
         size_t len = BN_num_bytes(q);
         size_t pms_len = BN_num_bytes(pms);
         unsigned char* buf = new unsigned char[len];
+        std::unique_ptr<unsigned char[]> p_buf(buf);
         memset(buf, 0, len);
         BN_bn2bin(pms, buf + (len - pms_len));
         reverse(buf, buf + len);
@@ -205,6 +212,7 @@ class HandShake {
 
         size_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
+        std::unique_ptr<unsigned char[]> p_seed(seed);
         memcpy(seed, rc, rc_len);
         memcpy(seed + rc_len, rs, rs_len);
 
@@ -218,8 +226,6 @@ class HandShake {
                                    true, true);
         }
 
-        delete[] seed;
-        delete[] buf;
     }
 
     // This extends the master key generation, chose one of them when integrating TLS.
@@ -229,6 +235,7 @@ class HandShake {
         size_t len = BN_num_bytes(q);
         size_t pms_len = BN_num_bytes(pms);
         unsigned char* buf = new unsigned char[len];
+        std::unique_ptr<unsigned char[]> p_buf(buf);
         memset(buf, 0, len);
         BN_bn2bin(pms, buf + (len - pms_len));
         reverse(buf, buf + len);
@@ -256,7 +263,6 @@ class HandShake {
                                    extended_master_key_label, extended_master_key_label_length,
                                    session_hash, hash_len, true, true);
         }
-        delete[] buf;
     }
 
     inline void compute_expansion_keys(const unsigned char* rc,
@@ -265,6 +271,7 @@ class HandShake {
                                        size_t rs_len) {
         size_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
+        std::unique_ptr<unsigned char[]> p_seed(seed);
         memcpy(seed, rs, rs_len);
         memcpy(seed + rs_len, rc, rc_len);
 
@@ -286,7 +293,6 @@ class HandShake {
         extract_integer(client_write_iv, key, key_length * 8 * 2, iv_length * 8);
         extract_integer(server_write_iv, key, key_length * 8 * 2 + iv_length * 8,
                         iv_length * 8);
-        delete[] seed;
     }
 
     inline void compute_client_finished_msg(const unsigned char* label,
@@ -355,11 +361,11 @@ class HandShake {
                                                       size_t iv_len,
                                                       int party) {
         unsigned char* msg = new unsigned char[finished_msg_length];
+        std::unique_ptr<unsigned char[]> p_msg(msg);
         bool res1 = aead_s->decrypt(io, msg, ctxt, finished_msg_length, tag, aad, aad_len, iv,
                                     iv_len, party);
 
         bool res2 = (memcmp(msg, server_ufin, finished_msg_length) == 0);
-        delete[] msg;
         return res1 & res2;
     }
 
@@ -373,6 +379,7 @@ class HandShake {
                                  int party) {
         size_t len = BN_num_bytes(q);
         unsigned char* buf = new unsigned char[len];
+        std::unique_ptr<unsigned char[]> p_buf(buf);
         memset(buf, 0, len);
 
         if (party == ALICE)
@@ -388,6 +395,7 @@ class HandShake {
 
         size_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
+        std::unique_ptr<unsigned char[]> p_seed(seed);
         memcpy(seed, rc, rc_len);
         memcpy(seed + rc_len, rs, rs_len);
 
@@ -400,8 +408,6 @@ class HandShake {
                                    master_key_label_length, seed, seed_len, true, true, true);
         }
 
-        delete[] seed;
-        delete[] buf;
     }
 
     // ALICE knows pms, which is the entire value, not a share.
@@ -412,6 +418,7 @@ class HandShake {
                                           int party) {
         size_t len = BN_num_bytes(q);
         unsigned char* buf = new unsigned char[len];
+        std::unique_ptr<unsigned char[]> p_buf(buf);
         memset(buf, 0, len);
 
         if (party == ALICE)
@@ -436,7 +443,6 @@ class HandShake {
                                    session_hash, hash_len, true, true, true);
         }
 
-        delete[] buf;
     }
 
     inline void prove_expansion_keys(Integer& key_c,
@@ -451,6 +457,7 @@ class HandShake {
                                      int party) {
         size_t seed_len = rc_len + rs_len;
         unsigned char* seed = new unsigned char[seed_len];
+        std::unique_ptr<unsigned char[]> p_seed(seed);
         memcpy(seed, rs, rs_len);
         memcpy(seed + rs_len, rc, rc_len);
 
@@ -471,7 +478,6 @@ class HandShake {
         extract_integer(iv_c, key, key_length * 8 * 2, iv_length * 8);
         extract_integer(iv_s, key, key_length * 8 * 2 + iv_length * 8, iv_length * 8);
 
-        delete[] seed;
     }
 
     inline void prove_client_finished_msg(const Integer& ms,
@@ -530,7 +536,9 @@ class HandShakeOffline {
     HMAC_SHA256_Offline hmac;
     PRFOffline prf;
     BIGNUM* q;
+    UniqueBN p_q;
     BN_CTX* ctx;
+    UniqueCtx p_ctx;
 
     Integer master_key;
     Integer client_write_key;
@@ -544,18 +552,19 @@ class HandShakeOffline {
     bool ENABLE_ROUNDS_OPT = false;
     HandShakeOffline(EC_GROUP* group, bool ENABLE_ROUNDS_OPT = false) {
         q = BN_new();
+        p_q.reset(q);
         ctx = BN_CTX_new();
+        p_ctx.reset(ctx);
         EC_GROUP_get_curve(group, q, NULL, NULL, ctx);
         this->ENABLE_ROUNDS_OPT = ENABLE_ROUNDS_OPT;
     }
     ~HandShakeOffline() {
-        BN_CTX_free(ctx);
-        BN_free(q);
     }
 
     inline void compute_master_key() {
         size_t len = BN_num_bytes(q);
         unsigned char* buf = new unsigned char[len];
+        std::unique_ptr<unsigned char[]> p_buf(buf);
         memset(buf, 0x00, len);
         Integer pmsa, pmsb;
         pmsa = Integer(len * 8, buf, ALICE);
@@ -572,12 +581,12 @@ class HandShakeOffline {
                                    master_key_label_length + 2 * random_length, true, true);
         }
 
-        delete[] buf;
     }
 
     inline void compute_extended_master_key() {
         size_t len = BN_num_bytes(q);
         unsigned char* buf = new unsigned char[len];
+        std::unique_ptr<unsigned char[]> p_buf(buf);
         memset(buf, 0x00, len);
         Integer pmsa, pmsb;
         pmsa = Integer(len * 8, buf, ALICE);
@@ -595,7 +604,6 @@ class HandShakeOffline {
                                    extended_master_key_label_length + session_hash_length,
                                    true, true);
         }
-        delete[] buf;
     }
 
     inline void compute_expansion_keys() {
