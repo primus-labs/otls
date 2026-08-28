@@ -146,7 +146,7 @@ class UniquePoint {
       std::unique_ptr<EC_POINT, void(*)(EC_POINT*)> ptr;
     public:
       UniquePoint(): ptr(nullptr, EC_POINT_free) {}
-      UniquePoint(EC_POINT* p): ptr(nullptr, EC_POINT_free) {}
+      UniquePoint(EC_POINT* p): ptr(p, EC_POINT_free) {}
       void reset(EC_POINT* p) {
           ptr.reset(p);
       }
@@ -168,7 +168,7 @@ class UniqueCtx {
       std::unique_ptr<BN_CTX, void(*)(BN_CTX*)> ptr;
     public:
       UniqueCtx(): ptr(nullptr, BN_CTX_free) {}
-      UniqueCtx(BN_CTX* p): ptr(nullptr, BN_CTX_free) {}
+      UniqueCtx(BN_CTX* p): ptr(p, BN_CTX_free) {}
       void reset(BN_CTX* p) {
           ptr.reset(p);
       }
