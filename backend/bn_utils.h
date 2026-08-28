@@ -20,6 +20,8 @@ inline void H(BIGNUM* out, block b, BIGNUM* q, BN_CTX* ctx, CCRH& ccrh) {
 template <typename IO>
 inline void send_bn(IO* io, BIGNUM* bn, Hash* hash = nullptr) {
     unsigned char arr[1000];
+    if (BN_num_bytes(bn) > (int)sizeof(arr))
+        error("send_bn: big integer does not fit the buffer");
     uint32_t length = BN_bn2bin(bn, arr);
     io->send_data(&length, sizeof(uint32_t));
     io->send_data(arr, length);
@@ -31,8 +33,10 @@ inline void send_bn(IO* io, BIGNUM* bn, Hash* hash = nullptr) {
 template <typename IO>
 inline void recv_bn(IO* io, BIGNUM* bn, Hash* hash = nullptr) {
     unsigned char arr[1000];
-    uint32_t length = -1;
+    uint32_t length = 0;
     io->recv_data(&length, sizeof(uint32_t));
+    if (length > sizeof(arr))
+        error("recv_bn: peer announced a length larger than the buffer");
     io->recv_data(arr, length);
     if (hash != nullptr)
         hash->put(arr, length);
